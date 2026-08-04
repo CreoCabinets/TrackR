@@ -1,0 +1,3004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#17324d" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2317324d'/%3E%3Cpath d='M13 17h25v8h-8v22h-9V25h-8zm29 0h9v30h-9z' fill='white'/%3E%3C/svg%3E" />
+<title>TrackR | Production Planning</title>
+<style>
+:root{
+  --bg:#f8f6f1;
+  --card:#ffffff;
+  --ink:#172033;
+  --muted:#64748b;
+  --line:#e4ddd2;
+  --soft:#fffaf2;
+  --people:190px;
+  --day:160px;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+}
+main{padding:18px 24px 72px;max-width:1700px;margin:0 auto}
+.topbar{
+  height:58px;
+  display:flex;
+  align-items:center;
+  gap:18px;
+  margin:-18px -24px 20px;
+  padding:0 24px;
+  background:#fff;
+  border-bottom:1px solid var(--line);
+  position:sticky;
+  top:0;
+  z-index:100;
+}
+.brand{display:flex;align-items:center;gap:10px;min-width:130px}
+.logo{width:34px;height:34px;border-radius:10px;background:#172033;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:950}
+.brand strong{font-size:22px;letter-spacing:-.05em}
+.nav{display:flex;gap:8px;overflow-x:auto;flex:1}
+.account-tools{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.account-pill{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:999px;padding:7px 10px;background:#fffaf2;font-size:12px;font-weight:900}
+.account-pill span{color:#64748b}.logout-form{margin:0}.logout-button{padding:8px 11px;font-size:12px}.button-link{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:10px;padding:9px 13px;background:#fff;color:var(--ink);font-weight:850;text-decoration:none}.button-link:hover{border-color:#aebdc7;background:#f8fafb}
+.readonly-note{border:1px solid #cbd5e1;background:#f8fafc;color:#475569;border-radius:14px;padding:10px 12px;font-size:12px;font-weight:850;margin-bottom:14px}
+button{
+  border:1px solid var(--line);
+  background:#fff;
+  color:#172033;
+  border-radius:999px;
+  padding:10px 14px;
+  font-weight:900;
+  cursor:pointer;
+  white-space:nowrap;
+}
+button.active, button.primary{background:#172033;color:#fff;border-color:#172033}
+button.danger{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+.view{display:none}
+.view.active{display:block}
+.header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px}
+h1{margin:0 0 6px;font-size:30px;letter-spacing:-.06em}
+h2{margin:0 0 6px;font-size:23px;letter-spacing:-.05em}
+.sub{margin:0;color:var(--muted);font-weight:750}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+.metric{background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px 16px;box-shadow:0 8px 24px rgba(23,32,51,.06)}
+.metric small{display:block;color:#64748b;text-transform:uppercase;letter-spacing:.06em;font-size:11px;font-weight:950;margin-bottom:6px}
+.metric strong{font-size:22px;letter-spacing:-.04em}
+.panel{background:#fff;border:1px solid var(--line);border-radius:24px;box-shadow:0 14px 38px rgba(23,32,51,.07);padding:18px}
+.panel + .panel{margin-top:16px}
+.panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
+.panel-head p{margin:0;color:#64748b;font-weight:750;font-size:13px}
+
+/* Home */
+.capacity-wrap{display:grid;grid-template-columns:280px 1fr;gap:18px;align-items:center}
+.capacity-donut{width:240px;height:240px;border-radius:50%;position:relative;background:conic-gradient(#4a84d8 0deg 80deg,#3f9a63 80deg 245deg,#9d62d3 245deg 300deg,#ebe7df 300deg 360deg)}
+.capacity-donut:after{content:"";position:absolute;inset:36px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px var(--line)}
+.capacity-center{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center}
+.capacity-center strong{font-size:34px;letter-spacing:-.06em}
+.capacity-center span{font-size:13px;color:#64748b;font-weight:850}
+.legend-list{display:grid;gap:10px}
+.legend-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:14px;padding:11px 12px;background:#fffaf2}
+.legend-dot{width:12px;height:12px;border-radius:50%}
+.legend-title{font-weight:950}.legend-sub{font-size:12px;color:#64748b;font-weight:800;margin-top:2px}
+.week-switch{display:flex;gap:8px;flex-wrap:wrap}
+.home-jobs{display:grid;gap:10px}
+.home-job{border:1px solid var(--line);border-radius:16px;background:#fff;overflow:hidden}
+.home-job-head{padding:13px 14px;display:flex;justify-content:space-between;gap:12px;align-items:center;cursor:pointer}
+.home-job-title{font-weight:950}.home-job-sub{margin-top:3px;font-size:12px;color:#64748b;font-weight:800}
+.home-job-detail{display:none;border-top:1px solid var(--line);background:#fffaf2;padding:12px 14px}
+.home-job.open .home-job-detail{display:block}
+.mini-detail{border:1px solid var(--line);border-radius:12px;background:#fff;padding:8px 10px;display:flex;justify-content:space-between;gap:10px;font-size:12px;font-weight:850}
+.mini-detail+.mini-detail{margin-top:7px}
+
+/* Jobs */
+.jobs-table,.employee-table{border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.table-head,.job-row{display:grid;grid-template-columns:1.1fr 1.15fr .65fr .75fr 1fr;align-items:center}
+.table-head,.employee-head{background:#fffaf2;color:#64748b;text-transform:uppercase;letter-spacing:.07em;font-size:11px;font-weight:950;border-bottom:1px solid var(--line)}
+.table-head div,.job-row>div{padding:14px 16px}
+.job-row{min-height:72px;border-bottom:1px solid var(--line);cursor:pointer}
+.job-row:last-child{border-bottom:none}.job-row:hover{background:#fffdfa}
+.job-title{font-weight:950;font-size:15px}.job-sub{font-size:12px;color:#64748b;font-weight:800;margin-top:3px}
+.pill{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:12px;font-weight:950;background:#fff}
+.pill.blue{background:#eaf1ff;border-color:#cadbff;color:#2452b8}.pill.green{background:#eaf8f0;border-color:#c6ecd7;color:#17613b}.pill.grey{background:#f4f1ec;border-color:#ded6c9;color:#5f6673}.pill.yellow{background:#fef3c7;border-color:#f2d894;color:#92400e}.pill.purple{background:#f4e8ff;border-color:#dfc5f5;color:#7b43af}
+
+
+/* Add Job */
+.aj-source-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.aj-source-card{border:1px solid var(--line);border-radius:22px;background:#fff;padding:18px;box-shadow:0 10px 28px rgba(23,32,51,.05);display:grid;gap:12px}
+.aj-source-card.active{box-shadow:inset 0 0 0 2px #172033,0 10px 28px rgba(23,32,51,.08)}
+.aj-source-card.pdf-dragging{border-color:#172033;background:#fffdf8;box-shadow:inset 0 0 0 2px #172033,0 10px 28px rgba(23,32,51,.08)}
+.aj-source-card.aj-manual-option,.aj-source-card.aj-manual-option.active{border:0;box-shadow:none;background:transparent;padding:18px 4px}
+.aj-source-icon{width:42px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;background:#fffaf2;border:1px solid var(--line);font-weight:950;font-size:18px}
+.aj-source-title{font-size:18px;font-weight:950;letter-spacing:-.035em}.aj-source-copy{font-size:13px;color:#64748b;font-weight:750;line-height:1.5}
+.aj-drop-hint{border:1px dashed #cfc5b7;border-radius:14px;background:#fffaf2;padding:12px;text-align:center;color:#64748b;font-size:12px;font-weight:900}
+.aj-source-card.pdf-dragging .aj-drop-hint{border-color:#172033;color:#172033;background:#fff}
+.aj-upload-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.aj-upload-row input{width:100%;border:1px solid var(--line);border-radius:13px;padding:10px;background:#fff;font-weight:800}
+.aj-form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.aj-field{display:grid;gap:6px}.aj-field.wide{grid-column:span 2}.aj-field.full{grid-column:1/-1}
+.aj-field label{font-size:11px;font-weight:950;color:#64748b;text-transform:uppercase;letter-spacing:.06em}.aj-field input,.aj-field select,.aj-field textarea{width:100%;border:1px solid var(--line);border-radius:13px;padding:11px 12px;background:#fff;color:#172033;font:inherit;font-weight:800}.aj-field textarea{min-height:92px;resize:vertical}
+.aj-check{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:13px;padding:11px 12px;background:#fff;font-weight:850;min-height:45px}.aj-check input{width:18px;height:18px;margin:0}
+.aj-labour-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}.aj-labour-card{border:1px solid var(--line);border-radius:16px;background:#fffaf2;padding:12px;display:grid;gap:7px}.aj-labour-card label{font-size:11px;color:#64748b;font-weight:950;text-transform:uppercase;letter-spacing:.05em}.aj-labour-card input{width:100%;border:1px solid var(--line);border-radius:11px;padding:9px 10px;font-weight:900;background:#fff}
+.aj-stage-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.aj-workflow-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.aj-workflow-card{border:1px solid var(--line);border-radius:20px;background:#fff;padding:15px;display:grid;gap:12px;min-width:0}.aj-workflow-card.complete{border-color:#b9e5ca}.aj-workflow-card.warning{border-color:#f0c76a}.aj-workflow-card.over{border-color:#f3a5a5}.aj-workflow-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.aj-workflow-title{font-size:16px;font-weight:950;letter-spacing:-.025em}.aj-workflow-meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:5px}.aj-workflow-meta .pill{padding:4px 8px;font-size:10px}.aj-workflow-fields{display:grid;grid-template-columns:1fr 92px;gap:8px}.aj-mini-field{display:grid;gap:5px}.aj-mini-field label{font-size:9px;font-weight:950;color:#64748b;text-transform:uppercase;letter-spacing:.06em}.aj-mini-field input{width:100%;min-width:0;border:1px solid var(--line);border-radius:11px;padding:9px 10px;background:#fff;font-weight:850;color:#172033}.aj-assignment-list{display:grid;gap:8px}.aj-assignment-row{display:grid;grid-template-columns:minmax(0,1fr) 82px 34px;gap:7px;align-items:end}.aj-assignment-row select,.aj-assignment-row input{width:100%;min-width:0;border:1px solid var(--line);border-radius:11px;padding:9px 10px;background:#fff;font-weight:800;color:#172033}.aj-assignment-row button{width:34px;height:39px;padding:0;border-radius:11px}.aj-assignment-labels{display:grid;grid-template-columns:minmax(0,1fr) 82px 34px;gap:7px;color:#64748b;font-size:9px;font-weight:950;text-transform:uppercase;letter-spacing:.06em}.aj-workflow-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.aj-workflow-actions-left{display:flex;gap:7px;flex-wrap:wrap}.aj-workflow-actions button{padding:8px 10px;font-size:11px}.aj-allocation-status{font-size:11px;font-weight:950}.aj-allocation-status.good{color:#17613b}.aj-allocation-status.warn{color:#9a6100}.aj-allocation-status.bad{color:#b42318}.aj-progress{height:8px;border-radius:999px;background:#edf0f3;overflow:hidden}.aj-progress>span{display:block;height:100%;background:#19a75b;border-radius:999px;transition:width .15s ease}.aj-workflow-card.warning .aj-progress>span{background:#e7a21a}.aj-workflow-card.over .aj-progress>span{background:#e5484d}.aj-calendar-dates{margin-top:16px;border-top:1px solid var(--line);padding-top:14px}.aj-calendar-dates h3{font-size:14px;margin:0 0 9px}.aj-milestone-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}.aj-milestone-card{border:1px dashed #e6c875;border-radius:15px;background:#fffaf2;padding:11px;display:grid;gap:6px}.aj-milestone-card strong{font-size:12px}.aj-milestone-card input{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px 9px;background:#fff;font-weight:800}.aj-stage-empty{grid-column:1/-1;padding:20px;text-align:center}.aj-stage-empty strong{display:block}.aj-stage-empty span{display:block;margin-top:5px;color:#64748b;font-size:12px;font-weight:750}
+.aj-review-bar{position:sticky;bottom:8px;z-index:60;margin-top:16px;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.97);box-shadow:0 18px 45px rgba(23,32,51,.16);padding:13px 15px;display:flex;justify-content:space-between;align-items:center;gap:14px}.aj-review-stats{display:flex;gap:18px;flex-wrap:wrap}.aj-review-stat small{display:block;color:#64748b;font-size:10px;font-weight:950;text-transform:uppercase;letter-spacing:.06em}.aj-review-stat strong{display:block;margin-top:3px;font-size:15px}.aj-review-actions{display:flex;gap:8px}.aj-inline-message{display:none;margin-bottom:14px}.aj-inline-message.show{display:block}
+@media(max-width:1180px){.aj-labour-grid{grid-template-columns:repeat(3,1fr)}.aj-workflow-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.aj-milestone-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:850px){.aj-source-grid{grid-template-columns:1fr}.aj-form-grid{grid-template-columns:1fr 1fr}.aj-labour-grid{grid-template-columns:1fr 1fr}.aj-workflow-grid{grid-template-columns:1fr}.aj-review-bar{align-items:flex-start;flex-direction:column}.aj-review-actions{width:100%}.aj-review-actions button{flex:1}}
+@media(max-width:560px){.aj-workflow-fields{grid-template-columns:1fr}.aj-assignment-row{grid-template-columns:minmax(0,1fr) 74px 34px}.aj-milestone-grid{grid-template-columns:1fr}}
+
+/* Monthly Calendar */
+.month-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+.month-title{font-size:22px;font-weight:950;letter-spacing:-.05em}
+.month-actions{display:flex;gap:8px;align-items:center}
+.month-grid{display:grid;grid-template-columns:repeat(7, 1fr);border:1px solid var(--line);border-radius:22px;overflow:hidden;background:#fff}
+.month-head{background:#fffaf2;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:11px 10px;font-size:11px;font-weight:950;color:#64748b;text-transform:uppercase;letter-spacing:.07em}
+.month-head:nth-child(7n){border-right:none}
+.month-day{min-height:138px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:10px;background:#fff;cursor:pointer}
+.month-day:hover{box-shadow:inset 0 0 0 2px rgba(23,32,51,.08)}
+.month-day.calendar-drop-active{box-shadow:inset 0 0 0 3px rgba(23,32,51,.22);background:#fffdf7}.month-day.calendar-drop-active.weekend{background:#f7f1e7}
+.month-item.dragging{opacity:.5;cursor:grabbing}
+.month-day:nth-child(7n){border-right:none}.month-day.outside{background:#faf8f4;color:#a8a29a}.month-day.weekend{background:#f8f5ef}
+.month-day-number{font-size:13px;font-weight:950;color:#475569;margin-bottom:8px}
+.month-day.today .month-day-number{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;border-radius:999px;background:#172033;color:#fff}
+.month-item{border:1px solid var(--line);border-radius:11px;padding:7px 8px;margin-bottom:6px;background:#f4f1ec;color:#5f6673;font-size:12px;font-weight:900;cursor:pointer}
+.month-item.install{background:#eaf1ff;border-color:#cadbff;color:#2452b8}.month-item.stone{background:#f4e8ff;border-color:#dfc5f5;color:#7b43af}.month-item.check{background:#fff4da;border-color:#f2d894;color:#8a5a00}.month-item.manual{background:#d9f5e7;border-color:#c6ecd7;color:#12633c}.month-item.admin{background:#e8f7f2;border-color:#b9dfd3;color:#155f4b}
+.month-item-title,.month-item-sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.month-item-sub{margin-top:2px;font-size:10px;opacity:.78}
+
+/* Schedule */
+.schedule-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.schedule-tools input,.schedule-tools select{border:1px solid var(--line);border-radius:999px;padding:10px 12px;font-weight:850;background:#fff}
+.schedule-range{font-size:12px;color:#64748b;font-weight:850;margin-top:5px}
+.planner{background:#fff;border:1px solid var(--line);border-radius:24px;box-shadow:0 14px 38px rgba(23,32,51,.09);overflow-x:auto;max-width:100%}
+.timeline{width:max-content;min-width:100%}
+.days{display:grid;grid-template-columns:var(--people) repeat(var(--day-count, 7),var(--day));position:sticky;top:0;z-index:30;background:#fffaf2;border-bottom:1px solid var(--line)}
+.corner,.day-head{min-height:76px;border-right:1px solid var(--line);padding:14px;background:#fffaf2}
+.corner{position:sticky;left:0;z-index:35;display:flex;align-items:center;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:950;color:#5f6673}
+.day-head.weekend{background:#f4f1ec;color:#8a8173}.day-head.today{background:#f2f6fc}.day-cap{float:right;border:1px solid #eadfcd;background:#fff;border-radius:999px;padding:4px 8px;font-size:12px;font-weight:950}.day-head.today .day-cap{border-color:#c8d7ed;background:#e7eef9;color:#35557c}.day-name{font-weight:950;font-size:18px;letter-spacing:-.04em}.day-date{display:block;color:#64748b;font-size:12px;font-weight:850;margin-top:3px}
+.row{position:relative;display:grid;grid-template-columns:var(--people) repeat(var(--day-count, 7),var(--day));min-height:124px;border-bottom:1px solid var(--line)}
+.person{position:sticky;left:0;z-index:20;background:#fff;border-right:1px solid var(--line);padding:18px 14px}
+.person strong{display:block;font-size:16px}.person span{display:block;color:#64748b;font-size:12px;font-weight:850;margin-top:4px}
+.cell{position:relative;min-height:inherit;border-right:1px solid var(--line);padding:10px;cursor:pointer}
+.cell.weekend{background:repeating-linear-gradient(-45deg,#f4f1ec,#f4f1ec 7px,#ede7dd 7px,#ede7dd 14px)}
+.cell.blocked-day{background:repeating-linear-gradient(-45deg,#fff7f7,#fff7f7 7px,#fee2e2 7px,#fee2e2 14px)}
+.cell.rostered-off{background:repeating-linear-gradient(-45deg,#f7f5f1,#f7f5f1 7px,#e7e1d8 7px,#e7e1d8 14px)}
+.cell.today{background:#f7f9fd}
+.cell.today.weekend{background:repeating-linear-gradient(-45deg,rgba(242,246,252,.94),rgba(242,246,252,.94) 7px,rgba(226,233,243,.94) 7px,rgba(226,233,243,.94) 14px)}
+.cell.today.blocked-day{background:repeating-linear-gradient(-45deg,#fff4f5,#fff4f5 7px,#fbdfe3 7px,#fbdfe3 14px)}
+.cell.today.rostered-off{background:repeating-linear-gradient(-45deg,#f3f5f8,#f3f5f8 7px,#dde3ea 7px,#dde3ea 14px)}
+.cell.drop-active{box-shadow:inset 0 0 0 3px rgba(23,32,51,.14)}.cell.drop-top{box-shadow:inset 0 4px 0 rgba(23,32,51,.22), inset 0 0 0 3px rgba(23,32,51,.10)}.cell.drop-bottom{box-shadow:inset 0 -4px 0 rgba(23,32,51,.22), inset 0 0 0 3px rgba(23,32,51,.10)}
+.badge{display:inline-flex;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:950;border:1px solid #c6ecd7;background:#eaf8f0;color:#17613b}.badge.tight{border-color:#f2d894;background:#fff4da;color:#8a5a00}.badge.off{border-color:#ded6c9;background:#f4f1ec;color:#9a8d7c}.badge.sick{border-color:#fecaca;background:#fff1f2;color:#b42318}.badge.away{border-color:#ddd6fe;background:#f5f3ff;color:#6d28d9}.badge.holiday{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8}.badge.rdo{border-color:#fed7aa;background:#fff7ed;color:#c2410c}
+.bars{position:absolute;left:var(--people);right:0;top:0;bottom:0;z-index:10;pointer-events:none}
+.bar{position:absolute;height:36px;border-radius:14px;padding:0 12px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 8px 15px rgba(23,32,51,.10);border:1px solid rgba(0,0,0,.05);cursor:pointer;pointer-events:auto}
+.bar:hover{transform:translateY(-1px);box-shadow:0 12px 22px rgba(23,32,51,.14);outline:2px solid rgba(23,32,51,.14)}.bar.dragging{opacity:.55;pointer-events:none!important}.bar.split{box-shadow:0 8px 15px rgba(23,32,51,.10), inset 5px 0 0 rgba(23,32,51,.28)}.bar.no-capacity{border-style:dashed;box-shadow:none}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:0 0 auto}.bar-main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bar-time{margin-left:auto;flex:0 0 auto;font-weight:950;opacity:.86}.split-chip,.no-cap-chip{flex:0 0 auto;border:1px solid rgba(23,32,51,.12);background:rgba(255,255,255,.72);border-radius:999px;padding:2px 6px;font-size:10px;font-weight:950;color:inherit}
+.blue{background:#d9ebff;color:#075985}.green{background:#d9f5e7;color:#12633c}.orange{background:#ffe8cc;color:#9a4f00}.grey{background:#f4f1ec;color:#5f6673}.purple{background:#f4e8ff;color:#7b43af}.yellow{background:#fef3c7;color:#92400e}
+.stage-check{background:#fff4da;color:#8a5a00}.stage-ordering{background:#fde7f3;color:#9d174d}.stage-drafting{background:#d9ebff;color:#075985}.stage-machining{background:#f4e8ff;color:#7b43af}.stage-assembly{background:#d9f5e7;color:#12633c}.stage-loading{background:#ffe8cc;color:#9a4f00}.stage-delivery{background:#dff7f6;color:#0f766e}.stage-install{background:#e8e6ff;color:#4338ca}.stage-2pak{background:#ffe4e6;color:#9f1239}.stage-stone{background:#efe6ff;color:#6d28d9}.stage-custom{background:#edf2f7;color:#475569}
+
+
+
+
+/* Employees */
+.settings-tabs{display:flex;gap:8px;margin:6px 0 14px;flex-wrap:wrap}.settings-tabs button.active{background:#172033;color:#fff;border-color:#172033}
+.employee-head,.employee-row{display:grid;grid-template-columns:1.3fr 1fr .8fr 1.4fr;align-items:center}
+.employee-head div,.employee-row>div{padding:13px 15px}.employee-row{border-bottom:1px solid var(--line);cursor:pointer}.employee-row:last-child{border-bottom:none}.employee-row:hover{background:#fffdfa}
+.days-mini{display:flex;gap:5px}.day-dot{width:26px;height:26px;border-radius:8px;border:1px solid #c6ecd7;background:#eaf8f0;color:#17613b;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:950}.day-dot.off{border-color:#ded6c9;background:#f4f1ec;color:#9a8d7c}
+
+/* Side panels */
+.panel-backdrop{position:fixed;inset:0;background:rgba(23,32,51,.18);z-index:260;opacity:0;pointer-events:none;transition:.18s ease}.panel-backdrop.open{opacity:1;pointer-events:auto}
+.side-panel{position:fixed;top:0;right:0;bottom:0;width:min(520px,94vw);background:#fff;z-index:270;box-shadow:-24px 0 60px rgba(23,32,51,.18);transform:translateX(105%);transition:.22s ease;display:flex;flex-direction:column}.side-panel.open{transform:translateX(0)}
+.side-head{padding:20px 20px 14px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.panel-title{font-size:20px;font-weight:950;letter-spacing:-.04em}.panel-sub{font-size:13px;color:#64748b;font-weight:800;margin-top:4px}.close-btn{border:1px solid var(--line);background:#fff;border-radius:999px;width:36px;height:36px;padding:0}
+.side-body{padding:18px 20px;display:grid;gap:14px;overflow:auto}.detail-card{border:1px solid var(--line);border-radius:16px;padding:14px;background:#fffaf2}.detail-card h3{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:#64748b}
+.form-grid{display:grid;gap:10px}.form-row{display:grid;gap:5px}.form-row label{font-size:11px;font-weight:950;color:#64748b;text-transform:uppercase;letter-spacing:.05em}.form-row input,.form-row select{border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-weight:850;color:#172033;background:#fff;width:100%}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.employee-list{display:grid;gap:8px}.employee-choice{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:#fff}.employee-choice label{display:flex;align-items:center;gap:10px;font-weight:900;cursor:pointer}.employee-choice input{width:18px;height:18px}.employee-choice span{color:#64748b;font-size:12px;font-weight:850}
+.note{border:1px solid var(--line);background:#fff;border-radius:14px;padding:10px 12px;color:#64748b;font-size:12px;font-weight:850;line-height:1.45}.action-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(20px);background:#172033;color:#fff;border-radius:999px;padding:11px 16px;font-weight:850;box-shadow:0 20px 50px rgba(23,32,51,.25);z-index:300;opacity:0;pointer-events:none;transition:.16s ease}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.float-scroll{position:fixed;left:24px;right:24px;bottom:8px;height:16px;z-index:200;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:999px;overflow-x:auto;overflow-y:hidden;box-shadow:0 10px 28px rgba(23,32,51,.12)}.float-scroll-inner{height:1px}
+@media(max-width:1100px){.cards{grid-template-columns:1fr 1fr}.capacity-wrap{grid-template-columns:1fr}}
+
+.roster-toggle{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.roster-toggle button{border-radius:14px}
+.roster-toggle button.active{background:#172033;color:#fff;border-color:#172033}
+.roster-grid{display:grid;grid-template-columns:64px repeat(5,1fr);gap:8px;align-items:end}
+.roster-label{font-size:12px;font-weight:950;color:#64748b;padding:10px 0}
+.roster-grid input{min-width:0;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-weight:850;background:#fff}
+.roster-total{display:grid;gap:7px;margin-top:10px}
+.roster-total-row{display:flex;justify-content:space-between;gap:12px;border:1px solid var(--line);background:#fff;border-radius:12px;padding:8px 10px;font-size:12px;font-weight:900}
+
+
+
+/* Settings navigation and calendar events */
+.settings-layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;align-items:start}
+.settings-menu{display:grid;gap:8px;background:#fff;border:1px solid var(--line);border-radius:20px;padding:10px;box-shadow:0 10px 28px rgba(23,32,51,.05);position:sticky;top:78px}
+.settings-menu button{border-radius:14px;text-align:left;padding:12px 14px}
+.settings-menu button.active{background:#172033;color:#fff;border-color:#172033}
+.settings-section{display:none}.settings-section.active{display:block}
+.settings-placeholder{display:grid;gap:10px;max-width:720px}
+.settings-placeholder .note{background:#fffaf2}
+.user-admin-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 160px auto;gap:10px;align-items:end}
+.user-admin-form .form-row{min-width:0}.user-list{display:grid;gap:10px;margin-top:16px}
+.user-row{display:grid;grid-template-columns:minmax(160px,1fr) 150px minmax(190px,1fr) auto;gap:10px;align-items:end;border:1px solid var(--line);border-radius:16px;padding:12px;background:#fff}
+.user-identity strong{display:block;font-size:15px}.user-identity span{display:block;margin-top:3px;color:#64748b;font-size:12px;font-weight:800}
+.user-row .form-row label{font-size:10px}.user-actions{display:flex;gap:7px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.user-role-pill{display:inline-flex;margin-left:7px;border:1px solid var(--line);border-radius:999px;padding:3px 7px;font-size:10px;text-transform:uppercase;letter-spacing:.05em;background:#fffaf2}
+@media(max-width:1050px){.user-admin-form{grid-template-columns:1fr 1fr}.user-row{grid-template-columns:1fr 1fr}.user-actions{justify-content:flex-start}}
+@media(max-width:650px){.user-admin-form,.user-row{grid-template-columns:1fr}.account-pill span{display:none}}
+.employee-row{position:relative}
+.employee-row.dragging{opacity:.45}
+.employee-row.drop-before{box-shadow:inset 0 3px 0 #172033}
+.employee-row.drop-after{box-shadow:inset 0 -3px 0 #172033}
+.employee-name-cell{display:flex;align-items:center;gap:10px;min-width:0}
+.drag-handle{width:28px;height:34px;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;justify-content:center;color:#7b8492;background:#fffaf2;cursor:grab;font-size:15px;line-height:1;flex:0 0 auto;user-select:none}
+.drag-handle:active{cursor:grabbing}
+.calendar-event-form{display:grid;grid-template-columns:1.2fr .8fr .8fr .8fr auto;gap:10px;align-items:end}
+.calendar-event-form .form-row{min-width:0}
+.calendar-event-list{display:grid;gap:9px;margin-top:14px}
+.calendar-event-row{display:grid;grid-template-columns:minmax(0,1.3fr) .8fr .8fr auto;gap:12px;align-items:center;border:1px solid var(--line);border-radius:15px;padding:11px 12px;background:#fff}
+.calendar-event-row strong{display:block}.calendar-event-row span{font-size:12px;color:#64748b;font-weight:800}
+.calendar-event-actions{display:flex;gap:7px;justify-content:flex-end}
+.calendar-event-actions button{padding:8px 10px;font-size:11px}
+.month-day.closed-day{background:repeating-linear-gradient(-45deg,#f8f5ef,#f8f5ef 7px,#ece5d9 7px,#ece5d9 14px)}
+.month-item.closure{background:#fff0df;border-color:#efc58f;color:#8a4b08;cursor:default}
+.day-head.closed{background:#f6efe5;color:#7a6041}
+.day-head.closed .day-cap{background:#fff4e6;border-color:#efc58f;color:#8a4b08}
+.cell.calendar-event-day{background:repeating-linear-gradient(-45deg,#f8f4ed,#f8f4ed 7px,#e9dfd0 7px,#e9dfd0 14px)}
+.cell.today.calendar-event-day{background:repeating-linear-gradient(-45deg,#f4f5f7,#f4f5f7 7px,#e2e5e9 7px,#e2e5e9 14px)}
+.badge.closure{border-color:#efc58f;background:#fff4e6;color:#8a4b08}
+@media(max-width:900px){.settings-layout{grid-template-columns:1fr}.settings-menu{position:static;grid-template-columns:repeat(3,1fr)}.settings-menu button{text-align:center}.calendar-event-form{grid-template-columns:1fr 1fr}.calendar-event-form .full-mobile{grid-column:1/-1}.calendar-event-row{grid-template-columns:1fr}.calendar-event-actions{justify-content:flex-start}}
+
+
+/* TrackR professional visual pass */
+:root{
+  --bg:#f3f6f8;
+  --card:#ffffff;
+  --ink:#142235;
+  --muted:#68778a;
+  --line:#dbe3ea;
+  --soft:#f7f9fb;
+  --brand:#17324d;
+  --brand-strong:#0f2438;
+  --accent:#0f766e;
+  --accent-soft:#e8f5f3;
+  --shadow-sm:0 1px 2px rgba(20,34,53,.04),0 5px 16px rgba(20,34,53,.04);
+  --shadow-md:0 2px 4px rgba(20,34,53,.04),0 14px 36px rgba(20,34,53,.07);
+}
+html{background:var(--bg);scroll-behavior:smooth}
+body{
+  background:
+    radial-gradient(circle at 15% -10%,rgba(15,118,110,.07),transparent 28rem),
+    linear-gradient(180deg,#f7f9fa 0,var(--bg) 22rem);
+  font-size:14px;
+  line-height:1.45;
+  letter-spacing:-.005em;
+}
+main{max-width:1780px;padding:24px 28px 76px}
+.topbar{
+  height:68px;
+  margin:-24px -28px 26px;
+  padding:0 28px;
+  gap:22px;
+  background:rgba(255,255,255,.96);
+  border-color:rgba(203,214,223,.9);
+  box-shadow:0 1px 0 rgba(20,34,53,.03),0 8px 28px rgba(20,34,53,.045);
+  backdrop-filter:saturate(150%) blur(14px);
+}
+.brand{gap:11px;min-width:150px}
+.logo{
+  width:40px;height:40px;border-radius:12px;
+  background:linear-gradient(145deg,var(--brand) 0,#245b69 100%);
+  color:#fff;font-size:12px;font-weight:900;letter-spacing:-.04em;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 7px 16px rgba(23,50,77,.19);
+}
+.brand strong{font-size:23px;font-weight:850;letter-spacing:-.045em;color:var(--brand-strong)}
+.nav{gap:5px;scrollbar-width:none}.nav::-webkit-scrollbar{display:none}
+.nav button{
+  border-color:transparent;background:transparent;color:#506176;
+  padding:9px 14px;border-radius:999px;font-size:13px;font-weight:800;
+  box-shadow:none;
+}
+.nav button:hover{background:#eef3f6;color:var(--brand);border-color:transparent;transform:none}
+.nav button.active{background:var(--brand);color:#fff;border-color:var(--brand);box-shadow:0 5px 14px rgba(23,50,77,.17)}
+.account-tools{gap:9px}
+.account-pill{background:#f6f9fa;border-color:#dbe4ea;padding:8px 11px;color:var(--brand);box-shadow:inset 0 1px 0 #fff}
+.account-pill span{color:#718095;font-weight:750}
+button{
+  border-color:#d5dee6;background:#fff;color:var(--brand);
+  border-radius:10px;padding:9px 13px;font-weight:800;
+  box-shadow:0 1px 1px rgba(20,34,53,.025);
+  transition:border-color .15s ease,background .15s ease,color .15s ease,box-shadow .15s ease,transform .15s ease;
+}
+button:not(:disabled):hover{border-color:#b9c7d2;background:#fbfcfd;box-shadow:0 5px 14px rgba(20,34,53,.07);transform:translateY(-1px)}
+button:not(:disabled):active{transform:translateY(0);box-shadow:none}
+button.active,button.primary{background:var(--brand);color:#fff;border-color:var(--brand);box-shadow:0 6px 16px rgba(23,50,77,.16)}
+button.active:hover,button.primary:hover{background:var(--brand-strong);border-color:var(--brand-strong)}
+button.danger{background:#fff5f5;color:#a32626;border-color:#efcaca;box-shadow:none}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid rgba(15,118,110,.18);outline-offset:2px}
+input:not([type="checkbox"]):not([type="radio"]),select,textarea{
+  border-color:#d4dee6!important;background:#fff!important;color:var(--ink)!important;
+  box-shadow:inset 0 1px 2px rgba(20,34,53,.025);
+  transition:border-color .15s ease,box-shadow .15s ease;
+}
+input:not([type="checkbox"]):not([type="radio"]):focus,select:focus,textarea:focus{border-color:#7aa7a2!important;box-shadow:0 0 0 3px rgba(15,118,110,.10)!important;outline:none}
+input[type="checkbox"],input[type="radio"]{accent-color:var(--accent)}
+.header{margin-bottom:18px;align-items:center}
+h1{font-size:31px;font-weight:850;letter-spacing:-.045em;color:var(--brand-strong)}
+h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-strong)}
+.sub{font-weight:650;color:var(--muted);max-width:780px}
+.cards{gap:16px;margin-bottom:18px}
+.metric{
+  border-color:#dce4ea;border-radius:15px;padding:16px 17px;
+  box-shadow:var(--shadow-sm);position:relative;overflow:hidden;
+}
+.metric:before{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:linear-gradient(90deg,var(--accent),rgba(15,118,110,.18))}
+.metric small{font-size:10px;color:#718095;letter-spacing:.075em;margin-bottom:7px}
+.metric strong{font-size:23px;font-weight:850;color:var(--brand-strong)}
+.panel{border-color:#dce4ea;border-radius:18px;box-shadow:var(--shadow-md);padding:20px}
+.panel+.panel{margin-top:18px}
+.panel-head{margin-bottom:16px}.panel-head p{color:var(--muted);font-weight:650;line-height:1.5}
+.readonly-note{border-color:#c9d9dd;background:#f0f7f6;color:#365d5b;border-radius:12px;box-shadow:var(--shadow-sm)}
+
+/* Home */
+.capacity-wrap{gap:26px}.capacity-donut{box-shadow:inset 0 0 0 1px rgba(20,34,53,.04),0 14px 30px rgba(20,34,53,.07)}
+.legend-row{border-color:#dce4ea;border-radius:12px;background:#f8fafb;padding:12px 13px}
+.home-job{border-color:#dce4ea;border-radius:13px;box-shadow:0 1px 2px rgba(20,34,53,.025)}
+.home-job-head{padding:14px 15px;transition:background .15s ease}.home-job-head:hover{background:#f8fafb}
+.home-job-detail{background:#f7f9fb}.mini-detail{border-color:#dce4ea;border-radius:10px}
+
+/* Jobs and employees */
+.jobs-table,.employee-table{border-color:#dbe3ea;border-radius:14px;box-shadow:0 1px 2px rgba(20,34,53,.025)}
+.table-head,.employee-head{background:#f5f8fa;color:#6c7b8d;border-color:#dbe3ea;font-size:10px}
+.table-head div,.job-row>div{padding:14px 15px}
+.job-row{border-color:#e2e8ed;transition:background .13s ease,box-shadow .13s ease}
+.job-row:hover,.employee-row:hover{background:#f7fafb;box-shadow:inset 3px 0 0 var(--accent)}
+.job-title{font-size:14px;color:var(--brand-strong)}
+.pill{border-color:#d9e2e8;background:#fff;border-radius:999px;padding:5px 9px;font-size:11px}
+.drag-handle{background:#f6f9fa;border-color:#d8e1e8;color:#718095}
+
+/* Add Job */
+.aj-source-grid{gap:16px}.aj-source-card{border-color:#dbe3ea;border-radius:16px;box-shadow:var(--shadow-sm);padding:19px}
+.aj-source-card.active,.aj-source-card.pdf-dragging{border-color:#6ea6a0;box-shadow:0 0 0 3px rgba(15,118,110,.10),var(--shadow-sm)}
+.aj-source-icon{border-color:#d8e2e8;background:#f4f8f8;color:var(--accent)}
+.aj-source-title{font-size:17px;color:var(--brand-strong)}
+.aj-drop-hint{background:#f7fafb;border-color:#c8d5de;color:#657589}
+.aj-form-grid{gap:13px}.aj-field label,.aj-mini-field label,.form-row label{color:#708094;letter-spacing:.065em}
+.aj-field input,.aj-field select,.aj-field textarea,.aj-check{border-radius:10px}
+.aj-labour-grid{gap:11px}.aj-labour-card{border-color:#dce4ea;border-radius:13px;background:#f7f9fb}
+.aj-workflow-grid{gap:15px}.aj-workflow-card{border-color:#dce4ea;border-radius:15px;padding:16px;box-shadow:0 2px 10px rgba(20,34,53,.035)}
+.aj-workflow-card.complete{border-color:#a9d8ca;box-shadow:inset 0 3px 0 #65b596,0 2px 10px rgba(20,34,53,.035)}
+.aj-workflow-card.warning{border-color:#e7c36d;box-shadow:inset 0 3px 0 #d9a526,0 2px 10px rgba(20,34,53,.035)}
+.aj-workflow-card.over{border-color:#e6a1a1;box-shadow:inset 0 3px 0 #d85a5a,0 2px 10px rgba(20,34,53,.035)}
+.aj-workflow-title{color:var(--brand-strong)}
+.aj-mini-field input,.aj-assignment-row select,.aj-assignment-row input{border-radius:9px}
+.aj-milestone-card{border-color:#dcc980;border-radius:12px;background:#fffdf6}
+.aj-review-bar{border-color:#dbe3ea!important;background:rgba(255,255,255,.97)!important;box-shadow:0 -8px 26px rgba(20,34,53,.08)!important}
+
+/* Calendar */
+.month-toolbar{margin-bottom:16px}.month-title{font-size:21px;color:var(--brand-strong)}
+.month-grid{border-color:#dbe3ea;border-radius:14px;box-shadow:0 1px 2px rgba(20,34,53,.025)}
+.month-head{background:#f5f8fa;border-color:#dbe3ea;color:#718095;padding:10px 11px}
+.month-day{border-color:#e0e7ec;padding:10px;transition:background .13s ease,box-shadow .13s ease}
+.month-day:hover{background:#fbfcfd;box-shadow:inset 0 0 0 2px rgba(15,118,110,.10)}
+.month-day.weekend{background:#f7f8f8}.month-day.outside{background:#fafbfb}
+.month-day.today .month-day-number{background:var(--accent);box-shadow:0 3px 9px rgba(15,118,110,.18)}
+.month-item{border-radius:8px;padding:7px 8px;box-shadow:0 1px 2px rgba(20,34,53,.035)}
+
+/* Schedule */
+.schedule-tools{gap:9px}.schedule-range{color:#718095}
+.planner{border-color:#d9e2e8;border-radius:15px;box-shadow:var(--shadow-md);scrollbar-color:#9aa8b4 #eef2f4}
+.days{background:#f5f8fa;border-color:#dbe3ea}
+.corner,.day-head{background:#f5f8fa;border-color:#dbe3ea;padding:13px 14px}
+.corner{color:#68788b}.day-head.weekend{background:#f0f3f4;color:#7b8793}.day-head.today{background:#eaf4f3}
+.day-name{font-size:17px;color:var(--brand-strong)}.day-date{color:#718095}
+.day-cap{border-color:#d6e0e7;background:#fff;font-size:11px}.day-head.today .day-cap{border-color:#a8d4cf;background:#f1faf8;color:#0d665f}
+.row{border-color:#e0e7ec}.person{border-color:#dbe3ea;padding:17px 14px}.person strong{font-size:15px;color:var(--brand-strong)}
+.cell{border-color:#e0e7ec}.cell.today{background:#f2f8f7}
+.cell.drop-active{box-shadow:inset 0 0 0 3px rgba(15,118,110,.16)}
+.badge{font-size:10px;padding:4px 7px}
+.bar{height:35px;border-radius:9px;box-shadow:0 4px 10px rgba(20,34,53,.10);font-weight:850}
+.bar:hover{outline:2px solid rgba(15,118,110,.18);box-shadow:0 8px 16px rgba(20,34,53,.14)}
+.bar.split{box-shadow:0 4px 10px rgba(20,34,53,.10),inset 4px 0 0 rgba(20,34,53,.24)}
+.float-scroll{background:rgba(255,255,255,.92);border-color:#d5dfe6;box-shadow:0 7px 20px rgba(20,34,53,.10)}
+
+/* Settings */
+.settings-layout{grid-template-columns:230px minmax(0,1fr);gap:18px}
+.settings-menu{border-color:#dbe3ea;border-radius:14px;padding:8px;box-shadow:var(--shadow-sm);top:86px}
+.settings-menu button{border-radius:9px;text-align:left;padding:11px 13px;background:transparent;border-color:transparent;box-shadow:none;color:#536579}
+.settings-menu button:hover{background:#f0f4f6;border-color:transparent;transform:none;box-shadow:none}
+.settings-menu button.active{background:var(--brand);color:#fff;border-color:var(--brand);box-shadow:0 5px 13px rgba(23,50,77,.15)}
+.user-row,.calendar-event-row{border-color:#dbe3ea;border-radius:12px;box-shadow:0 1px 2px rgba(20,34,53,.025)}
+.detail-card{border-color:#dbe3ea;border-radius:12px;background:#f7f9fb}.note{border-color:#dbe3ea;border-radius:10px;background:#f8fafb;color:#647589}
+
+/* Drawers and feedback */
+.panel-backdrop{background:rgba(15,28,43,.32);backdrop-filter:blur(3px)}
+.side-panel{box-shadow:-18px 0 52px rgba(15,28,43,.20)}
+.side-head{border-color:#dbe3ea;padding:22px 22px 16px}.side-body{padding:20px 22px}.panel-title{color:var(--brand-strong)}
+.close-btn{border-radius:10px}
+.toast{background:var(--brand-strong);border-radius:10px;box-shadow:0 16px 38px rgba(15,28,43,.25)}
+
+/* Scrollbars */
+*{scrollbar-width:thin;scrollbar-color:#9aa8b4 #eef2f4}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-track{background:#eef2f4;border-radius:999px}
+*::-webkit-scrollbar-thumb{background:#a9b5bf;border:2px solid #eef2f4;border-radius:999px}
+*::-webkit-scrollbar-thumb:hover{background:#8998a5}
+
+@media(max-width:900px){
+  main{padding:16px 14px 72px}
+  .topbar{height:auto;min-height:64px;margin:-16px -14px 20px;padding:10px 14px;gap:10px;flex-wrap:wrap}
+  .brand{min-width:auto}.logo{width:36px;height:36px}.brand strong{font-size:20px}
+  .nav{order:3;width:100%;flex-basis:100%}.nav button{padding:8px 12px}
+  .account-tools{margin-left:auto}.account-pill span{display:none}
+  .settings-layout{grid-template-columns:1fr}.settings-menu{position:static;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .settings-menu button{text-align:center}
+}
+@media(max-width:620px){
+  .cards{grid-template-columns:1fr 1fr;gap:10px}
+  .metric{padding:13px}.metric strong{font-size:20px}
+  h1{font-size:27px}.panel{padding:15px;border-radius:14px}
+  .account-pill{display:none}.logout-button{padding:8px 10px}
+}
+
+</style>
+</head>
+<body>
+<main>
+  <div class="topbar">
+    <div class="brand" aria-label="TrackR"><span class="logo">TR</span><strong>TrackR</strong></div>
+    <div class="nav">
+      <button id="tabHome" class="active" onclick="showView('home')">Home</button>
+      {% if current_user.role == 'admin' %}<button id="tabJobs" onclick="showView('jobs')">Jobs</button>{% endif %}
+      <button id="tabCalendar" onclick="showView('calendar')">Calendar</button>
+      <button id="tabSchedule" onclick="showView('schedule')">Schedule</button>
+      {% if current_user.role == 'admin' %}<button id="tabSettings" onclick="showView('settings')">Settings</button>{% endif %}
+    </div>
+    <div class="account-tools">
+      <div class="account-pill"><strong>{{ current_user.username }}</strong><span>{{ 'Admin' if current_user.role == 'admin' else 'Read only' }}</span></div>
+      <form class="logout-form" method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="logout-button" type="submit">Log out</button></form>
+    </div>
+  </div>
+  {% if current_user.role != 'admin' %}<div class="readonly-note">Read-only access: Home, Calendar and Schedule can be viewed, but changes are restricted to an admin.</div>{% endif %}
+
+  <section id="homeView" class="view active">
+    <div class="header">
+      <div><h1>Home</h1><p class="sub">A clear view of production capacity, upcoming work and team availability.</p></div>
+      <div class="week-switch"><button id="homeThisWeek" class="active" onclick="setHomeWeek('this')">This week</button><button id="homeNextWeek" onclick="setHomeWeek('next')">Next week</button></div>
+    </div>
+    <section class="panel">
+      <div class="panel-head"><div><h2>Department capacity</h2><p>Reads from employee hours and scheduled capacity work. The light gap shows unused capacity.</p></div></div>
+      <div class="capacity-wrap">
+        <div class="capacity-donut" id="homeDonut"><div class="capacity-center"><strong id="homeBookedTotal">0h</strong><span id="homeCapacityTotal">of 0h capacity</span></div></div>
+        <div class="legend-list">
+          <div class="legend-row"><span class="legend-dot" style="background:#4a84d8"></span><div><div class="legend-title">Drafting</div><div class="legend-sub">Forward Ordering, Drafting and QC</div></div><strong id="homeDrafting">0h / 0h</strong></div>
+          <div class="legend-row"><span class="legend-dot" style="background:#3f9a63"></span><div><div class="legend-title">Cabinet Making</div><div class="legend-sub">Assembly, loading and delivery</div></div><strong id="homeCabinet">0h / 0h</strong></div>
+          <div class="legend-row"><span class="legend-dot" style="background:#9d62d3"></span><div><div class="legend-title">Machining</div><div class="legend-sub">CNC and edgebander</div></div><strong id="homeMachining">0h / 0h</strong></div>
+        </div>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><div><h2 id="homeJobsTitle">This week’s jobs</h2><p>Click a job to see what is happening and who is doing it.</p></div></div>
+      <div class="home-jobs" id="homeJobs"></div>
+    </section>
+  </section>
+
+  <section id="jobsView" class="view">
+    <div class="header"><div><h1>Jobs</h1><p class="sub">Job list and task counts.</p></div><button class="primary" onclick="openAddJob()">Add job</button></div>
+    <section class="cards">
+      <div class="metric"><small>Active jobs</small><strong id="jobMetric">0</strong></div>
+      <div class="metric"><small>Capacity tasks</small><strong id="capTaskMetric">0</strong></div>
+      <div class="metric"><small>Milestones</small><strong id="milestoneMetric">0</strong></div>
+      <div class="metric"><small>Custom tasks</small><strong id="customMetric">0</strong></div>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><div><h2>Job list</h2><p>Milestones sit on Calendar. Capacity tasks feed Schedule.</p></div></div>
+      <div class="jobs-table">
+        <div class="table-head"><div>Job</div><div>Address</div><div>Install</div><div>Capacity hours</div><div>Milestones</div></div>
+        <div id="jobRows"></div>
+      </div>
+    </section>
+  </section>
+
+  <section id="addJobView" class="view">
+    <div class="header">
+      <div><h1 id="addJobTitle">Add Job</h1><p class="sub" id="addJobSubtitle">Import an estimate PDF or enter the job manually. Both routes create the same production plan.</p></div>
+      <button onclick="showView('jobs')">Back to Jobs</button>
+    </div>
+
+    <div class="aj-source-grid" id="ajSourceChoices">
+      <section class="aj-source-card" id="ajPdfCard">
+        <div class="aj-source-icon">PDF</div>
+        <div><div class="aj-source-title">Import estimate PDF</div><div class="aj-source-copy">Reads the quote number, site details and mapped labour hours using Tracka's existing import rules.</div></div>
+        <div class="aj-drop-hint" id="ajPdfDropHint">Drag an estimate PDF anywhere into this box</div>
+        <div class="aj-upload-row"><input id="ajPdfFile" type="file" accept="application/pdf" onchange="handlePdfFileChosen()"><button class="primary" id="ajReadPdfBtn" onclick="importEstimatePdf()">Read PDF</button></div>
+      </section>
+      <section class="aj-source-card aj-manual-option active" id="ajManualCard">
+        <div class="aj-source-icon">+</div>
+        <div><div class="aj-source-title">Enter job manually</div><div class="aj-source-copy">Starts with Tracka's standard hours for the selected job length. Every field and stage stays editable.</div></div>
+        <button onclick="startManualJob()">Start a blank job</button>
+      </section>
+    </div>
+
+    <div class="note aj-inline-message" id="ajImportMessage"></div>
+
+    <section class="panel" id="ajDetailsPanel">
+      <div class="panel-head"><div><h2>1. Job details</h2><p id="ajSourceLabel">Manual entry · standard template hours</p></div><span class="pill grey" id="ajEstimateBadge">Manual entry</span></div>
+      <div class="aj-form-grid">
+        <div class="aj-field"><label>Job number</label><input id="ajJobNumber" placeholder="Example: Q0628"></div>
+        <div class="aj-field wide"><label>Site address</label><input id="ajAddress" placeholder="Street address"></div>
+        <div class="aj-field"><label>Builder / Client</label><input id="ajBuilder" placeholder="Example: Private, PJ Burns"></div>
+        <div class="aj-field"><label>Job length</label><select id="ajJobLength" onchange="onAddJobLengthChange()"><option value="2">2 week job</option><option value="3">3 week job</option><option value="4" selected>4 week job</option><option value="5">5 week job</option><option value="6">6 week job</option><option value="7">7 week job</option></select></div>
+        <div class="aj-field"><label>Predicted install date</label><input id="ajInstallDate" type="date" onchange="refreshAddJobPlan()"></div>
+        <div class="aj-field"><label>Status</label><select id="ajJobStatus"><option>Active</option><option>Forecast</option><option>On Hold</option></select></div>
+        <div class="aj-field"><label>2pak job</label><label class="aj-check"><input id="ajTwoPack" type="checkbox" onchange="refreshAddJobPlan()">Add early 2pak stages</label></div>
+        <div class="aj-field full"><label>Notes</label><textarea id="ajNotes" placeholder="Any notes for this job"></textarea></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><div><h2>2. Labour hours</h2><p>PDF values are prefilled when available. Manual jobs use Tracka's standard template hours.</p></div><button onclick="applyManualDefaultHours()">Reset standard hours</button></div>
+      <div class="aj-labour-grid">
+        <div class="aj-labour-card"><label>Check Measure</label><input id="ajHoursCheck" type="number" min="0" step="0.25" value="0" oninput="refreshAddJobPlan()"></div>
+        <div class="aj-labour-card"><label>Drafting + QC</label><input id="ajHoursDrafting" type="number" min="0" step="0.25" value="12" oninput="refreshAddJobPlan()"></div>
+        <div class="aj-labour-card"><label>Machining</label><input id="ajHoursMachining" type="number" min="0" step="0.25" value="10" oninput="refreshAddJobPlan()"></div>
+        <div class="aj-labour-card"><label>Assembly</label><input id="ajHoursAssembly" type="number" min="0" step="0.25" value="32" oninput="refreshAddJobPlan()"></div>
+        <div class="aj-labour-card"><label>Loading</label><input id="ajHoursLoading" type="number" min="0" step="0.25" value="0" oninput="refreshAddJobPlan()"></div>
+        <div class="aj-labour-card"><label>Delivery + unloading</label><input id="ajHoursDelivery" type="number" min="0" step="0.25" value="0" oninput="refreshAddJobPlan()"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div><h2>3. Production workflow</h2><p>Assign one or more employees to each stage. Admin assignments are non-capacity and appear on Calendar instead of Schedule.</p></div>
+        <div class="aj-stage-toolbar"><button onclick="assignAllStagesByDepartment()">Assign all by department</button><button onclick="refreshAddJobPlan()">Regenerate stages</button></div>
+      </div>
+      <div id="ajStageRows" class="aj-workflow-grid"><div class="note aj-stage-empty"><strong>Choose an install date</strong><span>Your production stages will appear here automatically.</span></div></div>
+      <div id="ajCalendarDates" class="aj-calendar-dates" style="display:none"><h3>Calendar dates</h3><div id="ajMilestoneRows" class="aj-milestone-grid"></div></div>
+    </section>
+
+    <div class="aj-review-bar">
+      <div class="aj-review-stats">
+        <div class="aj-review-stat"><small>Stages</small><strong id="ajStageCount">0</strong></div>
+        <div class="aj-review-stat"><small>Capacity hours</small><strong id="ajCapacityTotal">0h</strong></div>
+        <div class="aj-review-stat"><small>Install</small><strong id="ajInstallSummary">Not selected</strong></div>
+      </div>
+      <div class="aj-review-actions"><button class="danger" id="ajDeleteButton" style="display:none" onclick="deleteEditingJob()">Delete Job</button><button onclick="showView('jobs')">Cancel</button><button class="primary" id="ajSaveButton" onclick="saveAddJob()">Create Job</button></div>
+    </div>
+  </section>
+
+  <section id="calendarView" class="view">
+    <div class="header"><div><h1>Calendar</h1><p class="sub">Monthly view for non-capacity dates and milestones. Click a day to add a calendar item.</p></div></div>
+    <section class="cards">
+      <div class="metric"><small>Calendar items</small><strong id="calendarItemMetric">0</strong></div>
+      <div class="metric"><small>Check measures</small><strong id="calendarCheckMetric">0</strong></div>
+      <div class="metric"><small>Installs</small><strong id="calendarInstallMetric">0</strong></div>
+      <div class="metric"><small>Stone items</small><strong id="calendarStoneMetric">0</strong></div>
+    </section>
+    <section class="panel">
+      <div class="month-toolbar">
+        <button onclick="changeMonth(-1)">Previous</button>
+        <div class="month-title" id="monthTitle">June 2026</div>
+        <div class="month-actions"><button onclick="goToday()">Today</button><button onclick="changeMonth(1)">Next</button></div>
+      </div>
+      <div class="month-grid" id="monthGrid"></div>
+      <div class="note" style="margin-top:12px">Calendar shows milestones and other non-capacity dates only. Capacity tasks stay in Schedule.</div>
+    </section>
+  </section>
+
+  <section id="scheduleView" class="view">
+    <div class="header">
+      <div><h1>Schedule</h1><p class="sub">Capacity planning only: drag tasks, split across employees, and update calendar-linked custom tasks.</p><div class="schedule-range" id="scheduleRangeLabel"></div></div>
+      <div class="schedule-tools">
+        <button onclick="changeScheduleWeek(-1)">Previous</button>
+        <button onclick="goScheduleToday()">Today</button>
+        <button onclick="changeScheduleWeek(1)">Next</button>
+        
+      </div>
+    </div>
+    <section class="cards">
+      <div class="metric"><small>Total capacity booked</small><strong id="bookedMetric">0%</strong></div>
+      <div class="metric"><small>Available spare</small><strong id="spareMetric">0h</strong></div>
+      <div class="metric"><small>Custom capacity tasks</small><strong id="scheduleCustomMetric">0</strong></div>
+      <div class="metric"><small>Split tasks</small><strong id="splitMetric">0</strong></div>
+    </section>
+    <div class="note" id="scheduleWarning" style="display:none;margin-bottom:12px"></div>
+    <section class="planner" id="planner">
+      <div class="timeline">
+        <div class="days" id="daysHeader"></div>
+        <div id="rows"></div>
+      </div>
+    </section>
+  </section>
+
+
+  <section id="settingsView" class="view">
+    <div class="header"><div><h1>Settings</h1><p class="sub">Manage users, employees and company-wide calendar closures.</p></div></div>
+    <div class="settings-layout">
+      <aside class="settings-menu" aria-label="Settings categories">
+        <button id="settingsNavUser" onclick="showSettingsSection('user')">User Admin</button>
+        <button id="settingsNavEmployees" class="active" onclick="showSettingsSection('employees')">Employees</button>
+        <button id="settingsNavCalendarEvents" onclick="showSettingsSection('calendarEvents')">Calendar Events</button>
+      </aside>
+      <div class="settings-content">
+        <section id="settingsUserSection" class="settings-section">
+          <section class="panel">
+            <div class="panel-head"><div><h2>User Admin</h2><p>Create admins or read-only users, reset passwords and remove accounts.</p></div><a class="button-link" href="/api/backup">Download backup</a></div>
+            <div class="user-admin-form">
+              <div class="form-row"><label>Username</label><input id="newUsername" autocomplete="off" placeholder="e.g. factory2"></div>
+              <div class="form-row"><label>Temporary password</label><input id="newUserPassword" type="password" autocomplete="new-password" placeholder="Minimum 12 characters"></div>
+              <div class="form-row"><label>Access</label><select id="newUserRole"><option value="user">Read-only user</option><option value="admin">Admin</option></select></div>
+              <button class="primary" onclick="addFlowUser()">Add user</button>
+            </div>
+            <div id="userRows" class="user-list"><div class="note">Loading users…</div></div>
+          </section>
+        </section>
+
+        <section id="settingsEmployeesSection" class="settings-section active">
+          <section class="panel">
+            <div class="panel-head"><div><h2>Employees</h2><p>Drag employees to set their order. The same order is used on Schedule.</p></div><button class="primary" onclick="openEmployeePanel(null)">Add employee</button></div>
+            <div class="employee-table">
+              <div class="employee-head"><div>Employee</div><div>Department</div><div>Capacity</div><div>Working week</div></div>
+              <div id="employeeRows"></div>
+            </div>
+          </section>
+        </section>
+
+        <section id="settingsCalendarEventsSection" class="settings-section">
+          <section class="panel">
+            <div class="panel-head"><div><h2>Calendar Events</h2><p>Block company-wide dates for public holidays, factory closures and shutdowns. These dates appear on Calendar and have zero capacity in Schedule.</p></div></div>
+            <div class="calendar-event-form">
+              <div class="form-row full-mobile"><label>Event name</label><input id="calendarEventName" placeholder="e.g. Christmas shutdown"></div>
+              <div class="form-row"><label>Type</label><select id="calendarEventType"><option>Factory Closure</option><option>Public Holiday</option><option>Company Event</option></select></div>
+              <div class="form-row"><label>Start date</label><input id="calendarEventStart" type="date"></div>
+              <div class="form-row"><label>End date</label><input id="calendarEventEnd" type="date"></div>
+              <button id="calendarEventSaveButton" class="primary" onclick="saveCalendarEvent()">Add event</button>
+            </div>
+            <div id="calendarEventRows" class="calendar-event-list"></div>
+          </section>
+        </section>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+<div class="panel-backdrop" id="panelBackdrop" onclick="closeAllPanels()"></div>
+<div class="float-scroll" id="floatScroll"><div class="float-scroll-inner" id="floatScrollInner"></div></div>
+
+<aside class="side-panel" id="taskPanel">
+  <div class="side-head">
+    <div><div class="panel-title" id="panelTitle">Task</div><div class="panel-sub" id="panelSub">Details</div></div>
+    <button class="close-btn" onclick="closeTaskPanel()">×</button>
+  </div>
+  <div class="side-body">
+    <div class="detail-card">
+      <h3>Task details</h3>
+      <div class="form-grid">
+        <div class="two-col">
+          <div class="form-row"><label>Job</label><select id="taskJob"></select></div>
+          <div class="form-row"><label>Type</label><select id="taskType" onchange="updateTypeHint()"><option value="milestone">Calendar milestone only</option><option value="capacity">Capacity task for schedule</option></select></div>
+        </div>
+        <div class="form-row"><label>Task name</label><input id="taskName" placeholder="e.g. Check Measure, Install, Touch up"></div>
+        <div class="two-col">
+          <div class="form-row"><label>Start day</label><input id="taskDate" type="date"></div>
+          <div class="form-row"><label>Hours</label><input id="taskHours" value="2h"></div>
+        </div>
+        <div class="two-col">
+          <div class="form-row"><label>Department</label><select id="taskDepartment"><option>Drafting</option><option>Cabinet Making</option><option>Machining</option><option>Milestone</option></select></div>
+          <div class="form-row"><label>Status</label><select id="taskStatus"><option>Planned</option><option>Forecast</option><option>In Progress</option><option>Complete</option><option>Waiting</option></select></div>
+        </div>
+      </div>
+      <div class="note" id="typeHint" style="margin-top:10px">Calendar milestone only: shows on Calendar and does not use employee capacity.</div>
+    </div>
+
+    <div class="detail-card" id="employeeCard">
+      <h3>Assigned employees</h3>
+      <div class="employee-list" id="employeeChoices"></div>
+      <div class="note" style="margin-top:10px">When more than one employee is selected, TrackR splits the task evenly and marks it as Split.</div>
+    </div>
+
+    <div class="detail-card" id="allocationCard">
+      <h3>Actual split</h3>
+      <div id="allocationSummary" class="note">Save the task to calculate allocation.</div>
+    </div>
+
+    <div class="detail-card">
+      <div class="action-row"><button class="danger" onclick="deleteTask()">Delete</button><button class="primary" onclick="savePanelTask()">Save task</button></div>
+    </div>
+  </div>
+</aside>
+
+<aside class="side-panel" id="dayPanel">
+  <div class="side-head">
+    <div><div class="panel-title" id="dayPanelTitle">Day</div><div class="panel-sub">Capacity and items</div></div>
+    <button class="close-btn" onclick="closeDayPanel()">×</button>
+  </div>
+  <div class="side-body" id="dayPanelBody"></div>
+</aside>
+
+
+<aside class="side-panel" id="statusPanel">
+  <div class="side-head">
+    <div><div class="panel-title">Add blocked range</div><div class="panel-sub">Sick, Away, Holiday or RDO</div></div>
+    <button class="close-btn" onclick="closeStatusPanel()">×</button>
+  </div>
+  <div class="side-body">
+    <div class="detail-card">
+      <h3>Blocked range</h3>
+      <div class="form-grid">
+        <div class="form-row"><label>Employee</label><select id="statusPerson"></select></div>
+        <div class="form-row"><label>Type</label><select id="statusType"><option>Sick</option><option>Away</option><option>Holiday</option><option>RDO</option></select></div>
+        <div class="two-col">
+          <div class="form-row"><label>Start day</label><select id="statusStart"></select></div>
+          <div class="form-row"><label>End day</label><select id="statusEnd"></select></div>
+        </div>
+      </div>
+    </div>
+    <div class="detail-card"><button class="primary" onclick="saveStatusRange()">Save blocked range</button></div>
+  </div>
+</aside>
+
+<aside class="side-panel" id="employeePanel">
+  <div class="side-head">
+    <div><div class="panel-title" id="employeePanelTitle">Employee</div><div class="panel-sub">Department and normal working hours</div></div>
+    <button class="close-btn" onclick="closeEmployeePanel()">×</button>
+  </div>
+  <div class="side-body">
+    <div class="detail-card">
+      <h3>Employee details</h3>
+      <div class="form-grid">
+        <div class="form-row"><label>Name</label><input id="employeeNameInput"></div>
+        <div class="form-row"><label>Department</label><select id="employeeRoleInput"><option>Drafting</option><option>Cabinet Making</option><option>Machining</option><option>Admin</option></select></div>
+      </div>
+    </div>
+    <div class="detail-card">
+      <h3>Work pattern</h3>
+      <div class="roster-toggle">
+        <button id="standardPatternBtn" onclick="setEmployeePattern('Standard')">Standard week</button>
+        <button id="customPatternBtn" onclick="setEmployeePattern('Custom')">Custom</button>
+      </div>
+      <div class="note" style="margin-top:10px">Standard uses one Mon–Fri pattern. Custom repeats Week 1 and Week 2 from the start date.</div>
+    </div>
+
+    <div class="detail-card">
+      <h3>Standard week hours</h3>
+      <div class="two-col">
+        <div class="form-row"><label>Mon</label><input id="empMon" value="7h40" oninput="refreshRosterTotals()"></div>
+        <div class="form-row"><label>Tue</label><input id="empTue" value="7h40" oninput="refreshRosterTotals()"></div>
+        <div class="form-row"><label>Wed</label><input id="empWed" value="7h40" oninput="refreshRosterTotals()"></div>
+        <div class="form-row"><label>Thu</label><input id="empThu" value="7h40" oninput="refreshRosterTotals()"></div>
+        <div class="form-row"><label>Fri</label><input id="empFri" value="5h40" oninput="refreshRosterTotals()"></div>
+      </div>
+      <div class="note" style="margin-top:10px">Set a day to 0h to make it unavailable/RDO in Schedule.</div>
+    </div>
+
+    <div class="detail-card" id="customRosterCard">
+      <h3>Custom 2-week roster</h3>
+      <div class="form-row" style="margin-bottom:10px"><label>Custom start date</label><input id="customStartInput" type="date" value="2026-06-08" onchange="refreshRosterTotals()"></div>
+      <div class="roster-grid">
+        <div class="roster-label"></div><div class="form-row"><label>Mon</label></div><div class="form-row"><label>Tue</label></div><div class="form-row"><label>Wed</label></div><div class="form-row"><label>Thu</label></div><div class="form-row"><label>Fri</label></div>
+        <div class="roster-label">Week 1</div><input id="w1Mon" value="7h40" oninput="refreshRosterTotals()"><input id="w1Tue" value="7h40" oninput="refreshRosterTotals()"><input id="w1Wed" value="7h40" oninput="refreshRosterTotals()"><input id="w1Thu" value="7h40" oninput="refreshRosterTotals()"><input id="w1Fri" value="5h40" oninput="refreshRosterTotals()">
+        <div class="roster-label">Week 2</div><input id="w2Mon" value="7h40" oninput="refreshRosterTotals()"><input id="w2Tue" value="7h40" oninput="refreshRosterTotals()"><input id="w2Wed" value="7h40" oninput="refreshRosterTotals()"><input id="w2Thu" value="7h40" oninput="refreshRosterTotals()"><input id="w2Fri" value="0h" oninput="refreshRosterTotals()">
+      </div>
+      <div class="roster-total">
+        <div class="roster-total-row"><span>Week 1 total</span><strong id="week1Total">0h</strong></div>
+        <div class="roster-total-row"><span>Week 2 total</span><strong id="week2Total">0h</strong></div>
+        <div class="roster-total-row"><span>Average weekly capacity</span><strong id="averageWeekTotal">0h</strong></div>
+      </div>
+    </div>
+    <div class="detail-card">
+      <div class="action-row"><button class="danger" onclick="removeEmployee()">Remove</button><button class="primary" onclick="saveEmployee()">Save employee</button></div>
+    </div>
+  </div>
+</aside>
+
+<script>
+const currentUser = {{ current_user|tojson }};
+const isAdmin = currentUser.role === "admin";
+const csrfToken = {{ csrf_token|tojson }};
+let stateRevision = 0;
+let appUsers = [];
+
+async function apiFetch(url, options={}){
+  const method = String(options.method || "GET").toUpperCase();
+  const headers = {...(options.headers || {})};
+  if (!["GET","HEAD","OPTIONS"].includes(method)) headers["X-CSRF-Token"] = csrfToken;
+  const response = await fetch(url, {...options, headers});
+  if (response.status === 401) {window.location.href = "/login"; throw new Error("Login required");}
+  if (response.status === 403) {
+    let payload = {}; try {payload = await response.clone().json();} catch (_) {}
+    if (String(payload.error || "").toLowerCase().includes("password change")) window.location.href = "/change-password";
+  }
+  return response;
+}
+const baseYear = 2026;
+const baseMonth = 5; // legacy demo-data month (June)
+const scheduleStartDay = 8;
+const legacyBaseDate = new Date(baseYear, baseMonth, scheduleStartDay);
+const calendarBaseDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+let scheduleStartDate = startOfWeek(new Date());
+let scheduleSpanDays = 91;
+let scheduleDayWidth = 160;
+let days = [];
+
+let people = [];
+
+let jobs = [];
+
+let tasks = [];
+
+let selectedTaskId = null;
+let selectedEmployeeName = null;
+let visibleMonthOffset = 0;
+let currentDragTask = null;
+let currentDragPerson = null;
+let calendarDragTask = null;
+let calendarDragSuppressClick = false;
+let homeWeek = "this";
+let dayStatuses = [];
+let saveTimer = null;
+let saveChain = Promise.resolve();
+let stateLoaded = false;
+let addJobStages = [];
+let addJobSource = "manual";
+let addJobImportDetails = null;
+let editingJobId = null;
+let calendarEvents = [];
+let activeSettingsSection = "employees";
+let selectedCalendarEventId = null;
+let employeeDragName = null;
+
+function statePayload(){
+  return {
+    _revision: stateRevision,
+    version: 6,
+    people,
+    jobs,
+    tasks: tasks.map(({parts, unscheduledMinutes, ...task}) => task),
+    dayStatuses,
+    calendarEvents
+  };
+}
+
+async function loadSavedState(){
+  try{
+    const response = await apiFetch("/api/state");
+    if (response.status === 401) {window.location.href = "/login"; return;}
+    const state = await response.json();
+    stateRevision = Number(state._revision || 0);
+    people = Array.isArray(state.people) ? state.people : [];
+    jobs = Array.isArray(state.jobs) ? state.jobs : [];
+    tasks = Array.isArray(state.tasks) ? state.tasks : [];
+    tasks.forEach(task => {
+      if (!task.date && Number.isFinite(Number(task.start))) task.date = toIsoDate(legacyDateForDayIndex(Number(task.start)));
+    });
+    dayStatuses = Array.isArray(state.dayStatuses) ? state.dayStatuses : [];
+    calendarEvents = Array.isArray(state.calendarEvents) ? state.calendarEvents : [];
+    dayStatuses.forEach(status => {
+      if (!status.startDate && Number.isFinite(Number(status.start))) status.startDate = toIsoDate(legacyDateForDayIndex(Number(status.start)));
+      if (!status.endDate && Number.isFinite(Number(status.end))) status.endDate = toIsoDate(legacyDateForDayIndex(Number(status.end)));
+    });
+    initialiseScheduleWindow();
+    stateLoaded = true;
+    renderAll();
+    if (isAdmin) loadUsers();
+    showToast("TrackR data loaded");
+  }catch(error){
+    console.error(error);
+    showToast("Could not load saved TrackR data");
+  }
+}
+
+async function persistState(message="Saved"){
+  if(!stateLoaded || !isAdmin) return false;
+  clearTimeout(saveTimer);
+  try{
+    const response = await apiFetch("/api/state", {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify(statePayload())
+    });
+    let payload = {}; try {payload = await response.json();} catch (_) {}
+    if (response.status === 409) {
+      stateLoaded = false;
+      showToast(payload.error || "TrackR changed elsewhere. Refresh required.");
+      return false;
+    }
+    if(!response.ok) throw new Error(payload.error || "Save failed");
+    stateRevision = Number(payload.revision || stateRevision + 1);
+    showToast(message);
+    return true;
+  }catch(error){
+    console.error(error);
+    showToast("Save failed");
+    return false;
+  }
+}
+
+function queueStateSave(message="Saved"){
+  saveChain = saveChain.then(
+    () => persistState(message),
+    () => persistState(message)
+  );
+  return saveChain;
+}
+function saveState(message="Saved"){
+  if(!stateLoaded || !isAdmin) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => queueStateSave(message), 180);
+}
+
+
+function fmt(minutes){
+  minutes = Math.round(minutes || 0);
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h <= 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h${String(m).padStart(2,"0")}`;
+}
+function parseHours(value){
+  const txt = String(value || "").trim().toLowerCase();
+  if (!txt || txt === "0" || txt === "0h") return 0;
+  const compact = txt.match(/^(\d+)\s*h\s*(\d+)$/);
+  if (compact) return Number(compact[1]) * 60 + Number(compact[2]);
+  const h = txt.match(/(\d+(?:\.\d+)?)\s*h/);
+  const m = txt.match(/(\d+)\s*m/);
+  if (h || m) return Math.round((h ? Number(h[1]) * 60 : 0) + (m ? Number(m[1]) : 0));
+  const decimal = Number(txt);
+  if (Number.isFinite(decimal)) return Math.round(decimal * 60);
+  return 0;
+}
+function jobById(id){return jobs.find(job => job.id === id)}
+function dayNameForIndex(i){return days[i] ? days[i].name : ""}
+function parseIsoDate(value){
+  if (!value) return null;
+  const p = String(value).split("-").map(Number);
+  if (p.length !== 3 || p.some(Number.isNaN)) return null;
+  return new Date(p[0], p[1]-1, p[2]);
+}
+function addCalendarDays(dateObj, amount){
+  const result = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+  result.setDate(result.getDate() + Number(amount || 0));
+  return result;
+}
+function startOfWeek(dateObj){
+  const result = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+  const offset = (result.getDay() + 6) % 7;
+  result.setDate(result.getDate() - offset);
+  return result;
+}
+function legacyDateForDayIndex(dayIndex){ return addCalendarDays(legacyBaseDate, Number(dayIndex || 0)); }
+function legacyIndexForDate(dateObj){ return calendarDayDifference(legacyBaseDate, dateObj); }
+function dateForDayIndex(dayIndex){ return addCalendarDays(scheduleStartDate, Number(dayIndex || 0)); }
+function taskDate(task){ return parseIsoDate(task && task.date) || legacyDateForDayIndex(Number(task && task.start || 0)); }
+function taskDateForPerson(task,personName){
+  const override = task && task.assignmentDates && personName ? parseIsoDate(task.assignmentDates[personName]) : null;
+  return override || taskDate(task);
+}
+function isSameDate(a,b){ return !!a && !!b && a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+function scheduleIndexForDate(dateObj){ return calendarDayDifference(scheduleStartDate, dateObj); }
+function buildScheduleDays(){
+  days = Array.from({length:scheduleSpanDays}, (_,index) => {
+    const dateObj = dateForDayIndex(index);
+    return {name:dateObj.toLocaleDateString("en-AU",{weekday:"short"}),date:dateObj.toLocaleDateString("en-AU",{day:"numeric",month:"short"}),iso:toIsoDate(dateObj),monthDay:dateObj.getDate(),working:dateObj.getDay()!==0&&dateObj.getDay()!==6};
+  });
+  document.documentElement.style.setProperty("--day-count", scheduleSpanDays);
+}
+function initialiseScheduleWindow(){
+  // Always open the Schedule on the current week. Users can then navigate
+  // forward or backward without the initial view jumping to the nearest task.
+  scheduleStartDate = startOfWeek(new Date());
+  buildScheduleDays();
+}
+function updateScheduleDayWidth(){
+  const planner = document.getElementById("planner");
+  const peopleWidth = 190;
+  const plannerWidth = planner?.clientWidth || Math.max(900, window.innerWidth - 48);
+  const available = Math.max(7 * 125, plannerWidth - peopleWidth - 2);
+  // Fit exactly one Monday-to-Sunday week in the visible planner.
+  // The remaining continuous timeline stays available through horizontal scrolling.
+  scheduleDayWidth = Math.max(125, Math.floor(available / 7));
+  document.documentElement.style.setProperty("--day", `${scheduleDayWidth}px`);
+}
+function changeScheduleWeek(direction){ scheduleStartDate = addCalendarDays(scheduleStartDate, Number(direction||0)*7); buildScheduleDays(); renderAll(); }
+function goScheduleToday(){ scheduleStartDate = startOfWeek(new Date()); buildScheduleDays(); renderAll(); }
+function toIsoDate(dateObj){
+  if (!dateObj || Number.isNaN(dateObj.getTime())) return "";
+  return `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,"0")}-${String(dateObj.getDate()).padStart(2,"0")}`;
+}
+function addBusinessDays(dateObj, amount){
+  const result = new Date(dateObj);
+  const direction = amount >= 0 ? 1 : -1;
+  let remaining = Math.abs(Number(amount) || 0);
+  while (remaining > 0) {
+    result.setDate(result.getDate() + direction);
+    if (result.getDay() !== 0 && result.getDay() !== 6) remaining--;
+  }
+  return result;
+}
+function ensureBusinessDay(dateObj){
+  const result = new Date(dateObj);
+  while (result.getDay() === 0 || result.getDay() === 6) result.setDate(result.getDate() + 1);
+  return result;
+}
+function calendarDayDifference(fromDate, toDate){
+  const start = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+  const end = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
+  return Math.round((end - start) / 86400000);
+}
+function escapeHtml(value){
+  return String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[char]));
+}
+function weekPatternForDate(person, dateObj){
+  if ((person.workPattern || "Standard") !== "Custom") return person.week || {};
+  const start = parseIsoDate(person.customStart) || new Date(baseYear, baseMonth, scheduleStartDay);
+  const diffDays = Math.floor((dateObj - start) / (24*60*60*1000));
+  const cycleDay = ((diffDays % 14) + 14) % 14;
+  return cycleDay < 7 ? (person.week1 || person.week || {}) : (person.week2 || person.week || {});
+}
+function blockedStatusForDate(personName, dateObj){
+  if (!personName || !dateObj) return null;
+  const iso = toIsoDate(dateObj);
+  return dayStatuses.find(status => {
+    if (status.person !== personName) return false;
+    const start = status.startDate || toIsoDate(legacyDateForDayIndex(Number(status.start || 0)));
+    const end = status.endDate || toIsoDate(legacyDateForDayIndex(Number(status.end || status.start || 0)));
+    return iso >= start && iso <= end;
+  }) || null;
+}
+function globalCalendarEventForDate(dateObj){
+  if (!dateObj) return null;
+  const iso = toIsoDate(dateObj);
+  return calendarEvents.find(event => iso >= event.startDate && iso <= event.endDate) || null;
+}
+function capacityForDate(person, dateObj){
+  if (!person || !dateObj || dateObj.getDay()===0 || dateObj.getDay()===6) return 0;
+  if (globalCalendarEventForDate(dateObj)) return 0;
+  if (blockedStatusForDate(person.name,dateObj)) return 0;
+  const dayName = dateObj.toLocaleDateString("en-AU",{weekday:"short"});
+  return weekPatternForDate(person, dateObj)[dayName] || 0;
+}
+function capacityFor(person, dayIndex){ return capacityForDate(person, dateForDayIndex(dayIndex)); }
+function weeklyCapacity(person){
+  if ((person.workPattern || "Standard") === "Custom") {
+    const week1 = Object.values(person.week1 || {}).reduce((sum, mins) => sum + (mins || 0), 0);
+    const week2 = Object.values(person.week2 || {}).reduce((sum, mins) => sum + (mins || 0), 0);
+    return Math.round((week1 + week2) / 2);
+  }
+  return Object.values(person.week || {}).reduce((sum, mins) => sum + (mins || 0), 0);
+}
+function taskLabel(task){return `${task.job} · ${task.name}`}
+function typeColour(task){
+  const name = String(task.name || "").toLowerCase();
+  if (task.custom) return "stage-custom";
+  if (name.includes("stone")) return "stage-stone";
+  if (name.includes("check measure")) return "stage-check";
+  if (name.includes("forward ordering") || name.includes("ordering")) return "stage-ordering";
+  if (name.includes("draft")) return "stage-drafting";
+  if (name.includes("machin")) return "stage-machining";
+  if (name.includes("assembl")) return "stage-assembly";
+  if (name.includes("load")) return "stage-loading";
+  if (name.includes("deliver")) return "stage-delivery";
+  if (name.includes("install")) return "stage-install";
+  if (name.includes("2pak") || name.includes("2 pak")) return "stage-2pak";
+  if (task.type === "milestone") return "yellow";
+  if (task.department === "Drafting") return "stage-drafting";
+  if (task.department === "Machining") return "stage-machining";
+  if (task.department === "Cabinet Making") return "stage-assembly";
+  return "stage-custom";
+}
+function taskMatchesFilters(){
+  return true;
+
+}
+
+function calculate(){
+  tasks.forEach(task => {task.parts = []; task.unscheduledMinutes = 0;});
+  const used = {};
+  const allocation = {};
+  const usedByDate = {};
+  people.forEach(person => {
+    used[person.name] = days.map(() => 0);
+    allocation[person.name] = days.map(() => []);
+    usedByDate[person.name] = {};
+  });
+
+  tasks.filter(task => task.type === "milestone").forEach(task => {
+    const dateObj = taskDate(task);
+    const day = scheduleIndexForDate(dateObj);
+    task.parts.push({person:"Milestones", day, date:toIsoDate(dateObj), minutes:0});
+  });
+  tasks.filter(task => task.type === "capacity" && !(task.assigned || []).length).forEach(task => {
+    const dateObj = taskDate(task);
+    const day = scheduleIndexForDate(dateObj);
+    task.parts.push({person:"Unassigned", day, date:toIsoDate(dateObj), minutes:Number(task.duration || 0)});
+  });
+
+  const ordered = tasks.filter(task => task.type === "capacity").sort((a,b) => taskDate(a)-taskDate(b) || String(a.id).localeCompare(String(b.id)));
+  ordered.forEach(task => {
+    const assignedPeople = (task.assigned || []).map(name => people.find(p => p.name === name && p.role !== "Admin")).filter(Boolean);
+    if (!assignedPeople.length) return;
+
+    const customShares = task.assignmentMinutes || {};
+    const hasCustomShares = assignedPeople.some(person => customShares[person.name] != null);
+    const baseShare = Math.floor(Number(task.duration || 0) / assignedPeople.length);
+    let remainder = Number(task.duration || 0) - (baseShare * assignedPeople.length);
+
+    assignedPeople.forEach(person => {
+      let remaining = hasCustomShares ? Math.max(0,Number(customShares[person.name])||0) : baseShare + (remainder > 0 ? 1 : 0);
+      if (!hasCustomShares && remainder > 0) remainder -= 1;
+      let cursor = taskDateForPerson(task,person.name);
+      let guard = 0;
+
+      while (remaining > 0 && guard < 730) {
+        const iso = toIsoDate(cursor);
+        const cap = capacityForDate(person, cursor);
+        const alreadyUsed = usedByDate[person.name][iso] || 0;
+        const spare = Math.max(0, cap - alreadyUsed);
+        if (spare > 0) {
+          const use = Math.min(spare, remaining);
+          usedByDate[person.name][iso] = alreadyUsed + use;
+          remaining -= use;
+          const visibleDay = scheduleIndexForDate(cursor);
+          const part = {person:person.name, day:visibleDay, date:iso, minutes:use};
+          task.parts.push(part);
+          if (visibleDay >= 0 && visibleDay < days.length) {
+            used[person.name][visibleDay] += use;
+            allocation[person.name][visibleDay].push({task, minutes:use});
+          }
+        }
+        cursor = addCalendarDays(cursor,1);
+        guard++;
+      }
+      if (remaining > 0) task.unscheduledMinutes = Number(task.unscheduledMinutes || 0) + remaining;
+    });
+    task.parts.sort((a,b) => String(a.date).localeCompare(String(b.date)) || a.person.localeCompare(b.person));
+  });
+  return {used, allocation};
+}
+
+function segmentsForTask(task, rowName){
+  const parts = (task.parts || []).filter(part => part.person === rowName && part.day >= 0 && part.day < days.length).sort((a,b)=>a.day-b.day);
+  const out = [];
+  let current = null;
+  parts.forEach(part => {
+    if (!current) current = {start:part.day, span:1};
+    else if (current.start + current.span === part.day) current.span += 1;
+    else {out.push(current); current = {start:part.day, span:1};}
+  });
+  if (current) out.push(current);
+  return out;
+}
+
+function assignScheduleLanes(items){
+  const laneEnds = [];
+  items.forEach(item => {
+    let lane = laneEnds.findIndex(end => end <= item.start);
+    if (lane < 0) lane = laneEnds.length;
+    item.lane = lane;
+    laneEnds[lane] = item.start + item.span;
+  });
+  return laneEnds.length;
+}
+
+function showView(view){
+  const allowedViews = isAdmin ? ["home","jobs","addJob","calendar","schedule","settings"] : ["home","calendar","schedule"];
+  if (!allowedViews.includes(view)) view = "home";
+  ["home","jobs","addJob","calendar","schedule","settings"].forEach(name => {
+    const section = document.getElementById(name + "View");
+    if (section) section.classList.toggle("active", view === name);
+  });
+  ["home","jobs","calendar","schedule","settings"].forEach(name => {
+    const tab = document.getElementById("tab" + name[0].toUpperCase() + name.slice(1));
+    if (tab) tab.classList.toggle("active", view === name || (name === "jobs" && view === "addJob"));
+  });
+  if (view === "settings" && isAdmin) showSettingsSection(activeSettingsSection);
+  if (view === "schedule") setTimeout(() => {updateScheduleDayWidth(); renderSchedule();}, 0);
+  setTimeout(syncFloatingScrollWidth, 0);
+}
+function renderAll(){
+  renderHome();
+  if (isAdmin) renderJobs();
+  renderCalendar();
+  renderSchedule();
+  if (isAdmin) {
+    renderSettings();
+  }
+}
+
+/* Home */
+function setHomeWeek(week){
+  homeWeek = week;
+  document.getElementById("homeThisWeek").classList.toggle("active", week === "this");
+  document.getElementById("homeNextWeek").classList.toggle("active", week === "next");
+  renderHome();
+}
+function selectedHomeWeekRange(){
+  const start = addCalendarDays(startOfWeek(new Date()), homeWeek === "next" ? 7 : 0);
+  return {start,end:addCalendarDays(start,6),startIso:toIsoDate(start),endIso:toIsoDate(addCalendarDays(start,6))};
+}
+function departmentBooked(startIso,endIso){
+  calculate();
+  const totals = {Drafting:0,"Cabinet Making":0,Machining:0};
+  tasks.filter(task => task.type === "capacity").forEach(task => {
+    (task.parts || []).forEach(part => {
+      if (part.date >= startIso && part.date <= endIso && task.department in totals) totals[task.department] += Number(part.minutes || 0);
+    });
+  });
+  return totals;
+}
+function departmentCapacity(startDate,endDate){
+  const totals = {Drafting:0,"Cabinet Making":0,Machining:0};
+  people.filter(person => person.role in totals).forEach(person => {
+    for (let cursor = new Date(startDate); cursor <= endDate; cursor = addCalendarDays(cursor,1)) totals[person.role] += capacityForDate(person,cursor);
+  });
+  return totals;
+}
+function jobTouchesWeek(job,startIso,endIso){
+  if (job.installDate && job.installDate >= startIso && job.installDate <= endIso) return true;
+  return tasks.some(task => {
+    if (task.job !== job.id) return false;
+    if ((task.type === "milestone" || task.type === "admin") && task.date >= startIso && task.date <= endIso) return true;
+    return (task.parts || []).some(part => part.date >= startIso && part.date <= endIso);
+  });
+}
+function renderHome(){
+  const range = selectedHomeWeekRange();
+  const booked = departmentBooked(range.startIso,range.endIso);
+  const cap = departmentCapacity(range.start,range.end);
+  const d = Math.round(booked.Drafting);
+  const c = Math.round(booked["Cabinet Making"]);
+  const m = Math.round(booked.Machining);
+  const totalBooked = d+c+m;
+  const totalCap = cap.Drafting + cap["Cabinet Making"] + cap.Machining;
+  const dEnd = totalCap ? Math.min(360,(d/totalCap)*360) : 0;
+  const cEnd = totalCap ? Math.min(360,((d+c)/totalCap)*360) : 0;
+  const mEnd = totalCap ? Math.min(360,((d+c+m)/totalCap)*360) : 0;
+  document.getElementById("homeDonut").style.background = `conic-gradient(#4a84d8 0deg ${dEnd}deg,#3f9a63 ${dEnd}deg ${cEnd}deg,#9d62d3 ${cEnd}deg ${mEnd}deg,#ebe7df ${mEnd}deg 360deg)`;
+  document.getElementById("homeBookedTotal").textContent = fmt(totalBooked);
+  document.getElementById("homeCapacityTotal").textContent = `of ${fmt(totalCap)} capacity`;
+  document.getElementById("homeDrafting").textContent = `${fmt(d)} / ${fmt(cap.Drafting)}`;
+  document.getElementById("homeCabinet").textContent = `${fmt(c)} / ${fmt(cap["Cabinet Making"])}`;
+  document.getElementById("homeMachining").textContent = `${fmt(m)} / ${fmt(cap.Machining)}`;
+  document.getElementById("homeJobsTitle").textContent = homeWeek === "this" ? "This week’s jobs" : "Next week’s jobs";
+  const relevant = jobs.filter(job => jobTouchesWeek(job,range.startIso,range.endIso));
+  const container = document.getElementById("homeJobs");
+  container.innerHTML = relevant.map((job, idx) => {
+    const jobTasks = tasks.filter(task => task.job === job.id && ((task.date >= range.startIso && task.date <= range.endIso) || (task.parts || []).some(part => part.date >= range.startIso && part.date <= range.endIso))).slice(0,6);
+    return `<div class="home-job ${idx === 0 ? "open" : ""}">
+      <div class="home-job-head" data-home-toggle>
+        <div><div class="home-job-title">${escapeHtml(job.id)} · ${escapeHtml(job.address)}</div><div class="home-job-sub">${jobTasks.length} scheduled items · ${escapeHtml(job.status || "Active")}</div></div>
+        <span>⌃</span>
+      </div>
+      <div class="home-job-detail">
+        ${jobTasks.map(task => `<div class="mini-detail"><span>${escapeHtml(task.name)}</span><strong>${(task.assigned || []).length ? (task.assigned || []).map(escapeHtml).join(", ") : "Calendar"}</strong></div>`).join("") || `<div class="note">No scheduled items in this week.</div>`}
+      </div>
+    </div>`;
+  }).join("") || `<div class="note">No jobs are scheduled in this week.</div>`;
+  container.querySelectorAll("[data-home-toggle]").forEach(element => element.addEventListener("click", () => element.parentElement.classList.toggle("open")));
+}
+
+/* Add Job */
+const ADD_JOB_TEMPLATES = {
+  2:{Drafting:8,Machining:8,Assembly:24},
+  3:{Drafting:10,Machining:8,Assembly:28},
+  4:{Drafting:12,Machining:10,Assembly:32},
+  5:{Drafting:14,Machining:12,Assembly:38},
+  6:{Drafting:16,Machining:14,Assembly:44},
+  7:{Drafting:18,Machining:16,Assembly:50}
+};
+function configureAddJobPage(isEditing){
+  document.getElementById("addJobTitle").textContent = isEditing ? "Edit Job" : "Add Job";
+  document.getElementById("addJobSubtitle").textContent = isEditing ? "Update the job details, production dates, hours and assignments." : "Import an estimate PDF or enter the job manually. Both routes create the same production plan.";
+  document.getElementById("ajSaveButton").textContent = isEditing ? "Save Changes" : "Create Job";
+  document.getElementById("ajDeleteButton").style.display = isEditing ? "inline-flex" : "none";
+  document.getElementById("ajSourceChoices").style.display = isEditing ? "none" : "grid";
+}
+function openAddJob(){
+  if (!isAdmin) return;
+  editingJobId = null;
+  configureAddJobPage(false);
+  startManualJob(false);
+  showView("addJob");
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+function openEditJob(jobId){
+  if (!isAdmin) return;
+  const job = jobs.find(item => String(item.id) === String(jobId));
+  if (!job) return;
+  editingJobId = String(job.id);
+  configureAddJobPage(true);
+  addJobSource = job.source || "manual";
+  addJobImportDetails = null;
+  document.getElementById("ajJobNumber").value = job.id || "";
+  document.getElementById("ajAddress").value = job.address || "";
+  document.getElementById("ajBuilder").value = job.builder || "";
+  document.getElementById("ajJobLength").value = String(job.jobLengthWeeks || 4);
+  const existingJobTasks = tasks.filter(task => String(task.job) === String(job.id));
+  const installTask = existingJobTasks.find(task => String(task.name).toLowerCase() === "install");
+  const normalisedInstallDate = job.installDate || (installTask ? toIsoDate(taskDate(installTask)) : "");
+  document.getElementById("ajInstallDate").value = normalisedInstallDate;
+  document.getElementById("ajJobStatus").value = job.status || "Active";
+  document.getElementById("ajTwoPack").checked = !!job.twoPack;
+  document.getElementById("ajNotes").value = job.notes || "";
+  document.getElementById("ajSourceLabel").textContent = "Editing existing job";
+  document.getElementById("ajEstimateBadge").textContent = "Existing job";
+  const jobTasks = existingJobTasks;
+  const hoursFor = (...names) => jobTasks.filter(task => names.includes(task.name)).reduce((sum,task)=>sum+Number(task.estimatedHours ?? (Number(task.duration||0)/60)),0);
+  document.getElementById("ajHoursCheck").value = hoursFor("Check Measure");
+  document.getElementById("ajHoursDrafting").value = hoursFor("Drafting");
+  document.getElementById("ajHoursMachining").value = hoursFor("Machining","Machine 2pak Items");
+  document.getElementById("ajHoursAssembly").value = hoursFor("Assembly","Prep 2pak Items");
+  document.getElementById("ajHoursLoading").value = hoursFor("Loading");
+  document.getElementById("ajHoursDelivery").value = hoursFor("Delivery");
+  addJobStages = stagesFromJobTasks(jobTasks);
+  if (!addJobStages.length && job.installDate) addJobStages = buildAddJobStages();
+  hideAddJobMessage();
+  renderAddJobStages();
+  showView("addJob");
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+function setAddJobSource(source){
+  addJobSource = source;
+  document.getElementById("ajPdfCard").classList.toggle("active", source === "pdf");
+  document.getElementById("ajManualCard").classList.toggle("active", source === "manual");
+  document.getElementById("ajSourceLabel").textContent = source === "pdf" ? "PDF import · labour hours read from estimate" : "Manual entry · standard template hours";
+}
+function startManualJob(scroll=true){
+  setAddJobSource("manual");
+  addJobImportDetails = null;
+  addJobStages = [];
+  ["ajJobNumber","ajAddress","ajBuilder","ajInstallDate","ajNotes"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("ajJobLength").value = "4";
+  document.getElementById("ajJobStatus").value = "Active";
+  document.getElementById("ajTwoPack").checked = false;
+  document.getElementById("ajEstimateBadge").textContent = "Manual entry";
+  applyManualDefaultHours();
+  hideAddJobMessage();
+  if (scroll) document.getElementById("ajDetailsPanel").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function showAddJobMessage(message, isError=false){
+  const box = document.getElementById("ajImportMessage");
+  box.textContent = message;
+  box.classList.add("show");
+  box.style.background = isError ? "#fee2e2" : "#eaf8f0";
+  box.style.color = isError ? "#991b1b" : "#17613b";
+  box.style.borderColor = isError ? "#fecaca" : "#c6ecd7";
+}
+function hideAddJobMessage(){document.getElementById("ajImportMessage").classList.remove("show")}
+function handlePdfFileChosen(){
+  const input = document.getElementById("ajPdfFile");
+  const file = input.files && input.files[0];
+  document.getElementById("ajPdfDropHint").textContent = file ? file.name : "Drag an estimate PDF anywhere into this box";
+}
+function setupAddJobPdfDrop(){
+  const card = document.getElementById("ajPdfCard");
+  const input = document.getElementById("ajPdfFile");
+  if (!card || !input || card.dataset.dropReady === "true") return;
+  card.dataset.dropReady = "true";
+  ["dragenter","dragover"].forEach(type => card.addEventListener(type, event => {
+    event.preventDefault();
+    event.stopPropagation();
+    card.classList.add("pdf-dragging");
+  }));
+  ["dragleave","dragend"].forEach(type => card.addEventListener(type, event => {
+    event.preventDefault();
+    if (type === "dragleave" && card.contains(event.relatedTarget)) return;
+    card.classList.remove("pdf-dragging");
+  }));
+  card.addEventListener("drop", event => {
+    event.preventDefault();
+    event.stopPropagation();
+    card.classList.remove("pdf-dragging");
+    const file = Array.from(event.dataTransfer?.files || []).find(item => item.type === "application/pdf" || item.name.toLowerCase().endsWith(".pdf"));
+    if (!file) {
+      showAddJobMessage("Drop a PDF estimate into the import box.", true);
+      return;
+    }
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    input.files = transfer.files;
+    handlePdfFileChosen();
+    importEstimatePdf();
+  });
+}
+async function importEstimatePdf(){
+  const fileInput = document.getElementById("ajPdfFile");
+  const file = fileInput.files && fileInput.files[0];
+  if (!file) {showAddJobMessage("Choose an estimate PDF first.", true); return;}
+  const button = document.getElementById("ajReadPdfBtn");
+  button.disabled = true;
+  button.textContent = "Reading...";
+  const form = new FormData();
+  form.append("estimate_pdf", file);
+  try{
+    const response = await apiFetch("/api/import-estimate", {method:"POST", body:form});
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.error || "Could not read that PDF.");
+    const data = result.extracted || {};
+    addJobImportDetails = data;
+    setAddJobSource("pdf");
+    document.getElementById("ajJobNumber").value = data.quote_no || "";
+    document.getElementById("ajAddress").value = data.quote_name || "";
+    document.getElementById("ajEstimateBadge").textContent = "PDF imported";
+    document.getElementById("ajHoursCheck").value = Number(data.check_measure_hours || 0);
+    document.getElementById("ajHoursDrafting").value = Number(data.drafting_total_hours || 0);
+    document.getElementById("ajHoursMachining").value = Number(data.machining_hours || 0);
+    document.getElementById("ajHoursAssembly").value = Number(data.assembly_total_hours || 0);
+    document.getElementById("ajHoursLoading").value = Number(data.loading_total_hours || 0);
+    document.getElementById("ajHoursDelivery").value = Number(data.delivery_total_hours || 0);
+    document.getElementById("ajNotes").value = `Imported from estimate PDF. Check Measure ${Number(data.check_measure_hours || 0)}h calendar only, Drafting ${Number(data.drafting_total_hours || 0)}h, Machining ${Number(data.machining_hours || 0)}h, Assembly ${Number(data.assembly_total_hours || 0)}h, Loading ${Number(data.loading_total_hours || 0)}h, Delivery ${Number(data.delivery_total_hours || 0)}h.`;
+    refreshAddJobPlan();
+    showAddJobMessage("PDF read successfully. Check the details and choose the predicted install date.");
+    document.getElementById("ajDetailsPanel").scrollIntoView({behavior:"smooth",block:"start"});
+  }catch(error){
+    console.error(error);
+    showAddJobMessage(error.message || "Could not read that PDF.", true);
+  }finally{
+    button.disabled = false;
+    button.textContent = "Read PDF";
+  }
+}
+function onAddJobLengthChange(){
+  if (addJobSource === "manual") applyManualDefaultHours();
+  else refreshAddJobPlan();
+}
+function applyManualDefaultHours(){
+  const weeks = Number(document.getElementById("ajJobLength").value || 4);
+  const template = ADD_JOB_TEMPLATES[weeks] || ADD_JOB_TEMPLATES[4];
+  document.getElementById("ajHoursCheck").value = 0;
+  document.getElementById("ajHoursDrafting").value = template.Drafting;
+  document.getElementById("ajHoursMachining").value = template.Machining;
+  document.getElementById("ajHoursAssembly").value = template.Assembly;
+  document.getElementById("ajHoursLoading").value = 0;
+  document.getElementById("ajHoursDelivery").value = 0;
+  refreshAddJobPlan();
+}
+function addJobHour(id){const value=Number(document.getElementById(id).value);return Number.isFinite(value)&&value>0?value:0}
+function buildAddJobStages(){
+  const install = parseIsoDate(document.getElementById("ajInstallDate").value);
+  if (!install) return [];
+  const installDate = ensureBusinessDay(install);
+  const weeks = Number(document.getElementById("ajJobLength").value || 4);
+  const checkDate = addBusinessDays(installDate, -(weeks * 5));
+  const draftingDate = addBusinessDays(checkDate, 2);
+  const standardForward = addBusinessDays(installDate, -20);
+  const draftMinusOne = addBusinessDays(draftingDate, -1);
+  const forwardDate = standardForward < draftMinusOne ? standardForward : draftMinusOne;
+  const oldByName = new Map(addJobStages.map(stage => [stage.name, stage]));
+  const stage = (name, department, dateObj, hours, countsCapacity, notes="") => {
+    const old = oldByName.get(name) || {};
+    const totalHours = Number(hours||0);
+    const plannedDate = toIsoDate(dateObj);
+    const assignments = countsCapacity ? normaliseStageAssignments(old, totalHours) : [];
+    assignments.forEach(item => { if (!item.date || item.date === old.date) item.date = plannedDate; });
+    return {name,department,date:plannedDate,endDate:plannedDate,hours:totalHours,countsCapacity,notes,status:old.status||"Planned",assignments};
+  };
+  let stages = [
+    stage("Forward Ordering","Drafting",forwardDate,.5,true,"Standard 30 minutes from Drafting capacity."),
+    stage("Check Measure","Milestone",checkDate,addJobHour("ajHoursCheck"),false,"Shown on Calendar only and does not use capacity."),
+    stage("Drafting","Drafting",draftingDate,addJobHour("ajHoursDrafting"),true,"Includes drafting and QC labour."),
+    stage("Machining","Machining",addBusinessDays(installDate,-10),addJobHour("ajHoursMachining"),true,"Includes CNC and edgebander labour."),
+    stage("Assembly","Cabinet Making",addBusinessDays(installDate,-5),addJobHour("ajHoursAssembly"),true),
+    stage("Loading","Cabinet Making",addBusinessDays(installDate,-2),addJobHour("ajHoursLoading"),true),
+    stage("Delivery","Cabinet Making",addBusinessDays(installDate,-1),addJobHour("ajHoursDelivery"),true),
+    stage("Install","Milestone",installDate,0,false,"Install date marker.")
+  ];
+  if (document.getElementById("ajTwoPack").checked) {
+    const machining = stages.find(item => item.name === "Machining");
+    const assembly = stages.find(item => item.name === "Assembly");
+    const normalMachining = parseIsoDate(machining.date);
+    const awayEnd = addBusinessDays(normalMachining,-1);
+    const awayStart = addBusinessDays(awayEnd,-9);
+    const prepDate = addBusinessDays(awayStart,-1);
+    const machineDate = addBusinessDays(prepDate,-1);
+    const drafting = stages.find(item => item.name === "Drafting");
+    const draftNeededBy = addBusinessDays(machineDate,-1);
+    if (parseIsoDate(drafting.date) > draftNeededBy) {
+      const previousDraftDate = drafting.date;
+      drafting.date = toIsoDate(draftNeededBy);
+      (drafting.assignments || []).forEach(item => { if (!item.date || item.date === previousDraftDate) item.date = drafting.date; });
+    }
+    const originalMachiningHours = Number(machining.hours||0);
+    const originalAssemblyHours = Number(assembly.hours||0);
+    const machine2pakHours = Math.round((originalMachiningHours / 2) * 100) / 100;
+    const prep2pakHours = Math.round((originalAssemblyHours / 2) * 100) / 100;
+    machining.hours = Math.round((originalMachiningHours - machine2pakHours) * 100) / 100;
+    assembly.hours = Math.round((originalAssemblyHours - prep2pakHours) * 100) / 100;
+    if (machining.assignments?.length === 1 && Math.abs(Number(machining.assignments[0].hours||0)-originalMachiningHours) < .01) machining.assignments[0].hours = machining.hours;
+    if (assembly.assignments?.length === 1 && Math.abs(Number(assembly.assignments[0].hours||0)-originalAssemblyHours) < .01) assembly.assignments[0].hours = assembly.hours;
+    machining.notes = `Remaining machining after 2pak split: ${machining.hours}h.`;
+    assembly.notes = `Remaining assembly after 2pak split: ${assembly.hours}h.`;
+    const insertAt = stages.findIndex(item => item.name === "Machining");
+    const awayStage = stage("2pak Away","Milestone",awayStart,0,false,`Away until ${toIsoDate(awayEnd)}.`);
+    awayStage.endDate = toIsoDate(awayEnd);
+    stages.splice(insertAt,0,
+      stage("Machine 2pak Items","Machining",machineDate,machine2pakHours,true,"Machine 2pak items early for painting."),
+      stage("Prep 2pak Items","Cabinet Making",prepDate,prep2pakHours,true,"Prepare 2pak items before sending away."),
+      awayStage
+    );
+  }
+  const stoneCheck = addBusinessDays(installDate,1);
+  stages.push(stage("Stone Check Measure","Milestone",stoneCheck,0,false,"Stone supplier check measure marker."));
+  stages.push(stage("Stone Install","Milestone",addBusinessDays(stoneCheck,5),0,false,"Stone supplier install marker."));
+  return stages;
+}
+function refreshAddJobPlan(){
+  addJobStages = buildAddJobStages();
+  renderAddJobStages();
+}
+function employeesForDepartment(department){
+  const capacityPeople = people.filter(person => person.role !== "Admin");
+  const matching = capacityPeople.filter(person => person.role === department);
+  const others = capacityPeople.filter(person => person.role !== department);
+  return [...matching,...others];
+}
+function assignmentsFromTask(task){
+  const names = Array.isArray(task.assigned) ? task.assigned.filter(Boolean) : [];
+  const fallbackDate = toIsoDate(taskDate(task));
+  if (!names.length) return [{person:"",hours:Number(task.estimatedHours ?? (Number(task.duration||0)/60))||0,date:fallbackDate}];
+  const custom = task.assignmentMinutes || {};
+  const dates = task.assignmentDates || {};
+  const totalHours = Number(task.estimatedHours ?? (Number(task.duration||0)/60))||0;
+  const even = totalHours / names.length;
+  return names.map(name => ({person:name,hours:custom[name] != null ? Number(custom[name])/60 : even,date:dates[name] || fallbackDate}));
+}
+function isAdminEmployee(name){
+  const person = people.find(item => item.name === name);
+  return !!person && person.role === "Admin";
+}
+function stagesFromJobTasks(jobTasks){
+  const generated = jobTasks.filter(task => !task.custom);
+  const milestones = generated.filter(task => task.type === "milestone").map(task => ({
+    name:task.name,
+    department:"Milestone",
+    date:toIsoDate(taskDate(task)),
+    endDate:task.endDate || toIsoDate(taskDate(task)),
+    hours:Number(task.estimatedHours || 0),
+    countsCapacity:false,
+    notes:task.notes || "",
+    status:task.status || "Planned",
+    assignments:[]
+  }));
+  const grouped = new Map();
+  generated.filter(task => task.type === "capacity" || task.type === "admin").forEach(task => {
+    const department = task.stageDepartment || (task.type === "capacity" ? task.department : "Cabinet Making");
+    const key = task.stageGroup || `${task.name}|${department}`;
+    if (!grouped.has(key)) grouped.set(key,{name:task.stageGroup || task.name,department,capacityTask:null,adminTasks:[]});
+    const group = grouped.get(key);
+    if (task.type === "capacity") group.capacityTask = task;
+    else group.adminTasks.push(task);
+  });
+  const production = [...grouped.values()].map(group => {
+    const base = group.capacityTask || group.adminTasks[0];
+    const capacityHours = group.capacityTask ? Number(group.capacityTask.estimatedHours ?? (Number(group.capacityTask.duration||0)/60)) : 0;
+    const adminHours = group.adminTasks.reduce((sum,task)=>sum+Number(task.estimatedHours ?? (Number(task.duration||0)/60)),0);
+    const totalHours = Number(group.capacityTask?.stageTotalHours ?? base?.stageTotalHours ?? (capacityHours + adminHours));
+    let assignments = group.capacityTask ? assignmentsFromTask(group.capacityTask) : [];
+    if (group.adminTasks.length && assignments.length === 1 && !assignments[0].person && Number(assignments[0].hours||0) === 0) assignments = [];
+    group.adminTasks.forEach(task => {
+      const person = (task.assigned || [])[0] || task.adminEmployee || "";
+      if (person) assignments.push({person,hours:Number(task.estimatedHours ?? (Number(task.duration||0)/60))||0,date:(task.assignmentDates||{})[person] || toIsoDate(taskDate(task))});
+    });
+    if (!assignments.length) assignments = [{person:"",hours:totalHours,date:toIsoDate(taskDate(base))}];
+    return {
+      name:group.name,
+      department:group.department,
+      date:toIsoDate(taskDate(base)),
+      endDate:base.endDate || toIsoDate(taskDate(base)),
+      hours:totalHours,
+      countsCapacity:true,
+      notes:base.notes || "",
+      status:base.status || "Planned",
+      assignments
+    };
+  });
+  return [...production,...milestones].sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")) || a.name.localeCompare(b.name));
+}
+function normaliseStageAssignments(stage,totalHours){
+  if (Array.isArray(stage.assignments) && stage.assignments.length) {
+    const items = stage.assignments.map(item => ({person:item.person||"",hours:Math.max(0,Number(item.hours)||0),date:item.date || stage.date || ""}));
+    const previousTotal = Number(stage.hours||0);
+    if (items.length === 1 && Math.abs(Number(items[0].hours||0)-previousTotal) < .01 && Math.abs(Number(totalHours||0)-previousTotal) > .01) items[0].hours = Number(totalHours||0);
+    return items;
+  }
+  if (Array.isArray(stage.assigned) && stage.assigned.length) {
+    const even = totalHours / stage.assigned.length;
+    return stage.assigned.map(person => ({person,hours:even,date:stage.date || ""}));
+  }
+  if (stage.assigned) return [{person:stage.assigned,hours:totalHours,date:stage.date || ""}];
+  return [{person:"",hours:totalHours,date:stage.date || ""}];
+}
+function stageAssignedHours(stage){
+  return (stage.assignments || []).filter(item => item.person).reduce((sum,item)=>sum+Math.max(0,Number(item.hours)||0),0);
+}
+function stageRemainingHours(stage){return Math.round((Number(stage.hours||0)-stageAssignedHours(stage))*100)/100}
+function stageEmployeeOptions(stage,selected){
+  const capacityPeople = people.filter(person => person.role !== "Admin");
+  const adminPeople = people.filter(person => person.role === "Admin");
+  const matching = capacityPeople.filter(person => person.role === stage.department);
+  const others = capacityPeople.filter(person => person.role !== stage.department);
+  const make = list => list.map(person => `<option value="${escapeHtml(person.name)}" ${selected===person.name?"selected":""}>${escapeHtml(person.name)} · ${escapeHtml(person.role)}</option>`).join("");
+  const makeAdmin = list => list.map(person => `<option value="${escapeHtml(person.name)}" ${selected===person.name?"selected":""}>${escapeHtml(person.name)} · Admin · Calendar only</option>`).join("");
+  return `<option value="">Choose employee</option>${matching.length?`<optgroup label="${escapeHtml(stage.department)}">${make(matching)}</optgroup>`:""}${others.length?`<optgroup label="Other capacity employees">${make(others)}</optgroup>`:""}${adminPeople.length?`<optgroup label="Admin · Calendar only">${makeAdmin(adminPeople)}</optgroup>`:""}`;
+}
+function renderAddJobStages(){
+  const rows = document.getElementById("ajStageRows");
+  const milestonesWrap = document.getElementById("ajCalendarDates");
+  const milestoneRows = document.getElementById("ajMilestoneRows");
+  if (!addJobStages.length) {
+    rows.innerHTML = `<div class="note aj-stage-empty"><strong>Choose an install date</strong><span>Your production stages will appear here automatically.</span></div>`;
+    milestonesWrap.style.display = "none";
+    milestoneRows.innerHTML = "";
+  } else {
+    const orderedStages = addJobStages.map((stage,index) => ({stage,index})).sort((a,b) => String(a.stage.date||"").localeCompare(String(b.stage.date||"")) || a.index-b.index);
+    const capacityStages = orderedStages.filter(item => item.stage.countsCapacity);
+    const milestones = orderedStages.filter(item => !item.stage.countsCapacity);
+    rows.innerHTML = capacityStages.map(({stage,index}) => {
+      stage.assignments = normaliseStageAssignments(stage,Number(stage.hours||0));
+      const assigned = stageAssignedHours(stage);
+      const remaining = stageRemainingHours(stage);
+      const selectedCount = stage.assignments.filter(item => item.person).length;
+      const duplicate = new Set(stage.assignments.filter(item=>item.person).map(item=>item.person)).size !== selectedCount;
+      const over = remaining < -0.01;
+      const complete = selectedCount > 0 && Math.abs(remaining) <= 0.01 && !duplicate;
+      const warning = !complete && !over;
+      const cardClass = over || duplicate ? "over" : complete ? "complete" : warning ? "warning" : "";
+      const departmentClass = stage.department==="Drafting"?"blue":stage.department==="Machining"?"purple":"green";
+      const progress = Number(stage.hours||0)>0 ? Math.min(100,Math.max(0,(assigned/Number(stage.hours))*100)) : 100;
+      const statusText = duplicate ? "Employee selected twice" : over ? `${Math.abs(remaining)}h over` : selectedCount===0 ? `${stage.hours}h unassigned` : remaining>0.01 ? `${remaining}h remaining` : "Fully allocated";
+      const statusClass = duplicate || over ? "bad" : complete ? "good" : "warn";
+      const assignmentRows = stage.assignments.map((assignment,assignmentIndex) => `<div class="aj-assignment-row">
+        <select aria-label="Employee for ${escapeHtml(stage.name)}" onchange="updateStageAssignment(${index},${assignmentIndex},'person',this.value)">${stageEmployeeOptions(stage,assignment.person)}</select>
+        <input aria-label="Hours for ${escapeHtml(stage.name)} assignment" type="number" min="0" step="0.25" value="${Math.round(Number(assignment.hours||0)*100)/100}" onchange="updateStageAssignment(${index},${assignmentIndex},'hours',this.value)">
+        <button type="button" aria-label="Remove employee" onclick="removeStageAssignment(${index},${assignmentIndex})">×</button>
+      </div>`).join("");
+      return `<article class="aj-workflow-card ${cardClass}">
+        <div class="aj-workflow-head"><div><div class="aj-workflow-title">${escapeHtml(stage.name)}</div><div class="aj-workflow-meta"><span class="pill ${departmentClass}">${escapeHtml(stage.department)}</span><span class="pill grey">${Math.round(Number(stage.hours||0)*100)/100}h total</span></div></div><span class="aj-allocation-status ${statusClass}">${statusText}</span></div>
+        <div class="aj-workflow-fields"><div class="aj-mini-field"><label>Planned date</label><input type="date" value="${stage.date}" onchange="updateAddJobStage(${index},'date',this.value)"></div><div class="aj-mini-field"><label>Total hours</label><input type="number" min="0" step="0.25" value="${stage.hours}" onchange="updateAddJobStage(${index},'hours',this.value)"></div></div>
+        <div><div class="aj-assignment-labels"><span>Employee</span><span>Hours</span><span></span></div><div class="aj-assignment-list">${assignmentRows}</div></div>
+        <div class="aj-progress"><span style="width:${progress}%"></span></div>
+        <div class="aj-workflow-actions"><div class="aj-workflow-actions-left"><button type="button" onclick="addStageAssignment(${index})">+ Add employee</button><button type="button" onclick="splitStageEvenly(${index})">Split evenly</button></div></div>
+      </article>`;
+    }).join("") || `<div class="note aj-stage-empty"><strong>No capacity stages</strong><span>This plan only contains calendar dates.</span></div>`;
+    milestonesWrap.style.display = milestones.length ? "block" : "none";
+    milestoneRows.innerHTML = milestones.map(({stage,index}) => `<div class="aj-milestone-card"><strong>${escapeHtml(stage.name)}</strong><input type="date" value="${stage.date}" onchange="updateAddJobStage(${index},'date',this.value)"><span class="pill yellow">Calendar only</span></div>`).join("");
+  }
+  document.getElementById("ajStageCount").textContent = addJobStages.length;
+  const capacityHours = addJobStages.filter(stage => stage.countsCapacity).reduce((sum,stage)=>sum+Number(stage.hours||0),0);
+  document.getElementById("ajCapacityTotal").textContent = `${Math.round(capacityHours*100)/100}h`;
+  const install = parseIsoDate(document.getElementById("ajInstallDate").value);
+  document.getElementById("ajInstallSummary").textContent = install ? install.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"}) : "Not selected";
+}
+function updateAddJobStage(index,field,value){
+  const stage = addJobStages[index];
+  if (!stage) return;
+  if (field === "hours") {
+    const oldTotal = Number(stage.hours||0);
+    const nextTotal = Math.max(0,Number(value)||0);
+    stage.assignments = normaliseStageAssignments(stage,oldTotal);
+    if (stage.assignments.length === 1 && Math.abs(Number(stage.assignments[0].hours||0)-oldTotal) < .01) stage.assignments[0].hours = nextTotal;
+    stage.hours = nextTotal;
+  } else if (field === "date") {
+    const oldDate = stage.date || "";
+    stage.assignments = normaliseStageAssignments(stage,Number(stage.hours||0));
+    stage.date = value;
+    stage.endDate = value;
+    stage.assignments.forEach(item => { if (!item.date || item.date === oldDate) item.date = value; });
+  } else stage[field] = value;
+  renderAddJobStages();
+}
+function updateStageAssignment(stageIndex,assignmentIndex,field,value){
+  const stage = addJobStages[stageIndex];
+  if (!stage) return;
+  stage.assignments = normaliseStageAssignments(stage,Number(stage.hours||0));
+  const assignment = stage.assignments[assignmentIndex];
+  if (!assignment) return;
+  assignment[field] = field === "hours" ? Math.max(0,Number(value)||0) : value;
+  renderAddJobStages();
+}
+function addStageAssignment(stageIndex){
+  const stage = addJobStages[stageIndex];
+  if (!stage) return;
+  stage.assignments = normaliseStageAssignments(stage,Number(stage.hours||0));
+  const remaining = Math.max(0,stageRemainingHours(stage));
+  stage.assignments.push({person:"",hours:remaining,date:stage.date || ""});
+  renderAddJobStages();
+}
+function removeStageAssignment(stageIndex,assignmentIndex){
+  const stage = addJobStages[stageIndex];
+  if (!stage) return;
+  stage.assignments = normaliseStageAssignments(stage,Number(stage.hours||0));
+  stage.assignments.splice(assignmentIndex,1);
+  if (!stage.assignments.length) stage.assignments.push({person:"",hours:Number(stage.hours||0),date:stage.date || ""});
+  renderAddJobStages();
+}
+function splitStageEvenly(stageIndex){
+  const stage = addJobStages[stageIndex];
+  if (!stage) return;
+  stage.assignments = normaliseStageAssignments(stage,Number(stage.hours||0));
+  const selected = stage.assignments.filter(item => item.person);
+  if (selected.length < 2) {showToast("Choose at least two employees first."); return;}
+  const total = Math.round(Number(stage.hours||0)*100);
+  const base = Math.floor(total/selected.length);
+  let remainder = total-(base*selected.length);
+  selected.forEach(item => {item.hours=(base+(remainder>0?1:0))/100;if(remainder>0) remainder--;});
+  stage.assignments.filter(item => !item.person).forEach(item => item.hours=0);
+  renderAddJobStages();
+}
+function assignAllStagesByDepartment(){
+  addJobStages.filter(stage=>stage.countsCapacity).forEach(stage => {
+    const employee = people.find(person => person.role !== "Admin" && person.role === stage.department);
+    stage.assignments = [{person:employee ? employee.name : "",hours:Number(stage.hours||0),date:stage.date || ""}];
+  });
+  renderAddJobStages();
+  showToast("Stages assigned by department.");
+}
+async function saveAddJob(){
+  if (!isAdmin) return;
+  const jobNumber = document.getElementById("ajJobNumber").value.trim();
+  const address = document.getElementById("ajAddress").value.trim();
+  const builder = document.getElementById("ajBuilder").value.trim();
+  const installValue = document.getElementById("ajInstallDate").value;
+  const installDate = parseIsoDate(installValue);
+  if (!jobNumber || !address || !builder || !installDate) {
+    showAddJobMessage("Complete the job number, site address, builder/client and predicted install date.",true);
+    window.scrollTo({top:0,behavior:"smooth"});
+    return;
+  }
+  const duplicate = jobs.some(job => String(job.id).toLowerCase() === jobNumber.toLowerCase() && String(job.id) !== String(editingJobId || ""));
+  if (duplicate) {showAddJobMessage("That job number already exists.",true); return;}
+  if (!addJobStages.length) {showAddJobMessage("The production stages could not be generated. Check the install date.",true); return;}
+  const allocationProblem = addJobStages.find(stage => {
+    if (!stage.countsCapacity) return false;
+    stage.assignments = normaliseStageAssignments(stage,Number(stage.hours||0));
+    const selected = stage.assignments.filter(item => item.person);
+    if (Number(stage.hours || 0) > 0 && !selected.length) return true;
+    const names = selected.map(item=>item.person);
+    return new Set(names).size !== names.length || Math.abs(stageRemainingHours(stage)) > .01;
+  });
+  if (allocationProblem) {showAddJobMessage(`Assign every hour for ${allocationProblem.name}. Assigned hours must equal the stage total and each employee can only appear once.`,true); document.getElementById("ajStageRows").scrollIntoView({behavior:"smooth",block:"start"}); return;}
+
+  const isEditing = !!editingJobId;
+  const originalId = editingJobId;
+  const previousJobs = JSON.parse(JSON.stringify(jobs));
+  const previousTasks = JSON.parse(JSON.stringify(tasks));
+  const job = {
+    id:jobNumber,
+    name:address,
+    address,
+    builder,
+    install:installDate.toLocaleDateString("en-AU",{day:"numeric",month:"short"}),
+    installDate:toIsoDate(installDate),
+    status:document.getElementById("ajJobStatus").value,
+    jobLengthWeeks:Number(document.getElementById("ajJobLength").value||4),
+    twoPack:document.getElementById("ajTwoPack").checked,
+    notes:document.getElementById("ajNotes").value.trim(),
+    source:addJobSource
+  };
+
+  if (isEditing) {
+    const index = jobs.findIndex(item => String(item.id) === String(originalId));
+    if (index < 0) {showAddJobMessage("That job could not be found. Refresh TrackR and try again.",true); return;}
+    jobs[index] = job;
+  } else {
+    jobs.push(job);
+  }
+
+  const sourceJobId = String(originalId || jobNumber);
+  const existingStageIds = new Map();
+  tasks.filter(task => String(task.job) === sourceJobId && !task.custom).forEach(task => {
+    const employeeKey = task.type === "admin" ? ((task.assigned || [])[0] || task.adminEmployee || "") : "";
+    const key = `${task.stageGroup || task.name}|${task.stageDepartment || task.department}|${task.type}|${employeeKey}`;
+    if (!existingStageIds.has(key)) existingStageIds.set(key, task.id);
+  });
+
+  // Keep manually created tasks, including their Calendar/Schedule position, and
+  // relink them if the job number changed. Generated stages are rebuilt below.
+  tasks.forEach(task => {
+    if (isEditing && String(task.job) === String(originalId) && task.custom) task.job = jobNumber;
+  });
+  tasks = tasks.filter(task => !(String(task.job) === sourceJobId && !task.custom));
+
+  addJobStages.forEach((stage,index) => {
+    const stageDate = parseIsoDate(stage.date);
+    const start = stageDate ? legacyIndexForDate(stageDate) : 0;
+    if (!stage.countsCapacity) {
+      const type = "milestone";
+      const department = "Milestone";
+      const key = `${stage.name}|${department}|${type}|`;
+      tasks.push({
+        id:existingStageIds.get(key) || `${jobNumber}-${Date.now()}-${index}`,
+        job:jobNumber,
+        name:stage.name,
+        type,
+        department,
+        start,
+        monthDay:stageDate ? stageDate.getDate() : scheduleStartDay,
+        date:stage.date,
+        endDate:stage.endDate || stage.date,
+        duration:0,
+        estimatedHours:Number(stage.hours||0),
+        assigned:[],
+        assignmentMinutes:{},
+        assignmentDates:{},
+        status:stage.status || "Planned",
+        notes:stage.notes || "",
+        custom:false,
+        generated:true,
+        parts:[]
+      });
+      return;
+    }
+
+    stage.assignments = normaliseStageAssignments(stage,Number(stage.hours||0));
+    const selectedAssignments = stage.assignments.filter(item => item.person);
+    const adminAssignments = selectedAssignments.filter(item => isAdminEmployee(item.person));
+    const capacityAssignments = selectedAssignments.filter(item => !isAdminEmployee(item.person));
+    const hasAnyAssignments = selectedAssignments.length > 0;
+    const capacityHours = hasAnyAssignments ? capacityAssignments.reduce((sum,item)=>sum+Math.max(0,Number(item.hours)||0),0) : Number(stage.hours||0);
+    const department = stage.department;
+    const capacityKey = `${stage.name}|${department}|capacity|`;
+    if (capacityAssignments.length && capacityHours > 0) tasks.push({
+      id:existingStageIds.get(capacityKey) || `${jobNumber}-${Date.now()}-${index}-capacity`,
+      job:jobNumber,
+      name:stage.name,
+      stageGroup:stage.name,
+      stageDepartment:department,
+      stageTotalHours:Number(stage.hours||0),
+      type:"capacity",
+      department,
+      start,
+      monthDay:stageDate ? stageDate.getDate() : scheduleStartDay,
+      date:stage.date,
+      endDate:stage.endDate || stage.date,
+      duration:Math.round(capacityHours*60),
+      estimatedHours:capacityHours,
+      assigned:[...new Set(capacityAssignments.map(item=>item.person))],
+      assignmentMinutes:Object.fromEntries(capacityAssignments.map(item=>[item.person,Math.round(Math.max(0,Number(item.hours)||0)*60)])),
+      assignmentDates:Object.fromEntries(capacityAssignments.map(item=>[item.person,item.date || stage.date])),
+      status:stage.status || "Planned",
+      notes:stage.notes || "",
+      custom:false,
+      generated:true,
+      parts:[]
+    });
+
+    adminAssignments.forEach((assignment,adminIndex) => {
+      const assignmentDate = parseIsoDate(assignment.date || stage.date) || stageDate;
+      const adminKey = `${stage.name}|${department}|admin|${assignment.person}`;
+      tasks.push({
+        id:existingStageIds.get(adminKey) || `${jobNumber}-${Date.now()}-${index}-admin-${adminIndex}`,
+        job:jobNumber,
+        name:stage.name,
+        stageGroup:stage.name,
+        stageDepartment:department,
+        stageTotalHours:Number(stage.hours||0),
+        type:"admin",
+        department:"Admin",
+        adminEmployee:assignment.person,
+        start:assignmentDate ? legacyIndexForDate(assignmentDate) : start,
+        monthDay:assignmentDate ? assignmentDate.getDate() : scheduleStartDay,
+        date:assignmentDate ? toIsoDate(assignmentDate) : stage.date,
+        endDate:assignmentDate ? toIsoDate(assignmentDate) : stage.date,
+        duration:Math.round(Math.max(0,Number(assignment.hours)||0)*60),
+        estimatedHours:Math.max(0,Number(assignment.hours)||0),
+        assigned:[assignment.person],
+        assignmentMinutes:{[assignment.person]:Math.round(Math.max(0,Number(assignment.hours)||0)*60)},
+        assignmentDates:{[assignment.person]:assignmentDate ? toIsoDate(assignmentDate) : stage.date},
+        status:stage.status || "Planned",
+        notes:`Admin calendar task for ${stage.name}.`,
+        custom:false,
+        generated:true,
+        adminTask:true,
+        parts:[]
+      });
+    });
+  });
+
+  // Move the Calendar to the edited install month and make sure the Schedule
+  // recalculates from the new dates/assignments immediately.
+  visibleMonthOffset = (installDate.getFullYear()-calendarBaseDate.getFullYear())*12 + (installDate.getMonth()-calendarBaseDate.getMonth());
+  tasks.forEach(task => { task.parts = []; });
+  renderAll();
+
+  const saved = await queueStateSave(isEditing ? "Job updated" : "Job created");
+  if (!saved) {
+    jobs = previousJobs;
+    tasks = previousTasks;
+    renderAll();
+    showAddJobMessage("The job could not be saved. Your previous data has been restored.",true);
+    return;
+  }
+
+  editingJobId = null;
+  configureAddJobPage(false);
+  showView("jobs");
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+async function deleteEditingJob(){
+  if (!isAdmin) return;
+  if (!editingJobId) return;
+  const job = jobs.find(item => String(item.id) === String(editingJobId));
+  if (!job) return;
+  const linkedTaskCount = tasks.filter(task => String(task.job) === String(editingJobId)).length;
+  const confirmed = confirm(`Delete ${job.id}? This will also delete ${linkedTaskCount} linked Calendar and Schedule item${linkedTaskCount === 1 ? "" : "s"}. This cannot be undone.`);
+  if (!confirmed) return;
+
+  const previousJobs = JSON.parse(JSON.stringify(jobs));
+  const previousTasks = JSON.parse(JSON.stringify(tasks));
+  jobs = jobs.filter(item => String(item.id) !== String(editingJobId));
+  tasks = tasks.filter(task => String(task.job) !== String(editingJobId));
+  tasks.forEach(task => { task.parts = []; });
+  renderAll();
+
+  const deletedId = editingJobId;
+  const saved = await queueStateSave(`${deletedId} deleted`);
+  if (!saved) {
+    jobs = previousJobs;
+    tasks = previousTasks;
+    renderAll();
+    showAddJobMessage("The job could not be deleted. Your previous data has been restored.",true);
+    return;
+  }
+
+  editingJobId = null;
+  configureAddJobPage(false);
+  showView("jobs");
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+
+/* Jobs */
+function renderJobs(){
+  const rows = document.getElementById("jobRows");
+  rows.innerHTML = jobs.map(job => {
+    const jobTasks = tasks.filter(task => task.job === job.id);
+    const capMins = jobTasks.filter(task => task.type === "capacity").reduce((sum,task) => sum + Number(task.duration || 0), 0);
+    const milestones = jobTasks.filter(task => task.type === "milestone").map(task => task.name).join(", ") || "None";
+    return `<div class="job-row" data-job-id="${escapeHtml(encodeURIComponent(job.id))}">
+      <div><div class="job-title">${escapeHtml(job.id)}</div><div class="job-sub">${jobTasks.length} tasks · ${escapeHtml(job.status || "Active")}</div></div>
+      <div><span class="job-sub">${escapeHtml(job.address)}</span></div>
+      <div><span class="pill ${job.status === "Forecast" ? "yellow" : "grey"}">${escapeHtml(job.install || "")}</span></div>
+      <div><span class="pill green">${fmt(capMins)}</span></div>
+      <div><span class="job-sub">${escapeHtml(milestones)}</span></div>
+    </div>`;
+  }).join("");
+  rows.querySelectorAll("[data-job-id]").forEach(row => row.addEventListener("click", () => openEditJob(decodeURIComponent(row.dataset.jobId))));
+  document.getElementById("jobMetric").textContent = jobs.length;
+  document.getElementById("capTaskMetric").textContent = tasks.filter(task => task.type === "capacity").length;
+  document.getElementById("milestoneMetric").textContent = tasks.filter(task => task.type === "milestone").length;
+  document.getElementById("customMetric").textContent = tasks.filter(task => task.custom).length;
+}
+
+/* Calendar */
+function renderCalendar(){
+  const grid = document.getElementById("monthGrid");
+  const monthDate = new Date(calendarBaseDate.getFullYear(), calendarBaseDate.getMonth() + visibleMonthOffset, 1);
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  document.getElementById("monthTitle").textContent = monthDate.toLocaleString("en-AU", {month:"long", year:"numeric"});
+  const firstDay = new Date(year, month, 1);
+  const firstGridDate = new Date(firstDay);
+  const mondayOffset = (firstDay.getDay() + 6) % 7;
+  firstGridDate.setDate(firstDay.getDate() - mondayOffset);
+
+  const headers = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map(day => `<div class="month-head">${day}</div>`).join("");
+  let cells = "";
+  for (let i=0;i<42;i++){
+    const d = new Date(firstGridDate);
+    d.setDate(firstGridDate.getDate()+i);
+    const inMonth = d.getMonth() === month;
+    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+    const now = new Date();
+    const isToday = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    const items = tasks.filter(task => {
+      if (task.type !== "milestone" && task.type !== "admin") return false;
+      const taskDate = task.date ? parseIsoDate(task.date) : new Date(baseYear,baseMonth,task.monthDay);
+      return taskDate && taskDate.getFullYear() === d.getFullYear() && taskDate.getMonth() === d.getMonth() && taskDate.getDate() === d.getDate();
+    });
+    const closure = globalCalendarEventForDate(d);
+    cells += `<div class="month-day ${inMonth ? "" : "outside"} ${isWeekend ? "weekend" : ""} ${isToday ? "today" : ""} ${closure ? "closed-day" : ""}" data-date="${toIsoDate(d)}" onclick="if(!calendarDragSuppressClick) openDayTaskPanel(${d.getFullYear()}, ${d.getMonth()}, ${d.getDate()})">
+      <div class="month-day-number">${d.getDate()}</div>
+      ${closure ? `<div class="month-item closure" onclick="event.stopPropagation(); showSettingsSection('calendarEvents'); showView('settings')"><div class="month-item-title">${escapeHtml(closure.name)}</div><div class="month-item-sub">${escapeHtml(closure.type)}</div></div>` : ``}
+      ${items.map(task => {
+        const job = jobById(task.job);
+        const lower = task.name.toLowerCase();
+        const cls = task.type === "admin" ? "admin" : lower.includes("install") ? "install" : lower.includes("stone") ? "stone" : lower.includes("check") ? "check" : "";
+        const assignee = task.type === "admin" ? ((task.assigned || [])[0] || task.adminEmployee || "Admin") : "";
+        return `<div class="month-item ${cls}" draggable="true" data-task-id="${escapeHtml(task.id)}" data-task-type="${escapeHtml(task.type)}" data-job-id="${escapeHtml(encodeURIComponent(task.job))}">
+          <div class="month-item-title">${escapeHtml(task.job)} · ${escapeHtml(task.name)}</div>
+          <div class="month-item-sub">${task.type === "admin" ? `${escapeHtml(assignee)} · ` : ""}${job ? escapeHtml(job.address) : ""}</div>
+        </div>`;
+      }).join("")}
+    </div>`;
+  }
+  grid.innerHTML = headers + cells;
+  grid.querySelectorAll(".month-item[data-task-id]").forEach(item => item.addEventListener("click", event => {
+    event.stopPropagation();
+    if (calendarDragSuppressClick) return;
+    if (item.dataset.taskType === "admin") openEditJob(decodeURIComponent(item.dataset.jobId));
+    else openTaskPanel(item.dataset.taskId);
+  }));
+  if (isAdmin) {
+    wireCalendarDrops();
+  } else {
+    grid.querySelectorAll("[onclick]").forEach(element => {element.onclick = null; element.removeAttribute("onclick");});
+    grid.querySelectorAll("[draggable]").forEach(element => {element.draggable = false; element.removeAttribute("draggable");});
+  }
+  const calendarItems = tasks.filter(task => task.type === "milestone" || task.type === "admin");
+  const milestones = tasks.filter(task => task.type === "milestone");
+  document.getElementById("calendarItemMetric").textContent = calendarItems.length + calendarEvents.length;
+  document.getElementById("calendarCheckMetric").textContent = milestones.filter(t => t.name.toLowerCase().includes("check")).length;
+  document.getElementById("calendarInstallMetric").textContent = milestones.filter(t => t.name.toLowerCase().includes("install") && !t.name.toLowerCase().includes("stone")).length;
+  document.getElementById("calendarStoneMetric").textContent = milestones.filter(t => t.name.toLowerCase().includes("stone")).length;
+}
+function clearCalendarDropClasses(){
+  document.querySelectorAll("#monthGrid .month-day").forEach(day => day.classList.remove("calendar-drop-active"));
+}
+function syncInstallDateFromTask(task){
+  if (!task || task.type !== "milestone" || task.name.trim().toLowerCase() !== "install") return;
+  const job = jobById(task.job);
+  const dateObj = parseIsoDate(task.date);
+  if (!job || !dateObj) return;
+  job.installDate = toIsoDate(dateObj);
+  job.install = dateObj.toLocaleDateString("en-AU",{day:"numeric",month:"short"});
+}
+function setTaskDate(task,newDate){
+  if (!task || !newDate) return;
+  const oldDate = taskDate(task);
+  const delta = oldDate ? calendarDayDifference(oldDate,newDate) : 0;
+  task.start = legacyIndexForDate(newDate);
+  task.monthDay = newDate.getDate();
+  task.date = toIsoDate(newDate);
+  const oldEnd = parseIsoDate(task.endDate);
+  if (oldEnd) task.endDate = toIsoDate(addCalendarDays(oldEnd,delta));
+  if (task.assignmentDates) {
+    task.assignmentDates = Object.fromEntries(Object.entries(task.assignmentDates).map(([name,iso]) => {
+      const assignmentDate = parseIsoDate(iso);
+      return [name, assignmentDate ? toIsoDate(addCalendarDays(assignmentDate,delta)) : toIsoDate(newDate)];
+    }));
+  }
+  syncInstallDateFromTask(task);
+}
+function moveCalendarTaskToDate(task, isoDate){
+  const newDate = parseIsoDate(isoDate);
+  if (!task || !newDate) return;
+  setTaskDate(task,newDate);
+  renderAll();
+  saveState("Calendar task moved and saved");
+}
+function wireCalendarDrops(){
+  document.querySelectorAll("#monthGrid .month-item").forEach(item => {
+    item.addEventListener("dragstart", event => {
+      const task = tasks.find(candidate => candidate.id === item.dataset.taskId);
+      if (!task) {event.preventDefault(); return;}
+      calendarDragTask = task;
+      calendarDragSuppressClick = true;
+      item.classList.add("dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", task.id);
+    });
+    item.addEventListener("dragend", () => {
+      item.classList.remove("dragging");
+      calendarDragTask = null;
+      clearCalendarDropClasses();
+      setTimeout(() => {calendarDragSuppressClick = false;}, 180);
+    });
+  });
+  document.querySelectorAll("#monthGrid .month-day").forEach(day => {
+    day.addEventListener("dragover", event => {
+      if (!calendarDragTask) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      clearCalendarDropClasses();
+      day.classList.add("calendar-drop-active");
+    });
+    day.addEventListener("drop", event => {
+      if (!calendarDragTask) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const task = calendarDragTask;
+      calendarDragTask = null;
+      clearCalendarDropClasses();
+      moveCalendarTaskToDate(task, day.dataset.date);
+      setTimeout(() => {calendarDragSuppressClick = false;}, 180);
+    });
+    day.addEventListener("dragleave", event => {
+      if (!day.contains(event.relatedTarget)) day.classList.remove("calendar-drop-active");
+    });
+  });
+}
+function changeMonth(delta){visibleMonthOffset += delta; renderCalendar()}
+function goToday(){visibleMonthOffset = 0; renderCalendar()}
+
+/* Schedule */
+function renderSchedule(){
+  buildScheduleDays();
+  updateScheduleDayWidth();
+  const result = calculate();
+  const rangeStart = dateForDayIndex(0);
+  const rangeEnd = dateForDayIndex(days.length-1);
+  document.getElementById("scheduleRangeLabel").textContent = `${rangeStart.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})} – ${rangeEnd.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})}`;
+  const today = new Date();
+  document.getElementById("daysHeader").innerHTML = `<div class="corner">Employees</div>` + days.map(day => {
+    const dateObj = parseIsoDate(day.iso);
+    const isToday = isSameDate(dateObj, today);
+    const closure = globalCalendarEventForDate(dateObj);
+    return `
+    <div class="day-head ${day.working ? "" : "weekend"} ${isToday ? "today" : ""} ${closure ? "closed" : ""}" title="${closure ? escapeHtml(closure.name) : ""}">
+      <span class="day-cap">${closure ? "Closed" : isToday ? "Today" : day.working ? "Work" : "Off"}</span>
+      <div class="day-name">${day.name}<span class="day-date">${day.date}</span></div>
+    </div>`;
+  }).join("");
+
+  const rows = document.getElementById("rows");
+  rows.innerHTML = "";
+  const rowNames = people.filter(person => person.role !== "Admin").map(person => person.name);
+  let totalCap = 0;
+  let totalUsed = 0;
+
+  rowNames.forEach(rowName => {
+    const isMilestoneRow = rowName === "Milestones";
+    const isUnassignedRow = rowName === "Unassigned";
+    const isSpecialRow = isMilestoneRow || isUnassignedRow;
+    const person = people.find(p => p.name === rowName);
+    const encodedRowName = encodeURIComponent(rowName);
+    const laneItems = [];
+    tasks.filter(taskMatchesFilters).forEach(task => {
+      segmentsForTask(task, rowName).forEach(seg => laneItems.push({task, ...seg}));
+    });
+    laneItems.sort((a,b) => a.start - b.start || a.span-b.span || taskLabel(a.task).localeCompare(taskLabel(b.task)));
+    const laneCount = assignScheduleLanes(laneItems);
+    const rowH = Math.max(124, 58 + laneCount * 42 + 18);
+
+    const row = document.createElement("div");
+    row.className = "row";
+    row.style.minHeight = rowH + "px";
+    row.innerHTML = `
+      <div class="person" ${isMilestoneRow ? "" : `onclick="openDayPanel(decodeURIComponent('${encodedRowName}'),0)"`}>
+        <strong>${escapeHtml(rowName)}</strong>
+        <span>${isMilestoneRow ? "No capacity items" : isUnassignedRow ? "Needs assignment" : escapeHtml(person.role)}</span>
+      </div>
+      ${days.map((day,index) => {
+        if (isMilestoneRow) {
+          const count = tasks.filter(task => task.type === "milestone" && scheduleIndexForDate(taskDate(task)) === index).length;
+          return `<div class="cell ${day.working ? "" : "weekend"}" data-person="Milestones" data-day="${index}" onclick="openDayPanel('Milestones',${index})"><span class="badge">${count} items</span></div>`;
+        }
+        if (isUnassignedRow) {
+          const count = tasks.filter(task => task.type === "capacity" && !(task.assigned || []).length && scheduleIndexForDate(taskDate(task)) === index).length;
+          return `<div class="cell ${day.working ? "" : "weekend"}" data-person="Unassigned" data-day="${index}" onclick="openDayPanel('Unassigned',${index})"><span class="badge ${count ? "tight" : "off"}">${count ? `${count} waiting` : "None"}</span></div>`;
+        }
+        const dateObj = dateForDayIndex(index);
+        const blockedStatus = blockedStatusForDate(rowName,dateObj);
+        const calendarEvent = globalCalendarEventForDate(dateObj);
+        const cap = capacityFor(person,index);
+        const booked = (result.used[rowName] && result.used[rowName][index]) || 0;
+        const rosteredOff = day.working && !blockedStatus && !calendarEvent && cap === 0;
+        const isTodayCell = isSameDate(dateObj,today);
+        if (day.working) { totalCap += cap; totalUsed += booked; }
+        const badgeClass = calendarEvent ? "closure" : blockedStatus ? String(blockedStatus.type || "").toLowerCase() : rosteredOff ? "rdo" : booked >= cap - 10 ? "tight" : "";
+        const badgeText = calendarEvent ? calendarEvent.name : blockedStatus ? blockedStatus.type : rosteredOff ? "RDO" : day.working ? `${fmt(booked)} / ${fmt(cap)}` : "Weekend";
+        return `<div class="cell ${day.working ? "" : "weekend"} ${calendarEvent ? "calendar-event-day" : ""} ${blockedStatus ? "blocked-day" : ""} ${rosteredOff ? "rostered-off" : ""} ${isTodayCell ? "today" : ""}" data-person="${escapeHtml(rowName)}" data-day="${index}" onclick="openDayPanel(decodeURIComponent('${encodedRowName}'),${index})" title="${calendarEvent ? escapeHtml(calendarEvent.name) : ""}"><span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span></div>`;
+      }).join("")}
+      <div class="bars"></div>
+    `;
+    const bars = row.querySelector(".bars");
+    laneItems.forEach(item => {
+      const minutes = (item.task.parts || []).filter(part => part.person === rowName && part.day >= item.start && part.day < item.start + item.span).reduce((sum,part)=>sum+part.minutes,0);
+      const bar = document.createElement("div");
+      bar.className = `bar ${typeColour(item.task)} ${item.task.type === "milestone" ? "no-capacity" : ""} ${(item.task.assigned || []).length > 1 ? "split" : ""}`;
+      bar.style.left = `${item.start * scheduleDayWidth + 10}px`;
+      bar.style.width = `${Math.max(96, item.span * scheduleDayWidth - 20)}px`;
+      bar.style.top = `${56 + item.lane * 42}px`;
+      bar.innerHTML = `<span class="dot"></span><span class="bar-main">${escapeHtml(taskLabel(item.task))}</span>${item.task.type === "milestone" ? `<span class="no-cap-chip">No capacity</span>` : ``}${(item.task.assigned || []).length > 1 ? `<span class="split-chip">Split</span>` : ``}<span class="bar-time">${item.task.type === "milestone" ? "" : fmt(minutes)}</span>`;
+      bar.title = "Click to edit task";
+      bar.setAttribute("aria-label", `Edit ${taskLabel(item.task)}`);
+      bar.onclick = (event) => {event.stopPropagation(); openTaskPanel(item.task.id)};
+      if (item.task.type === "capacity") {
+        bar.draggable = true;
+        bar.addEventListener("dragstart", event => {
+          currentDragTask = item.task;
+          currentDragPerson = rowName;
+          event.dataTransfer.setData("text/plain", item.task.id);
+          setTimeout(() => bar.classList.add("dragging"), 0);
+        });
+        bar.addEventListener("dragend", () => {
+          bar.classList.remove("dragging");
+          setTimeout(() => {currentDragTask = null; currentDragPerson = null; clearDropClasses();}, 0);
+        });
+      }
+      bars.appendChild(bar);
+    });
+    rows.appendChild(row);
+  });
+  if (isAdmin) {
+    wireScheduleDrops();
+  } else {
+    rows.querySelectorAll("[onclick]").forEach(element => {element.onclick = null; element.removeAttribute("onclick");});
+    rows.querySelectorAll("[draggable]").forEach(element => {element.draggable = false; element.removeAttribute("draggable");});
+  }
+  const bookedPercent = totalCap ? Math.round((totalUsed / totalCap) * 100) : 0;
+  document.getElementById("bookedMetric").textContent = `${bookedPercent}%`;
+  document.getElementById("spareMetric").textContent = fmt(Math.max(0,totalCap-totalUsed));
+  document.getElementById("scheduleCustomMetric").textContent = tasks.filter(task => task.custom && task.type === "capacity").length;
+  document.getElementById("splitMetric").textContent = tasks.filter(task => task.type === "capacity" && (task.assigned || []).length > 1).length;
+  const unscheduled = tasks.filter(task => Number(task.unscheduledMinutes || 0) > 0);
+  const warning = document.getElementById("scheduleWarning");
+  if (unscheduled.length) {
+    warning.style.display = "block";
+    warning.textContent = `${unscheduled.length} task${unscheduled.length === 1 ? "" : "s"} could not be fully scheduled because no capacity was available within two years. Review employee hours or task assignments.`;
+  } else warning.style.display = "none";
+  syncFloatingScrollWidth();
+}
+function clearDropClasses(){document.querySelectorAll(".cell").forEach(cell => cell.classList.remove("drop-active","drop-top","drop-bottom"))}
+function materialiseAssignmentMinutes(task){
+  const names = [...new Set((task.assigned || []).filter(Boolean))];
+  const existing = task.assignmentMinutes || {};
+  const total = Math.max(0,Number(task.duration || 0));
+  if (!names.length) return {};
+  const hasCustom = names.some(name => existing[name] != null);
+  if (hasCustom) return Object.fromEntries(names.map(name => [name,Math.max(0,Number(existing[name])||0)]));
+  const base = Math.floor(total / names.length);
+  let remainder = total - (base * names.length);
+  return Object.fromEntries(names.map(name => {
+    const share = base + (remainder > 0 ? 1 : 0);
+    if (remainder > 0) remainder -= 1;
+    return [name,share];
+  }));
+}
+function materialiseAssignmentDates(task){
+  const names = [...new Set((task.assigned || []).filter(Boolean))];
+  const existing = task.assignmentDates || {};
+  const fallback = toIsoDate(taskDate(task));
+  return Object.fromEntries(names.map(name => [name,existing[name] || fallback]));
+}
+function reassignDraggedShare(task,sourcePerson,newPerson,newDate){
+  const assigned = [...new Set((task.assigned || []).filter(Boolean))];
+  const shares = materialiseAssignmentMinutes(task);
+  const dates = materialiseAssignmentDates(task);
+  const newIso = toIsoDate(newDate || taskDate(task));
+  if (!newPerson) {
+    task.assigned = [];
+    task.assignmentMinutes = {};
+    task.assignmentDates = {};
+    return true;
+  }
+  if (assigned.length > 1 && sourcePerson && assigned.includes(sourcePerson)) {
+    if (sourcePerson !== newPerson) {
+      if (assigned.includes(newPerson)) {
+        showToast(`${newPerson} already has a separate share of this stage.`);
+        return false;
+      }
+      const movedMinutes = Math.max(0,Number(shares[sourcePerson])||0);
+      delete shares[sourcePerson];
+      delete dates[sourcePerson];
+      task.assigned = assigned.map(name => name === sourcePerson ? newPerson : name);
+      shares[newPerson] = movedMinutes;
+      dates[newPerson] = newIso;
+    } else {
+      task.assigned = assigned;
+      dates[sourcePerson] = newIso;
+    }
+    task.assignmentMinutes = Object.fromEntries(task.assigned.map(name => [name,Math.max(0,Number(shares[name])||0)]));
+    task.assignmentDates = Object.fromEntries(task.assigned.map(name => [name,dates[name] || newIso]));
+    return true;
+  }
+  const total = Object.values(shares).reduce((sum,value)=>sum+Math.max(0,Number(value)||0),0) || Math.max(0,Number(task.duration || 0));
+  task.assigned = [newPerson];
+  task.assignmentMinutes = {[newPerson]:total};
+  task.assignmentDates = {[newPerson]:newIso};
+  return true;
+}
+function moveTaskToCell(task, cell, sourcePerson=currentDragPerson){
+  const newDay = Number(cell.dataset.day);
+  const newPerson = cell.dataset.person;
+  const newDate = dateForDayIndex(newDay);
+  if (!task || task.type !== "capacity" || newPerson === "Milestones") {showToast("Only capacity tasks can be moved here."); return;}
+  const independentShare = (task.assigned || []).length > 1 && sourcePerson && (task.assigned || []).includes(sourcePerson);
+  if (independentShare) {
+    const moved = reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);
+    if (!moved) { clearDropClasses(); return; }
+  } else {
+    setTaskDate(task,newDate);
+    reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);
+  }
+  renderAll();
+  saveState(independentShare ? "Employee share moved and saved" : "Task moved and saved");
+}
+function wireScheduleDrops(){
+  document.querySelectorAll("#rows .cell").forEach(cell => {
+    cell.ondragover = event => {
+      if (!currentDragTask) return;
+      event.preventDefault();
+      clearDropClasses();
+      cell.classList.add("drop-active");
+      const rect = cell.getBoundingClientRect();
+      cell.classList.add((event.clientY - rect.top) < rect.height / 2 ? "drop-top" : "drop-bottom");
+    };
+    cell.ondrop = event => {
+      event.preventDefault();
+      if (!currentDragTask) return;
+      moveTaskToCell(currentDragTask, cell, currentDragPerson);
+      currentDragTask = null;
+      currentDragPerson = null;
+      clearDropClasses();
+    };
+    cell.ondragleave = () => cell.classList.remove("drop-active","drop-top","drop-bottom");
+  });
+}
+
+/* Task panel */
+function fillPanelOptions(){
+  document.getElementById("taskJob").innerHTML = jobs.map(job => `<option value="${escapeHtml(job.id)}">${escapeHtml(job.id)}</option>`).join("");
+}
+function openDayTaskPanel(year, month, day){
+  openCustomTaskPanel();
+  document.getElementById("taskDate").value = toIsoDate(new Date(year,month,day));
+  document.getElementById("panelTitle").textContent = `Add task · ${day} ${new Date(year,month,day).toLocaleString("en-AU",{month:"short"})}`;
+  document.getElementById("panelSub").textContent = "Calendar milestone or schedule capacity task";
+}
+function openCustomTaskPanel(){
+  selectedTaskId = null;
+  fillPanelOptions();
+  document.getElementById("panelTitle").textContent = "Add task";
+  document.getElementById("panelSub").textContent = "Calendar milestone or schedule capacity task";
+  if (jobs.length) document.getElementById("taskJob").value = jobs[0].id;
+  document.getElementById("taskType").value = "milestone";
+  document.getElementById("taskName").value = "";
+  document.getElementById("taskDate").value = toIsoDate(new Date());
+  document.getElementById("taskHours").value = "2h";
+  document.getElementById("taskDepartment").value = "Milestone";
+  document.getElementById("taskStatus").value = "Planned";
+  renderEmployeeChoices([]);
+  updateTypeHint();
+  updateAllocationSummary(null);
+  openPanel("taskPanel");
+}
+function openScheduleTaskPanel(personName, dayIndex){
+  openCustomTaskPanel();
+  const person = people.find(item => item.name === personName);
+  const dateObj = dateForDayIndex(dayIndex);
+  document.getElementById("panelTitle").textContent = `Add task · ${personName}`;
+  document.getElementById("panelSub").textContent = dateObj.toLocaleDateString("en-AU",{weekday:"short",day:"numeric",month:"short",year:"numeric"});
+  document.getElementById("taskType").value = "capacity";
+  document.getElementById("taskDate").value = toIsoDate(dateObj);
+  document.getElementById("taskDepartment").value = ["Drafting","Cabinet Making","Machining"].includes(person?.role) ? person.role : "Cabinet Making";
+  renderEmployeeChoices([personName]);
+  updateTypeHint();
+}
+function openScheduleStatusPanel(personName, dayIndex){
+  openStatusPanel(personName, dayIndex);
+}
+function openTaskPanel(id){
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  selectedTaskId = id;
+  fillPanelOptions();
+  document.getElementById("panelTitle").textContent = "Edit task";
+  document.getElementById("panelSub").textContent = `${taskLabel(task)} · ${task.type === "milestone" ? "Calendar milestone only" : "Capacity task"}`;
+  document.getElementById("taskJob").value = task.job;
+  document.getElementById("taskType").value = task.type;
+  document.getElementById("taskName").value = task.name;
+  document.getElementById("taskDate").value = toIsoDate(taskDate(task));
+  document.getElementById("taskHours").value = task.type === "milestone" ? "0h" : fmt(task.duration);
+  document.getElementById("taskDepartment").value = task.department;
+  document.getElementById("taskStatus").value = task.status || "Planned";
+  renderEmployeeChoices(task.assigned);
+  updateTypeHint();
+  updateAllocationSummary(task);
+  openPanel("taskPanel");
+}
+function renderEmployeeChoices(selected){
+  document.getElementById("employeeChoices").innerHTML = people.filter(person => person.role !== "Admin").map(person => `
+    <div class="employee-choice">
+      <label><input type="checkbox" value="${escapeHtml(person.name)}" ${selected.includes(person.name) ? "checked" : ""}>${escapeHtml(person.name)}</label>
+      <span>${escapeHtml(person.role)}</span>
+    </div>`).join("");
+}
+function updateTypeHint(){
+  const type = document.getElementById("taskType").value;
+  const employeeCard = document.getElementById("employeeCard");
+  const hoursInput = document.getElementById("taskHours");
+  const department = document.getElementById("taskDepartment");
+  if (type === "milestone") {
+    employeeCard.style.display = "none";
+    hoursInput.value = "0h";
+    department.value = "Milestone";
+    document.getElementById("typeHint").textContent = "Calendar milestone only: shows on Calendar and does not use employee capacity.";
+  } else {
+    employeeCard.style.display = "block";
+    if (hoursInput.value === "0h") hoursInput.value = "2h";
+    if (department.value === "Milestone") department.value = "Cabinet Making";
+    document.getElementById("typeHint").textContent = "Capacity task: adds hours to assigned employees in Schedule and does not appear on Calendar.";
+  }
+}
+function savePanelTask(){
+  const type = document.getElementById("taskType").value;
+  const selected = [...document.querySelectorAll("#employeeChoices input:checked")].map(input => input.value);
+  if (type === "capacity" && !selected.length) {showToast("Pick at least one employee for a capacity task."); return;}
+  const task = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) : {id:`custom-${Date.now()}`, custom:true};
+  task.job = document.getElementById("taskJob").value;
+  task.type = type;
+  task.name = document.getElementById("taskName").value.trim() || (type === "milestone" ? "Milestone" : "Custom Task");
+  const selectedDate = parseIsoDate(document.getElementById("taskDate").value) || new Date();
+  task.start = legacyIndexForDate(selectedDate);
+  task.monthDay = selectedDate.getDate();
+  task.date = toIsoDate(selectedDate);
+  task.department = type === "milestone" ? "Milestone" : document.getElementById("taskDepartment").value;
+  task.duration = type === "milestone" ? 0 : parseHours(document.getElementById("taskHours").value);
+  task.assigned = type === "milestone" ? [] : selected;
+  task.assignmentMinutes = {};
+  task.assignmentDates = type === "milestone" ? {} : Object.fromEntries(selected.map(name => [name,toIsoDate(selectedDate)]));
+  task.status = document.getElementById("taskStatus").value;
+  if (!selectedTaskId) tasks.push(task);
+  calculate();
+  updateAllocationSummary(task);
+  renderAll();
+  closeTaskPanel();
+  saveState(type === "milestone" ? "Milestone saved" : "Capacity task saved");
+}
+function deleteTask(){
+  if (!selectedTaskId) {closeTaskPanel(); return;}
+  tasks = tasks.filter(t => t.id !== selectedTaskId);
+  closeTaskPanel();
+  renderAll();
+  saveState("Task deleted");
+}
+function updateAllocationSummary(task){
+  const el = document.getElementById("allocationSummary");
+  if (!task || task.type !== "capacity") {el.textContent = "No capacity allocation for calendar-only milestones."; return;}
+  calculate();
+  const rows = task.assigned.map(name => {
+    const minutes = (task.parts || []).filter(p => p.person === name).reduce((s,p)=>s+p.minutes,0);
+    return `${name}: ${fmt(minutes)}`;
+  });
+  el.replaceChildren(...rows.flatMap((row,index) => index ? [document.createElement("br"),document.createTextNode(row)] : [document.createTextNode(row)]));
+}
+
+/* Day panel */
+function openDayPanel(personName, dayIndex){
+  const day = days[dayIndex];
+  const result = calculate();
+  const person = people.find(p => p.name === personName);
+  const title = personName === "Milestones" ? `${day.name} ${day.date}` : `${personName} · ${day.name} ${day.date}`;
+  document.getElementById("dayPanelTitle").textContent = title;
+  const body = document.getElementById("dayPanelBody");
+  if (personName === "Milestones") {
+    const items = tasks.filter(t => t.type === "milestone" && scheduleIndexForDate(taskDate(t)) === dayIndex);
+    body.innerHTML = `<div class="detail-card"><h3>Calendar items</h3>${items.map(t => `<div class="mini-detail"><span>${escapeHtml(taskLabel(t))}</span><button data-open-task="${escapeHtml(encodeURIComponent(t.id))}">Open</button></div>`).join("") || `<div class="note">No items.</div>`}</div><button class="primary" data-add-calendar-task>Add task here</button>`;
+    body.querySelectorAll("[data-open-task]").forEach(button => button.addEventListener("click", () => openTaskPanel(decodeURIComponent(button.dataset.openTask))));
+    body.querySelector("[data-add-calendar-task]")?.addEventListener("click", () => openDayTaskPanel(dateForDayIndex(dayIndex).getFullYear(),dateForDayIndex(dayIndex).getMonth(),dateForDayIndex(dayIndex).getDate()));
+  } else if (personName === "Unassigned") {
+    const items = tasks.filter(t => t.type === "capacity" && !(t.assigned || []).length && scheduleIndexForDate(taskDate(t)) === dayIndex);
+    body.innerHTML = `<div class="detail-card"><h3>Unassigned tasks</h3>${items.map(t => `<div class="mini-detail"><span>${escapeHtml(taskLabel(t))}</span><button data-open-task="${escapeHtml(encodeURIComponent(t.id))}">Assign</button></div>`).join("") || `<div class="note">No unassigned tasks.</div>`}</div>`;
+    body.querySelectorAll("[data-open-task]").forEach(button => button.addEventListener("click", () => openTaskPanel(decodeURIComponent(button.dataset.openTask))));
+  } else {
+    const booked = (result.used[personName] && result.used[personName][dayIndex]) || 0;
+    const cap = capacityFor(person, dayIndex);
+    const items = (result.allocation[personName] && result.allocation[personName][dayIndex]) || [];
+    const blocked = blockedStatusForDate(personName,dateForDayIndex(dayIndex));
+    body.innerHTML = `
+      <div class="detail-card"><h3>Capacity</h3><div class="note">${blocked ? `${blocked.type} · capacity blocked` : `${fmt(booked)} booked / ${fmt(cap)} available`}</div>${blocked ? `<button class="danger" style="margin-top:10px;width:100%" data-day-action="remove-status">Remove ${blocked.type} from this day</button>` : ""}</div>
+      <div class="detail-card"><h3>Tasks</h3>${items.map(item => `<div class="mini-detail"><span>${escapeHtml(taskLabel(item.task))}</span><strong>${fmt(item.minutes)}</strong></div>`).join("") || `<div class="note">No work allocated.</div>`}</div>
+      <div class="detail-card"><h3>Add to this day</h3><div class="action-row"><button class="primary" data-day-action="task">Add custom task</button><button data-day-action="status">Sick / Away</button></div></div>`;
+    body.querySelector('[data-day-action="task"]').addEventListener("click", () => openScheduleTaskPanel(personName, dayIndex));
+    body.querySelector('[data-day-action="status"]').addEventListener("click", () => openScheduleStatusPanel(personName, dayIndex));
+    const removeStatusButton = body.querySelector('[data-day-action="remove-status"]');
+    if (removeStatusButton) removeStatusButton.addEventListener("click", () => removeBlockedDay(personName, dayIndex));
+  }
+  openPanel("dayPanel");
+}
+
+
+function currentEmployeePattern(){
+  return document.getElementById("customPatternBtn").classList.contains("active") ? "Custom" : "Standard";
+}
+function setEmployeePattern(pattern){
+  document.getElementById("standardPatternBtn").classList.toggle("active", pattern === "Standard");
+  document.getElementById("customPatternBtn").classList.toggle("active", pattern === "Custom");
+  document.getElementById("customRosterCard").style.display = pattern === "Custom" ? "block" : "none";
+  refreshRosterTotals();
+}
+function getStandardWeekFromInputs(){
+  return {Mon:parseHours(empMon.value),Tue:parseHours(empTue.value),Wed:parseHours(empWed.value),Thu:parseHours(empThu.value),Fri:parseHours(empFri.value)};
+}
+function getCustomWeekInputs(prefix){
+  return {
+    Mon:parseHours(document.getElementById(prefix+"Mon").value),
+    Tue:parseHours(document.getElementById(prefix+"Tue").value),
+    Wed:parseHours(document.getElementById(prefix+"Wed").value),
+    Thu:parseHours(document.getElementById(prefix+"Thu").value),
+    Fri:parseHours(document.getElementById(prefix+"Fri").value)
+  };
+}
+function setWeekInputs(prefix, week){
+  document.getElementById(prefix+"Mon").value = fmt((week && week.Mon) || 0);
+  document.getElementById(prefix+"Tue").value = fmt((week && week.Tue) || 0);
+  document.getElementById(prefix+"Wed").value = fmt((week && week.Wed) || 0);
+  document.getElementById(prefix+"Thu").value = fmt((week && week.Thu) || 0);
+  document.getElementById(prefix+"Fri").value = fmt((week && week.Fri) || 0);
+}
+function refreshRosterTotals(){
+  if (!document.getElementById("week1Total")) return;
+  const standard = getStandardWeekFromInputs();
+  const week1 = getCustomWeekInputs("w1");
+  const week2 = getCustomWeekInputs("w2");
+  const standardTotal = Object.values(standard).reduce((s,v)=>s+v,0);
+  const total1 = Object.values(week1).reduce((s,v)=>s+v,0);
+  const total2 = Object.values(week2).reduce((s,v)=>s+v,0);
+  document.getElementById("week1Total").textContent = fmt(total1);
+  document.getElementById("week2Total").textContent = fmt(total2);
+  document.getElementById("averageWeekTotal").textContent = currentEmployeePattern() === "Custom" ? fmt((total1 + total2) / 2) : fmt(standardTotal);
+}
+
+
+
+function openStatusPanel(personName=null, dayIndex=null){
+  document.getElementById("statusPerson").innerHTML = people.filter(p => p.role !== "Admin").map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join("");
+  const opts = days.map(d => `<option value="${d.iso}">${d.name} ${d.date}</option>`).join("");
+  document.getElementById("statusStart").innerHTML = opts;
+  document.getElementById("statusEnd").innerHTML = opts;
+  if (personName && people.some(person => person.name === personName)) document.getElementById("statusPerson").value = personName;
+  const selectedIso = Number.isInteger(dayIndex) ? toIsoDate(dateForDayIndex(dayIndex)) : document.getElementById("statusStart").value;
+  document.getElementById("statusStart").value = selectedIso;
+  document.getElementById("statusEnd").value = selectedIso;
+  openPanel("statusPanel");
+}
+function closeStatusPanel(closeBackdrop=true){
+  document.getElementById("statusPanel").classList.remove("open");
+  if(closeBackdrop) document.getElementById("panelBackdrop").classList.remove("open");
+}
+function saveStatusRange(){
+  const startDate = document.getElementById("statusStart").value;
+  let endDate = document.getElementById("statusEnd").value;
+  if (endDate < startDate) endDate = startDate;
+  dayStatuses.push({
+    person: document.getElementById("statusPerson").value,
+    type: document.getElementById("statusType").value,
+    startDate,
+    endDate,
+    start:legacyIndexForDate(parseIsoDate(startDate)),
+    end:legacyIndexForDate(parseIsoDate(endDate))
+  });
+  closeStatusPanel();
+  renderAll();
+  saveState("Blocked range saved");
+}
+function removeStatusRange(index){
+  dayStatuses.splice(index,1);
+  renderAll();
+  saveState("Blocked range removed");
+}
+function removeBlockedDay(personName, dayIndex){
+  const targetDate = dateForDayIndex(dayIndex);
+  const targetIso = toIsoDate(targetDate);
+  const statusIndex = dayStatuses.findIndex(status => {
+    if (status.person !== personName) return false;
+    const startDate = parseIsoDate(status.startDate) || legacyDateForDayIndex(Number(status.start || 0));
+    const endDate = parseIsoDate(status.endDate) || legacyDateForDayIndex(Number(status.end || status.start || 0));
+    return targetDate >= startDate && targetDate <= endDate;
+  });
+  if (statusIndex < 0) return;
+
+  const status = dayStatuses[statusIndex];
+  const startDate = parseIsoDate(status.startDate) || legacyDateForDayIndex(Number(status.start || 0));
+  const endDate = parseIsoDate(status.endDate) || legacyDateForDayIndex(Number(status.end || status.start || 0));
+
+  if (isSameDate(startDate,endDate)) {
+    dayStatuses.splice(statusIndex,1);
+  } else if (isSameDate(targetDate,startDate)) {
+    const nextStart = addCalendarDays(startDate,1);
+    status.startDate = toIsoDate(nextStart);
+    status.start = legacyIndexForDate(nextStart);
+  } else if (isSameDate(targetDate,endDate)) {
+    const nextEnd = addCalendarDays(endDate,-1);
+    status.endDate = toIsoDate(nextEnd);
+    status.end = legacyIndexForDate(nextEnd);
+  } else {
+    const beforeEnd = addCalendarDays(targetDate,-1);
+    const afterStart = addCalendarDays(targetDate,1);
+    const afterStatus = {
+      ...status,
+      startDate:toIsoDate(afterStart),
+      endDate:toIsoDate(endDate),
+      start:legacyIndexForDate(afterStart),
+      end:legacyIndexForDate(endDate)
+    };
+    status.endDate = toIsoDate(beforeEnd);
+    status.end = legacyIndexForDate(beforeEnd);
+    dayStatuses.splice(statusIndex + 1,0,afterStatus);
+  }
+
+  closeDayPanel();
+  renderAll();
+  saveState(`${status.type} removed from ${targetIso}`);
+}
+
+/* Employees */
+async function userApi(url, options={}){
+  const response = await apiFetch(url, {
+    ...options,
+    headers: {"Content-Type":"application/json", ...(options.headers || {})}
+  });
+  let payload = {};
+  try { payload = await response.json(); } catch (_) {}
+  if (response.status === 401) {window.location.href = "/login"; throw new Error("Login required");}
+  if (!response.ok) throw new Error(payload.error || "User update failed");
+  return payload;
+}
+async function loadUsers(){
+  if (!isAdmin) return;
+  try {
+    const payload = await userApi("/api/users", {method:"GET", headers:{}});
+    appUsers = Array.isArray(payload.users) ? payload.users : [];
+    renderUserAdmin();
+  } catch (error) {
+    const rows = document.getElementById("userRows");
+    if (rows) rows.innerHTML = `<div class="note">${escapeHtml(error.message)}</div>`;
+  }
+}
+function renderUserAdmin(){
+  const rows = document.getElementById("userRows");
+  if (!rows) return;
+  rows.innerHTML = appUsers.length ? appUsers.map(user => `<div class="user-row">
+    <div class="user-identity"><strong>${escapeHtml(user.username)}${user.is_current ? `<span class="user-role-pill">You</span>` : ""}${user.must_change_password ? `<span class="user-role-pill">Password change required</span>` : ""}</strong><span>${user.role === "admin" ? "Full admin access" : "Home, Calendar and Schedule only"}</span></div>
+    <div class="form-row"><label>Access</label><select id="userRole-${user.id}" ${user.is_current ? "disabled" : ""}><option value="user" ${user.role === "user" ? "selected" : ""}>Read-only user</option><option value="admin" ${user.role === "admin" ? "selected" : ""}>Admin</option></select></div>
+    <div class="form-row"><label>New password</label><input id="userPassword-${user.id}" type="password" autocomplete="new-password" placeholder="Leave blank to keep current"></div>
+    <div class="user-actions"><button onclick="saveFlowUser(${user.id})">Save</button>${user.is_current ? "" : `<button class="danger" onclick="deleteFlowUser(${user.id}, '${encodeURIComponent(user.username)}')">Delete</button>`}</div>
+  </div>`).join("") : `<div class="note">No users found.</div>`;
+}
+async function addFlowUser(){
+  if (!isAdmin) return;
+  const username = document.getElementById("newUsername").value.trim();
+  const password = document.getElementById("newUserPassword").value;
+  const role = document.getElementById("newUserRole").value;
+  try {
+    await userApi("/api/users", {method:"POST", body:JSON.stringify({username,password,role})});
+    document.getElementById("newUsername").value = "";
+    document.getElementById("newUserPassword").value = "";
+    document.getElementById("newUserRole").value = "user";
+    await loadUsers();
+    showToast("User added");
+  } catch (error) { showToast(error.message); }
+}
+async function saveFlowUser(userId){
+  if (!isAdmin) return;
+  const user = appUsers.find(item => item.id === userId);
+  if (!user) return;
+  const roleElement = document.getElementById(`userRole-${userId}`);
+  const passwordElement = document.getElementById(`userPassword-${userId}`);
+  const changes = {};
+  if (roleElement && !roleElement.disabled && roleElement.value !== user.role) changes.role = roleElement.value;
+  if (passwordElement && passwordElement.value) changes.password = passwordElement.value;
+  if (!Object.keys(changes).length) {showToast("No changes to save"); return;}
+  try {
+    await userApi(`/api/users/${userId}`, {method:"PATCH", body:JSON.stringify(changes)});
+    if (passwordElement) passwordElement.value = "";
+    await loadUsers();
+    showToast("User updated");
+  } catch (error) {showToast(error.message); await loadUsers();}
+}
+async function deleteFlowUser(userId, encodedUsername){
+  if (!isAdmin) return;
+  const username = decodeURIComponent(encodedUsername || "user");
+  if (!confirm(`Delete ${username}?`)) return;
+  try {
+    await userApi(`/api/users/${userId}`, {method:"DELETE"});
+    await loadUsers();
+    showToast("User deleted");
+  } catch (error) {showToast(error.message);}
+}
+
+function showSettingsSection(section){
+  if (!isAdmin) return;
+  activeSettingsSection = section;
+  ["user","employees","calendarEvents"].forEach(name => {
+    document.getElementById(`settings${name[0].toUpperCase()+name.slice(1)}Section`)?.classList.toggle("active", section === name);
+  });
+  document.getElementById("settingsNavUser")?.classList.toggle("active", section === "user");
+  document.getElementById("settingsNavEmployees")?.classList.toggle("active", section === "employees");
+  document.getElementById("settingsNavCalendarEvents")?.classList.toggle("active", section === "calendarEvents");
+  if (section === "calendarEvents") renderCalendarEvents();
+  if (section === "user") loadUsers();
+}
+function renderSettings(){
+  renderEmployees();
+  renderCalendarEvents();
+  showSettingsSection(activeSettingsSection);
+}
+function renderEmployees(){
+  const rows = document.getElementById("employeeRows");
+  if (!rows) return;
+  rows.innerHTML = people.map(p => {
+    const patternHtml = (p.workPattern || "Standard") === "Custom"
+      ? ["Mon","Tue","Wed","Thu","Fri"].map(d => `<span class="day-dot ${(p.week1[d] || 0) === 0 ? "off" : ""}">${d[0]}</span>`).join("") + ["Mon","Tue","Wed","Thu","Fri"].map(d => `<span class="day-dot ${(p.week2[d] || 0) === 0 ? "off" : ""}">${d[0]}</span>`).join("")
+      : ["Mon","Tue","Wed","Thu","Fri"].map(d => `<span class="day-dot ${(p.week[d] || 0) === 0 ? "off" : ""}">${d[0]}</span>`).join("");
+    return `<div class="employee-row" draggable="true" data-employee="${escapeHtml(p.name)}">
+      <div class="employee-name-cell"><span class="drag-handle" title="Drag to reorder" aria-label="Drag ${escapeHtml(p.name)} to reorder">⋮⋮</span><div><strong>${escapeHtml(p.name)}</strong><div class="job-sub">${escapeHtml(p.workPattern || "Standard")}</div></div></div>
+      <div><span class="pill grey">${escapeHtml(p.role)}</span></div>
+      <div><span class="pill ${p.role === "Admin" ? "grey" : "green"}">${p.role === "Admin" ? "Non capacity" : fmt(weeklyCapacity(p))}</span></div>
+      <div><div class="days-mini">${patternHtml}</div></div>
+    </div>`;
+  }).join("");
+
+  rows.querySelectorAll(".employee-row").forEach(row => {
+    row.addEventListener("click", event => {
+      if (event.target.closest(".drag-handle") || employeeDragName) return;
+      openEmployeePanel(row.dataset.employee);
+    });
+    row.addEventListener("dragstart", event => {
+      employeeDragName = row.dataset.employee;
+      row.classList.add("dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", employeeDragName);
+    });
+    row.addEventListener("dragover", event => {
+      if (!employeeDragName || employeeDragName === row.dataset.employee) return;
+      event.preventDefault();
+      const rect = row.getBoundingClientRect();
+      const after = event.clientY > rect.top + rect.height / 2;
+      row.classList.toggle("drop-before", !after);
+      row.classList.toggle("drop-after", after);
+    });
+    row.addEventListener("dragleave", () => row.classList.remove("drop-before","drop-after"));
+    row.addEventListener("drop", event => {
+      event.preventDefault();
+      const targetName = row.dataset.employee;
+      const after = row.classList.contains("drop-after");
+      document.querySelectorAll(".employee-row").forEach(item => item.classList.remove("drop-before","drop-after"));
+      if (!employeeDragName || employeeDragName === targetName) return;
+      const fromIndex = people.findIndex(person => person.name === employeeDragName);
+      if (fromIndex < 0) return;
+      const [moved] = people.splice(fromIndex,1);
+      let targetIndex = people.findIndex(person => person.name === targetName);
+      if (targetIndex < 0) targetIndex = people.length;
+      if (after) targetIndex += 1;
+      people.splice(Math.min(targetIndex, people.length),0,moved);
+      employeeDragName = null;
+      renderAll();
+      saveState("Employee order saved");
+    });
+    row.addEventListener("dragend", () => {
+      employeeDragName = null;
+      document.querySelectorAll(".employee-row").forEach(item => item.classList.remove("dragging","drop-before","drop-after"));
+    });
+  });
+}
+function renderCalendarEvents(){
+  const rows = document.getElementById("calendarEventRows");
+  if (!rows) return;
+  const ordered = [...calendarEvents].sort((a,b) => a.startDate.localeCompare(b.startDate) || a.name.localeCompare(b.name));
+  rows.innerHTML = ordered.length ? ordered.map(event => `<div class="calendar-event-row">
+    <div><strong>${escapeHtml(event.name)}</strong><span>${escapeHtml(event.type)}</span></div>
+    <div><strong>${formatCalendarEventDate(event.startDate)}</strong><span>Starts</span></div>
+    <div><strong>${formatCalendarEventDate(event.endDate)}</strong><span>Ends</span></div>
+    <div class="calendar-event-actions"><button onclick="editCalendarEvent('${escapeHtml(event.id)}')">Edit</button><button class="danger" onclick="removeCalendarEvent('${escapeHtml(event.id)}')">Remove</button></div>
+  </div>`).join("") : `<div class="note">No company-wide calendar events have been added yet.</div>`;
+}
+function formatCalendarEventDate(value){
+  const date = parseIsoDate(value);
+  return date ? date.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"}) : "—";
+}
+function clearCalendarEventForm(){
+  selectedCalendarEventId = null;
+  ["calendarEventName","calendarEventStart","calendarEventEnd"].forEach(id => {const element=document.getElementById(id); if(element) element.value="";});
+  const type = document.getElementById("calendarEventType"); if(type) type.value = "Factory Closure";
+  const button = document.getElementById("calendarEventSaveButton"); if(button) button.textContent = "Add event";
+}
+function saveCalendarEvent(){
+  if (!isAdmin) return;
+  const name = document.getElementById("calendarEventName").value.trim();
+  const type = document.getElementById("calendarEventType").value;
+  const startDate = document.getElementById("calendarEventStart").value;
+  const endDate = document.getElementById("calendarEventEnd").value || startDate;
+  if (!name || !startDate) {showToast("Enter an event name and start date"); return;}
+  if (endDate < startDate) {showToast("End date must be on or after the start date"); return;}
+  let event = calendarEvents.find(item => item.id === selectedCalendarEventId);
+  if (!event) {
+    event = {id:`calendar-event-${Date.now()}`,name,type,startDate,endDate};
+    calendarEvents.push(event);
+  } else Object.assign(event,{name,type,startDate,endDate});
+  clearCalendarEventForm();
+  renderAll();
+  saveState("Calendar event saved");
+}
+function editCalendarEvent(id){
+  if (!isAdmin) return;
+  const event = calendarEvents.find(item => item.id === id);
+  if (!event) return;
+  selectedCalendarEventId = event.id;
+  document.getElementById("calendarEventName").value = event.name;
+  document.getElementById("calendarEventType").value = event.type;
+  document.getElementById("calendarEventStart").value = event.startDate;
+  document.getElementById("calendarEventEnd").value = event.endDate;
+  document.getElementById("calendarEventSaveButton").textContent = "Save changes";
+}
+function removeCalendarEvent(id){
+  if (!isAdmin) return;
+  const event = calendarEvents.find(item => item.id === id);
+  if (!event || !confirm(`Remove ${event.name}?`)) return;
+  calendarEvents = calendarEvents.filter(item => item.id !== id);
+  if (selectedCalendarEventId === id) clearCalendarEventForm();
+  renderAll();
+  saveState("Calendar event removed");
+}
+function openEmployeePanel(name){
+  if (!isAdmin) return;
+  selectedEmployeeName = name;
+  let p = people.find(x => x.name === name);
+  if (!p) p = {name:"", role:"Cabinet Making", workPattern:"Standard", week:{Mon:460,Tue:460,Wed:460,Thu:460,Fri:340}};
+  document.getElementById("employeePanelTitle").textContent = p.name || "Add employee";
+  document.getElementById("employeeNameInput").value = p.name;
+  document.getElementById("employeeRoleInput").value = p.role;
+  document.getElementById("empMon").value = fmt((p.week && p.week.Mon) || 0);
+  document.getElementById("empTue").value = fmt((p.week && p.week.Tue) || 0);
+  document.getElementById("empWed").value = fmt((p.week && p.week.Wed) || 0);
+  document.getElementById("empThu").value = fmt((p.week && p.week.Thu) || 0);
+  document.getElementById("empFri").value = fmt((p.week && p.week.Fri) || 0);
+  document.getElementById("customStartInput").value = p.customStart || "2026-06-08";
+  setWeekInputs("w1", p.week1 || p.week || {Mon:460,Tue:460,Wed:460,Thu:460,Fri:340});
+  setWeekInputs("w2", p.week2 || p.week || {Mon:460,Tue:460,Wed:460,Thu:460,Fri:0});
+  setEmployeePattern(p.workPattern || "Standard");
+  refreshRosterTotals();
+  openPanel("employeePanel");
+}
+function renameEmployeeReferences(oldName,newName){
+  tasks.forEach(task => {
+    task.assigned = (task.assigned || []).map(name => name === oldName ? newName : name);
+    if (task.adminEmployee === oldName) task.adminEmployee = newName;
+    ["assignmentMinutes","assignmentDates"].forEach(key => {
+      const mapping = task[key] || {};
+      if (Object.prototype.hasOwnProperty.call(mapping,oldName)) {
+        mapping[newName] = mapping[oldName];
+        delete mapping[oldName];
+        task[key] = mapping;
+      }
+    });
+  });
+  dayStatuses.forEach(status => {if (status.person === oldName) status.person = newName;});
+}
+function convertEmployeeAssignmentsForRole(name,oldRole,newRole){
+  if (oldRole === newRole) return;
+  if (newRole === "Admin") {
+    const additions = [];
+    tasks.filter(task => task.type === "capacity" && (task.assigned || []).includes(name)).forEach(task => {
+      const shares = materialiseAssignmentMinutes(task);
+      const share = Math.max(0,Number(shares[name] || 0));
+      const assignmentDate = (task.assignmentDates || {})[name] || task.date;
+      task.assigned = (task.assigned || []).filter(employee => employee !== name);
+      if (task.assignmentMinutes) delete task.assignmentMinutes[name];
+      if (task.assignmentDates) delete task.assignmentDates[name];
+      task.duration = Math.max(0,Number(task.duration || 0)-share);
+      task.estimatedHours = Number(task.duration || 0)/60;
+      if (share > 0) additions.push({...task,id:`${task.id}-admin-${Date.now()}-${additions.length}`,type:"admin",department:"Admin",adminEmployee:name,duration:share,estimatedHours:share/60,assigned:[name],assignmentMinutes:{[name]:share},assignmentDates:{[name]:assignmentDate},date:assignmentDate,endDate:assignmentDate,parts:[]});
+    });
+    tasks = tasks.filter(task => !(task.type === "capacity" && Number(task.duration || 0) <= 0 && !(task.assigned || []).length));
+    tasks.push(...additions);
+  } else if (oldRole === "Admin") {
+    const adminTasks = tasks.filter(task => task.type === "admin" && ((task.assigned || []).includes(name) || task.adminEmployee === name));
+    adminTasks.forEach(adminTask => {
+      const stageDepartment = adminTask.stageDepartment || newRole;
+      let capacityTask = tasks.find(task => task.type === "capacity" && task.job === adminTask.job && (task.stageGroup || task.name) === (adminTask.stageGroup || adminTask.name) && (task.stageDepartment || task.department) === stageDepartment);
+      if (!capacityTask) {
+        capacityTask = {...adminTask,id:`${adminTask.id}-capacity`,type:"capacity",department:stageDepartment,adminEmployee:undefined,duration:0,estimatedHours:0,assigned:[],assignmentMinutes:{},assignmentDates:{},parts:[]};
+        tasks.push(capacityTask);
+      }
+      const share = Math.max(0,Number(adminTask.duration || 0));
+      capacityTask.assigned = [...new Set([...(capacityTask.assigned || []),name])];
+      capacityTask.assignmentMinutes = {...(capacityTask.assignmentMinutes || {}),[name]:share};
+      capacityTask.assignmentDates = {...(capacityTask.assignmentDates || {}),[name]:adminTask.date};
+      capacityTask.duration = Number(capacityTask.duration || 0)+share;
+      capacityTask.estimatedHours = Number(capacityTask.duration || 0)/60;
+    });
+    const adminIds = new Set(adminTasks.map(task => task.id));
+    tasks = tasks.filter(task => !adminIds.has(task.id));
+  }
+}
+function employeeAssignmentCount(name){
+  return tasks.filter(task => (task.assigned || []).includes(name) || task.adminEmployee === name).length;
+}
+function saveEmployee(){
+  if (!isAdmin) return;
+  const nameInput = document.getElementById("employeeNameInput");
+  const newName = nameInput.value.trim();
+  if (!newName) {
+    showToast("Enter an employee name");
+    nameInput.focus();
+    return;
+  }
+
+  let p = people.find(x => x.name === selectedEmployeeName);
+  const duplicate = people.find(x => x !== p && x.name.toLowerCase() === newName.toLowerCase());
+  if (duplicate) {
+    showToast("That employee name already exists");
+    nameInput.focus();
+    return;
+  }
+
+  if (!p) {
+    p = {name:"", role:"Cabinet Making", workPattern:"Standard", week:{Mon:460,Tue:460,Wed:460,Thu:460,Fri:340}};
+    people.push(p);
+  }
+
+  const oldName = p.name;
+  const oldRole = p.role;
+  const newRole = document.getElementById("employeeRoleInput").value;
+  p.name = newName;
+  p.role = newRole;
+  p.workPattern = currentEmployeePattern();
+  p.week = getStandardWeekFromInputs();
+  p.week1 = getCustomWeekInputs("w1");
+  p.week2 = getCustomWeekInputs("w2");
+  p.customStart = document.getElementById("customStartInput").value || "2026-06-08";
+
+  if (oldName && oldName !== p.name) renameEmployeeReferences(oldName,p.name);
+  if (oldName) convertEmployeeAssignmentsForRole(p.name,oldRole,newRole);
+
+  selectedEmployeeName = p.name;
+  closeEmployeePanel();
+  renderAll();
+  saveState("Employee saved");
+}
+function removeEmployee(){
+  if (!isAdmin) return;
+  if (!selectedEmployeeName) return;
+  const assignmentCount = employeeAssignmentCount(selectedEmployeeName);
+  if (assignmentCount) {showToast(`Reassign or delete ${assignmentCount} linked task${assignmentCount === 1 ? "" : "s"} before removing this employee.`); return;}
+  if (!confirm(`Remove ${selectedEmployeeName}?`)) return;
+  people = people.filter(p => p.name !== selectedEmployeeName);
+  dayStatuses = dayStatuses.filter(status => status.person !== selectedEmployeeName);
+  closeEmployeePanel();
+  renderAll();
+  saveState("Employee removed");
+}
+
+/* Panels and scroll */
+function openPanel(panelId){
+  closeAllPanels(false);
+  document.getElementById("panelBackdrop").classList.add("open");
+  document.getElementById(panelId).classList.add("open");
+}
+function closeTaskPanel(closeBackdrop=true){document.getElementById("taskPanel").classList.remove("open"); if(closeBackdrop) document.getElementById("panelBackdrop").classList.remove("open")}
+function closeDayPanel(closeBackdrop=true){document.getElementById("dayPanel").classList.remove("open"); if(closeBackdrop) document.getElementById("panelBackdrop").classList.remove("open")}
+function closeEmployeePanel(closeBackdrop=true){document.getElementById("employeePanel").classList.remove("open"); if(closeBackdrop) document.getElementById("panelBackdrop").classList.remove("open")}
+function closeAllPanels(closeBackdrop=true){
+  document.getElementById("taskPanel").classList.remove("open");
+  document.getElementById("dayPanel").classList.remove("open");
+  document.getElementById("statusPanel").classList.remove("open");
+  document.getElementById("employeePanel").classList.remove("open");
+  if (closeBackdrop) document.getElementById("panelBackdrop").classList.remove("open");
+}
+function syncFloatingScrollWidth(){
+  const planner = document.getElementById("planner");
+  const floatScroll = document.getElementById("floatScroll");
+  const inner = document.getElementById("floatScrollInner");
+  if (!planner || !floatScroll || !inner) return;
+  inner.style.width = Math.max(planner.scrollWidth, planner.clientWidth + 1) + "px";
+  const scheduleActive = document.getElementById("scheduleView")?.classList.contains("active");
+  floatScroll.style.display = scheduleActive && planner.scrollWidth > planner.clientWidth + 2 ? "block" : "none";
+  floatScroll.scrollLeft = planner.scrollLeft;
+}
+function setupScrollSync(){
+  const planner = document.getElementById("planner");
+  const floatScroll = document.getElementById("floatScroll");
+  if (!planner || !floatScroll) return;
+  let locking = false;
+  planner.addEventListener("scroll", () => {if(locking)return; locking=true; floatScroll.scrollLeft=planner.scrollLeft; locking=false;});
+  floatScroll.addEventListener("scroll", () => {if(locking)return; locking=true; planner.scrollLeft=floatScroll.scrollLeft; locking=false;});
+}
+function showToast(message){
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(window.toastTimer);
+  window.toastTimer = setTimeout(() => toast.classList.remove("show"), 2200);
+}
+
+setupScrollSync();
+setupAddJobPdfDrop();
+showView("home");
+loadSavedState();
+</script>
+</body>
+</html>
