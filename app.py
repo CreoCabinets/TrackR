@@ -508,8 +508,8 @@ def validate_state(payload: object) -> dict:
             if employee not in exact_people_names:
                 raise ValueError(f"Task {task_id} refers to missing employee {employee}.")
         if task_type == "capacity":
-            if require_number(task.get("duration", 0), f"Duration for {task_id}") > 0 and not assigned:
-                raise ValueError(f"Capacity task {task_id} must be assigned to at least one employee.")
+            # Unassigned capacity tasks are valid. They remain visible in the
+            # Schedule's Unassigned row until an employee is chosen later.
             if any(people_roles.get(employee) == "Admin" or not people_capacity.get(employee, False) for employee in assigned):
                 raise ValueError(f"Capacity task {task_id} can only be assigned to capacity employees.")
         if task_type == "milestone":

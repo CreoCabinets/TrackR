@@ -490,7 +490,7 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
       <div class="metric"><small>Custom tasks</small><strong id="customMetric">0</strong></div>
     </section>
     <section class="panel">
-      <div class="panel-head"><div><h2>Job list</h2><p>Milestones sit on Calendar. Capacity tasks feed Schedule.</p></div></div>
+      <div class="panel-head"><div><h2>Job list</h2><p>The Milestones column includes every stage shown on Calendar. Capacity tasks continue to feed Schedule.</p></div></div>
       <div class="jobs-table">
         <div class="table-head"><div>Job</div><div>Address</div><div>Install</div><div>Capacity hours</div><div>Milestones</div></div>
         <div id="jobRows"></div>
@@ -548,7 +548,7 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
 
     <section class="panel">
       <div class="panel-head">
-        <div><h2>3. Production workflow</h2><p>Assign one or more employees to each stage. Admin assignments are non-capacity and appear on Calendar instead of Schedule.</p></div>
+        <div><h2>3. Production workflow</h2><p>Employee assignments are optional. Unassigned capacity stages can be assigned later from Schedule. Admin assignments are non-capacity and appear on Calendar instead of Schedule.</p></div>
         <div class="aj-stage-toolbar"><button onclick="assignAllStagesByDepartment()">Assign all by department</button><button onclick="refreshAddJobPlan()">Regenerate stages</button></div>
       </div>
       <div id="ajRemovedStages" class="aj-removed-stages" aria-live="polite"></div>
@@ -848,6 +848,8 @@ let addJobRemovedStageCache = new Map();
 let addJobSource = "manual";
 let addJobImportDetails = null;
 let editingJobId = null;
+let addJobSaveInProgress = false;
+let lastStateSaveError = "";
 let calendarEvents = [];
 let activeSettingsSection = "employees";
 let selectedCalendarEventId = null;
@@ -902,6 +904,7 @@ async function loadSavedState(){
 async function persistState(message="Saved"){
   if(!stateLoaded || !isAdmin) return false;
   clearTimeout(saveTimer);
+  lastStateSaveError = "";
   try{
     const response = await apiFetch("/api/state", {
       method: "POST",
@@ -910,17 +913,19 @@ async function persistState(message="Saved"){
     });
     let payload = {}; try {payload = await response.json();} catch (_) {}
     if (response.status === 409) {
+      lastStateSaveError = payload.error || "TrackR changed elsewhere. Refresh TrackR and try again.";
       stateLoaded = false;
-      showToast(payload.error || "TrackR changed elsewhere. Refresh required.");
+      showToast(lastStateSaveError);
       return false;
     }
-    if(!response.ok) throw new Error(payload.error || "Save failed");
+    if(!response.ok) throw new Error(payload.error || `Save failed (${response.status})`);
     stateRevision = Number(payload.revision || stateRevision + 1);
     showToast(message);
     return true;
   }catch(error){
     console.error(error);
-    showToast("Save failed");
+    lastStateSaveError = error?.message || "Save failed";
+    showToast(lastStateSaveError);
     return false;
   }
 }
@@ -1305,10 +1310,17 @@ const ADD_JOB_TEMPLATES = {
   6:{Drafting:16,Machining:14,Assembly:44},
   7:{Drafting:18,Machining:16,Assembly:50}
 };
+function setAddJobSaving(saving,isEditing=!!editingJobId){
+  addJobSaveInProgress = saving;
+  const button = document.getElementById("ajSaveButton");
+  if (!button) return;
+  button.disabled = saving;
+  button.textContent = saving ? (isEditing ? "Saving..." : "Creating...") : (isEditing ? "Save Changes" : "Create Job");
+}
 function configureAddJobPage(isEditing){
   document.getElementById("addJobTitle").textContent = isEditing ? "Edit Job" : "Add Job";
   document.getElementById("addJobSubtitle").textContent = isEditing ? "Update the job details, production dates, hours and assignments." : "Import an estimate PDF or enter the job manually. Both routes create the same production plan.";
-  document.getElementById("ajSaveButton").textContent = isEditing ? "Save Changes" : "Create Job";
+  setAddJobSaving(false,isEditing);
   document.getElementById("ajDeleteButton").style.display = isEditing ? "inline-flex" : "none";
   document.getElementById("ajSourceChoices").style.display = isEditing ? "none" : "grid";
 }
@@ -1792,7 +1804,7 @@ function assignAllStagesByDepartment(){
   showToast("Stages assigned by department.");
 }
 async function saveAddJob(){
-  if (!isAdmin) return;
+  if (!isAdmin || addJobSaveInProgress) return;
   const jobNumber = document.getElementById("ajJobNumber").value.trim();
   const address = document.getElementById("ajAddress").value.trim();
   const builder = document.getElementById("ajBuilder").value.trim();
@@ -1809,7 +1821,7 @@ async function saveAddJob(){
     if (!stage.countsCapacity) return false;
     stage.assignments = normaliseStageAssignments(stage,Number(stage.hours||0));
     const selected = stage.assignments.filter(item => item.person);
-    if (Number(stage.hours || 0) > 0 && !selected.length) return true;
+    if (!selected.length) return false;
     const names = selected.map(item=>item.person);
     return new Set(names).size !== names.length || Math.abs(stageRemainingHours(stage)) > .01;
   });
@@ -1904,7 +1916,7 @@ async function saveAddJob(){
     const capacityHours = hasAnyAssignments ? capacityAssignments.reduce((sum,item)=>sum+Math.max(0,Number(item.hours)||0),0) : Number(stage.hours||0);
     const department = stage.department;
     const capacityKey = `${stage.name}|${department}|capacity|`;
-    if (capacityAssignments.length && capacityHours > 0) tasks.push({
+    if (capacityHours > 0 && (!hasAnyAssignments || capacityAssignments.length)) tasks.push({
       id:existingStageIds.get(capacityKey) || `${jobNumber}-${Date.now()}-${index}-capacity`,
       job:jobNumber,
       name:stage.name,
@@ -1967,12 +1979,19 @@ async function saveAddJob(){
   tasks.forEach(task => { task.parts = []; });
   renderAll();
 
-  const saved = await queueStateSave(isEditing ? "Job updated" : "Job created");
+  setAddJobSaving(true,isEditing);
+  let saved = false;
+  try {
+    saved = await queueStateSave(isEditing ? "Job updated" : "Job created");
+  } finally {
+    setAddJobSaving(false,isEditing);
+  }
   if (!saved) {
     jobs = previousJobs;
     tasks = previousTasks;
     renderAll();
-    showAddJobMessage("The job could not be saved. Your previous data has been restored.",true);
+    const detail = lastStateSaveError ? ` ${lastStateSaveError}` : "";
+    showAddJobMessage(`The job could not be saved. Your previous data has been restored.${detail}`,true);
     return;
   }
 
@@ -2015,12 +2034,30 @@ async function deleteEditingJob(){
 }
 
 /* Jobs */
+function calendarStageNamesForJob(jobId){
+  const seen = new Set();
+  return tasks
+    .filter(task => String(task.job) === String(jobId) && calendarTaskVisible(task))
+    .sort((a,b) => {
+      const aDate = taskDate(a);
+      const bDate = taskDate(b);
+      const dateDiff = (aDate?.getTime?.() || 0) - (bDate?.getTime?.() || 0);
+      return dateDiff || String(a.name || "").localeCompare(String(b.name || ""));
+    })
+    .map(task => String(task.stageGroup || task.name || "").trim())
+    .filter(name => {
+      const key = name.toLocaleLowerCase();
+      if (!name || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
 function renderJobs(){
   const rows = document.getElementById("jobRows");
   rows.innerHTML = jobs.map(job => {
-    const jobTasks = tasks.filter(task => task.job === job.id);
+    const jobTasks = tasks.filter(task => String(task.job) === String(job.id));
     const capMins = jobTasks.filter(task => task.type === "capacity").reduce((sum,task) => sum + Number(task.duration || 0), 0);
-    const milestones = jobTasks.filter(task => task.type === "milestone").map(task => task.name).join(", ") || "None";
+    const milestones = calendarStageNamesForJob(job.id).join(", ") || "None";
     return `<div class="job-row" data-job-id="${escapeHtml(encodeURIComponent(job.id))}">
       <div><div class="job-title">${escapeHtml(job.id)}</div><div class="job-sub">${jobTasks.length} tasks · ${escapeHtml(job.status || "Active")}</div></div>
       <div><span class="job-sub">${escapeHtml(job.address)}</span></div>
@@ -2032,7 +2069,7 @@ function renderJobs(){
   rows.querySelectorAll("[data-job-id]").forEach(row => row.addEventListener("click", () => openEditJob(decodeURIComponent(row.dataset.jobId))));
   document.getElementById("jobMetric").textContent = jobs.length;
   document.getElementById("capTaskMetric").textContent = tasks.filter(task => task.type === "capacity").length;
-  document.getElementById("milestoneMetric").textContent = tasks.filter(task => task.type === "milestone").length;
+  document.getElementById("milestoneMetric").textContent = tasks.filter(calendarTaskVisible).length;
   document.getElementById("customMetric").textContent = tasks.filter(task => task.custom).length;
 }
 
@@ -2488,8 +2525,8 @@ function updateTypeHint(){
     if (hoursInput.value === "0h") hoursInput.value = "2h";
     if (department.value === "Milestone") department.value = "Cabinet Making";
     document.getElementById("employeeCardTitle").textContent = "Assigned capacity employees";
-    document.getElementById("employeeCardNote").textContent = "When more than one employee is selected, TrackR splits the task evenly and marks it as Split.";
-    document.getElementById("typeHint").textContent = "Capacity task: uses assigned employee capacity in Schedule. Tick the Calendar option when the same task must also appear on Calendar.";
+    document.getElementById("employeeCardNote").textContent = "Assignment is optional. Leave everyone unticked to place the task in Schedule's Unassigned row, or choose multiple employees to split it evenly.";
+    document.getElementById("typeHint").textContent = "Capacity task: uses employee capacity once assigned. Tick the Calendar option when the same task must also appear on Calendar.";
   }
   renderEmployeeChoices(selected);
 }
@@ -2498,7 +2535,6 @@ function savePanelTask(){
   const selected = [...document.querySelectorAll("#employeeChoices input:checked")].map(input => input.value);
   const jobText = document.getElementById("taskJob").value.trim();
   if (!jobText) {showToast("Enter a job number or description."); document.getElementById("taskJob").focus(); return;}
-  if (type === "capacity" && !selected.length) {showToast("Pick at least one capacity employee."); return;}
   const task = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) : {id:`custom-${Date.now()}`, custom:true};
   task.job = jobText;
   task.type = type;
