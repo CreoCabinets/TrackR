@@ -440,6 +440,27 @@ def validate_state(payload: object) -> dict:
         clean_text(job.get("address"), f"Address for {job_id}", max_length=300, required=True)
         clean_text(job.get("builder", ""), f"Builder for {job_id}", max_length=160)
         clean_text(job.get("notes", ""), f"Notes for {job_id}", max_length=3000)
+        labour_hours = job.get("labourHours", {})
+        if not isinstance(labour_hours, dict):
+            raise ValueError(f"Invalid labour hours for {job_id}.")
+        allowed_labour_hours = {"checkMeasure", "drafting", "machining", "assembly", "loading", "delivery"}
+        if not set(labour_hours).issubset(allowed_labour_hours):
+            raise ValueError(f"Invalid labour hour category for {job_id}.")
+        job["labourHours"] = {
+            key: require_number(value, f"{job_id} {key} labour hours", 0, 100_000)
+            for key, value in labour_hours.items()
+        }
+        excluded_stages = job.get("excludedStages", [])
+        if not isinstance(excluded_stages, list) or len(excluded_stages) > 50:
+            raise ValueError(f"Invalid excluded stages for {job_id}.")
+        cleaned_excluded_stages: list[str] = []
+        seen_excluded_stages: set[str] = set()
+        for stage_name in excluded_stages:
+            cleaned_name = clean_text(stage_name, f"Excluded stage for {job_id}", max_length=140, required=True)
+            if cleaned_name.casefold() not in seen_excluded_stages:
+                cleaned_excluded_stages.append(cleaned_name)
+                seen_excluded_stages.add(cleaned_name.casefold())
+        job["excludedStages"] = cleaned_excluded_stages
         job_status = clean_text(job.get("status", "Active"), f"Status for {job_id}", max_length=40)
         if job_status not in ALLOWED_JOB_STATUSES:
             raise ValueError(f"Invalid status for {job_id}.")
