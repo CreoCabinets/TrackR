@@ -68,7 +68,7 @@ app.config.update(
 )
 
 ALLOWED_USER_ROLES = {"admin", "user"}
-ALLOWED_EMPLOYEE_ROLES = {"Drafting", "Cabinet Making", "Machining", "Admin"}
+ALLOWED_EMPLOYEE_ROLES = {"Drafting", "Cabinet Making", "Machining", "Installer / Site", "Admin"}
 ALLOWED_TASK_TYPES = {"capacity", "milestone", "admin"}
 ALLOWED_JOB_STATUSES = {"Active", "Forecast", "On Hold", "Complete", "Planned", "Waiting", "In Progress"}
 ALLOWED_TASK_STATUSES = {"Planned", "Forecast", "In Progress", "Complete", "Waiting", "Active", "On Hold"}
@@ -76,7 +76,7 @@ ALLOWED_DAY_STATUS_TYPES = {"Sick", "Away", "Holiday", "RDO"}
 ALLOWED_EVENT_TYPES = {"Factory Closure", "Public Holiday", "Company Event"}
 WEEK_DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri")
 TEXT_MAX = 500
-STATE_VERSION = 6
+STATE_VERSION = 7
 MAX_PEOPLE = 250
 MAX_JOBS = 5000
 MAX_TASKS = 30000
@@ -90,7 +90,7 @@ LOGIN_MAX_FAILURES = 8
 DUMMY_PASSWORD_HASH = generate_password_hash(secrets.token_urlsafe(24))
 
 DEFAULT_STATE = {
-  "version": 6,
+  "version": 7,
   "people": [
     {
       "customStart": "2026-06-08",
@@ -397,6 +397,7 @@ def validate_state(payload: object) -> dict:
 
     people_names: set[str] = set()
     people_roles: dict[str, str] = {}
+    people_capacity: dict[str, bool] = {}
     for index, person in enumerate(state["people"]):
         if not isinstance(person, dict):
             raise ValueError(f"Employee {index + 1} is invalid.")
@@ -408,7 +409,14 @@ def validate_state(payload: object) -> dict:
         role = person.get("role")
         if role not in ALLOWED_EMPLOYEE_ROLES:
             raise ValueError(f"Invalid department for {name}.")
+        counts_capacity = person.get("countsCapacity", role != "Admin")
+        if not isinstance(counts_capacity, bool):
+            raise ValueError(f"Capacity setting for {name} must be yes or no.")
+        if role == "Admin" and counts_capacity:
+            raise ValueError(f"Admin employee {name} cannot count toward capacity.")
+        person["countsCapacity"] = counts_capacity
         people_roles[name] = role
+        people_capacity[name] = counts_capacity
         pattern = person.get("workPattern", "Standard")
         if pattern not in {"Standard", "Custom"}:
             raise ValueError(f"Invalid work pattern for {name}.")
@@ -439,7 +447,6 @@ def validate_state(payload: object) -> dict:
             raise ValueError(f"Invalid install date for {job_id}.")
 
     task_ids: set[str] = set()
-    exact_job_ids = {str(job.get("id")) for job in state["jobs"]}
     exact_people_names = set(people_roles)
     for index, task in enumerate(state["tasks"]):
         if not isinstance(task, dict):
@@ -455,10 +462,12 @@ def validate_state(payload: object) -> dict:
         task_type = task.get("type")
         if task_type not in ALLOWED_TASK_TYPES:
             raise ValueError(f"Invalid task type for {task_id}.")
-        job_id = clean_text(task.get("job"), f"Job for {task_id}", max_length=64, required=True)
-        if job_id not in exact_job_ids:
-            raise ValueError(f"Task {task_id} refers to a missing job.")
+        clean_text(task.get("job"), f"Job for {task_id}", max_length=160, required=True)
         clean_text(task.get("name"), f"Name for {task_id}", max_length=140, required=True)
+        show_on_calendar = task.get("showOnCalendar", False)
+        if not isinstance(show_on_calendar, bool):
+            raise ValueError(f"Calendar setting for {task_id} must be yes or no.")
+        task["showOnCalendar"] = show_on_calendar if task_type == "capacity" else False
         clean_text(task.get("department", ""), f"Department for {task_id}", max_length=80)
         task_status = clean_text(task.get("status", "Planned"), f"Status for {task_id}", max_length=40)
         if task_status not in ALLOWED_TASK_STATUSES:
@@ -480,8 +489,11 @@ def validate_state(payload: object) -> dict:
         if task_type == "capacity":
             if require_number(task.get("duration", 0), f"Duration for {task_id}") > 0 and not assigned:
                 raise ValueError(f"Capacity task {task_id} must be assigned to at least one employee.")
-            if any(people_roles.get(employee) == "Admin" for employee in assigned):
-                raise ValueError(f"Capacity task {task_id} cannot be assigned to Admin employees.")
+            if any(people_roles.get(employee) == "Admin" or not people_capacity.get(employee, False) for employee in assigned):
+                raise ValueError(f"Capacity task {task_id} can only be assigned to capacity employees.")
+        if task_type == "milestone":
+            if any(people_roles.get(employee) == "Admin" or people_capacity.get(employee, False) for employee in assigned):
+                raise ValueError(f"Calendar-only task {task_id} can only be assigned to non-capacity employees.")
         if task_type == "admin":
             if len(assigned) != 1 or people_roles.get(assigned[0]) != "Admin":
                 raise ValueError(f"Admin calendar task {task_id} must have one Admin employee.")
@@ -550,6 +562,15 @@ def migrate_state(state: object) -> tuple[dict, bool]:
     if not isinstance(state.get("calendarEvents"), list):
         state["calendarEvents"] = []
         changed = True
+    if current_version < 7:
+        for person in state.get("people", []):
+            if isinstance(person, dict) and not isinstance(person.get("countsCapacity"), bool):
+                person["countsCapacity"] = person.get("role") != "Admin"
+                changed = True
+        for task in state.get("tasks", []):
+            if isinstance(task, dict) and not isinstance(task.get("showOnCalendar"), bool):
+                task["showOnCalendar"] = False
+                changed = True
     if current_version < STATE_VERSION:
         state["version"] = STATE_VERSION
         changed = True
