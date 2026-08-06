@@ -76,7 +76,7 @@ ALLOWED_DAY_STATUS_TYPES = {"Sick", "Away", "Holiday", "RDO"}
 ALLOWED_EVENT_TYPES = {"Factory Closure", "Public Holiday", "Company Event"}
 WEEK_DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri")
 TEXT_MAX = 500
-STATE_VERSION = 8
+STATE_VERSION = 9
 MAX_PEOPLE = 250
 MAX_JOBS = 5000
 MAX_TASKS = 30000
@@ -90,7 +90,7 @@ LOGIN_MAX_FAILURES = 8
 DUMMY_PASSWORD_HASH = generate_password_hash(secrets.token_urlsafe(24))
 
 DEFAULT_STATE = {
-  "version": 8,
+  "version": 9,
   "people": [
     {
       "customStart": "2026-06-08",
@@ -572,6 +572,37 @@ def validate_state(payload: object) -> dict:
     return state
 
 
+
+def is_stone_task_name(value: object) -> bool:
+    return "stone" in str(value or "").strip().casefold()
+
+
+def default_calendar_stage(value: object) -> bool:
+    name = str(value or "").strip().casefold()
+    if "stone" in name:
+        return False
+    return (
+        "check measure" in name
+        or name == "delivery"
+        or name.endswith(" delivery")
+        or name == "install"
+        or name.endswith(" install")
+    )
+
+
+def department_for_stage(value: object, fallback: object = "Cabinet Making") -> str:
+    name = str(value or "").strip().casefold()
+    if "check measure" in name or ("install" in name and "stone" not in name):
+        return "Installer / Site"
+    if "draft" in name or "forward ordering" in name or name == "ordering":
+        return "Drafting"
+    if "machin" in name or "machine 2pak" in name:
+        return "Machining"
+    if "assembl" in name or "load" in name or "deliver" in name or "prep 2pak" in name:
+        return "Cabinet Making"
+    fallback_text = str(fallback or "")
+    return fallback_text if fallback_text in ALLOWED_EMPLOYEE_ROLES and fallback_text != "Admin" else "Cabinet Making"
+
 def migrate_state(state: object) -> tuple[dict, bool]:
     if not isinstance(state, dict):
         return copy.deepcopy(DEFAULT_STATE), True
@@ -612,11 +643,136 @@ def migrate_state(state: object) -> tuple[dict, bool]:
                 if task.get("assignmentDates") != reset_dates:
                     task["assignmentDates"] = reset_dates
                     changed = True
+    if current_version < 9:
+        # Workflow v9: every generated non-stone stage is a capacity task.
+        # Stone work remains calendar-only. Check Measure, Delivery and Install
+        # are linked to Calendar by default. Existing dates and usable capacity
+        # assignments are preserved; incomplete converted stages stay visible
+        # with zero hours or no employee so users can finish them deliberately.
+        jobs_by_id = {
+            str(job.get("id")): job
+            for job in state.get("jobs", [])
+            if isinstance(job, dict) and job.get("id") is not None
+        }
+        people_by_name = {
+            str(person.get("name")): person
+            for person in state.get("people", [])
+            if isinstance(person, dict) and person.get("name")
+        }
+        capacity_names = {
+            name for name, person in people_by_name.items()
+            if person.get("role") != "Admin" and person.get("countsCapacity", person.get("role") != "Admin") is not False
+        }
+        non_capacity_names = {
+            name for name, person in people_by_name.items()
+            if person.get("role") != "Admin" and person.get("countsCapacity", person.get("role") != "Admin") is False
+        }
+        for task in state.get("tasks", []):
+            if not isinstance(task, dict):
+                continue
+            if not isinstance(task.get("showOnCalendar"), bool):
+                task["showOnCalendar"] = False
+                changed = True
+            if not isinstance(task.get("stoneMason"), str):
+                task["stoneMason"] = ""
+                changed = True
+            task_name = task.get("name", "")
+            stone_task = is_stone_task_name(task_name)
+            job = jobs_by_id.get(str(task.get("job")), {})
+            historical = task.get("status") == "Complete" or job.get("status") == "Complete"
+            generated_stage = not bool(task.get("custom", False))
+
+            if historical:
+                continue
+
+            if stone_task and task.get("type") != "milestone":
+                kept = [name for name in task.get("assigned", []) if name in non_capacity_names]
+                task["type"] = "milestone"
+                task["department"] = "Milestone"
+                task["duration"] = 0
+                task["estimatedHours"] = 0
+                task["assigned"] = kept
+                task["assignmentMinutes"] = {}
+                task["assignmentDates"] = {
+                    name: task.get("date") for name in kept if valid_iso_date(task.get("date"))
+                }
+                task["showOnCalendar"] = False
+                changed = True
+                continue
+
+            if generated_stage and not stone_task and task.get("type") == "admin":
+                duration = max(0, float(task.get("duration", 0) or 0))
+                estimated = max(0, float(task.get("estimatedHours", 0) or 0))
+                if duration <= 0 and estimated > 0:
+                    duration = round(estimated * 60)
+                if estimated <= 0 and duration > 0:
+                    estimated = duration / 60
+                task["type"] = "capacity"
+                task["department"] = department_for_stage(task_name, task.get("stageDepartment") or task.get("department"))
+                task["stageGroup"] = task.get("stageGroup") or task_name
+                task["stageDepartment"] = task["department"]
+                task["stageTotalHours"] = float(task.get("stageTotalHours", estimated) or estimated)
+                task["duration"] = round(duration)
+                task["estimatedHours"] = estimated
+                task["assigned"] = []
+                task["assignmentMinutes"] = {}
+                task["assignmentDates"] = {}
+                task["showOnCalendar"] = default_calendar_stage(task_name)
+                task.pop("adminEmployee", None)
+                task.pop("adminTask", None)
+                changed = True
+                continue
+
+            if generated_stage and not stone_task and task.get("type") == "milestone":
+                kept = [name for name in task.get("assigned", []) if name in capacity_names]
+                duration = max(0, float(task.get("duration", 0) or 0))
+                estimated = max(0, float(task.get("estimatedHours", 0) or 0))
+                if duration <= 0 and estimated > 0:
+                    duration = round(estimated * 60)
+                if estimated <= 0 and duration > 0:
+                    estimated = duration / 60
+                task["type"] = "capacity"
+                task["department"] = department_for_stage(task_name, task.get("department"))
+                task["stageGroup"] = task.get("stageGroup") or task_name
+                task["stageDepartment"] = task.get("stageDepartment") or task["department"]
+                task["stageTotalHours"] = float(task.get("stageTotalHours", estimated) or estimated)
+                task["duration"] = round(duration)
+                task["estimatedHours"] = estimated
+                task["assigned"] = kept
+                if kept:
+                    base = int(duration) // len(kept) if kept else 0
+                    remainder = int(duration) - (base * len(kept))
+                    allocations: dict[str, int] = {}
+                    for name in kept:
+                        allocations[name] = base + (1 if remainder > 0 else 0)
+                        if remainder > 0:
+                            remainder -= 1
+                    task["assignmentMinutes"] = allocations
+                    task["assignmentDates"] = {
+                        name: task.get("date") for name in kept if valid_iso_date(task.get("date"))
+                    }
+                else:
+                    task["assignmentMinutes"] = {}
+                    task["assignmentDates"] = {}
+                task["showOnCalendar"] = default_calendar_stage(task_name)
+                changed = True
+                continue
+
+            if task.get("type") == "capacity" and not stone_task:
+                desired_calendar = bool(task.get("showOnCalendar")) or default_calendar_stage(task_name)
+                if task.get("showOnCalendar") != desired_calendar:
+                    task["showOnCalendar"] = desired_calendar
+                    changed = True
+                desired_department = department_for_stage(task_name, task.get("department"))
+                if task_name and ("check measure" in str(task_name).casefold() or ("install" in str(task_name).casefold() and "stone" not in str(task_name).casefold())) and task.get("department") != desired_department:
+                    task["department"] = desired_department
+                    task["stageDepartment"] = desired_department
+                    changed = True
+        changed = True
     if current_version < STATE_VERSION:
         state["version"] = STATE_VERSION
         changed = True
     return state, changed
-
 
 def read_pdf_text(file_stream) -> str:
     reader = PdfReader(file_stream, strict=False)
@@ -764,9 +920,10 @@ def init_db() -> None:
                     stored_version = int(stored_state.get("version", 0) or 0) if isinstance(stored_state, dict) else 0
                 except (TypeError, ValueError):
                     stored_version = 0
-                if stored_version < 8:
+                if stored_version < STATE_VERSION:
                     conn.commit()
-                    backup_database(label="pre-v8-schedule-reset", force=True)
+                    backup_label = "pre-v9-workflow-conversion" if stored_version < 9 else "pre-state-migration"
+                    backup_database(label=backup_label, force=True)
                 stored_state, changed = migrate_state(stored_state)
             try:
                 validated_state = validate_state(stored_state)
