@@ -61,6 +61,13 @@ button.danger{background:#fee2e2;color:#991b1b;border-color:#fecaca}
 .view{display:none}
 .view.active{display:block}
 .header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px}
+.header-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+.view-search{display:flex;align-items:center;gap:8px;min-width:min(320px,42vw);border:1px solid var(--line);border-radius:999px;background:#fff;padding:2px 12px;box-shadow:0 4px 12px rgba(23,32,51,.04)}
+.view-search:focus-within{border-color:#80aaa5;box-shadow:0 0 0 3px rgba(15,118,110,.10)}
+.view-search:before{content:"Search";font-size:10px;font-weight:950;text-transform:uppercase;letter-spacing:.06em;color:#718095}
+.view-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;padding:9px 0;font:inherit;font-weight:800;color:var(--ink)}
+.view-search input::placeholder{color:#98a3af;font-weight:750}
+.search-empty{padding:22px;text-align:center;color:#64748b;font-size:13px;font-weight:850}
 h1{margin:0 0 6px;font-size:30px;letter-spacing:-.06em}
 h2{margin:0 0 6px;font-size:23px;letter-spacing:-.05em}
 .sub{margin:0;color:var(--muted);font-weight:750}
@@ -96,7 +103,8 @@ h2{margin:0 0 6px;font-size:23px;letter-spacing:-.05em}
 
 /* Jobs */
 .jobs-table,.employee-table{border:1px solid var(--line);border-radius:20px;overflow:hidden}
-.table-head,.job-row{display:grid;grid-template-columns:1.1fr 1.15fr .65fr .75fr 1fr;align-items:center}
+.jobs-table{overflow-x:auto}
+.table-head,.job-row{display:grid;grid-template-columns:.85fr 1fr 1.15fr .58fr .68fr 1.15fr;align-items:center;min-width:1050px}
 .table-head,.employee-head{background:#fffaf2;color:#64748b;text-transform:uppercase;letter-spacing:.07em;font-size:11px;font-weight:950;border-bottom:1px solid var(--line)}
 .table-head div,.job-row>div{padding:14px 16px}
 .job-row{min-height:72px;border-bottom:1px solid var(--line);cursor:pointer}
@@ -149,9 +157,11 @@ h2{margin:0 0 6px;font-size:23px;letter-spacing:-.05em}
 .schedule-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .schedule-tools input,.schedule-tools select{border:1px solid var(--line);border-radius:999px;padding:10px 12px;font-weight:850;background:#fff}
 .schedule-range{font-size:12px;color:#64748b;font-weight:850;margin-top:5px}
-.planner{background:#fff;border:1px solid var(--line);border-radius:24px;box-shadow:0 14px 38px rgba(23,32,51,.09);overflow-x:auto;max-width:100%}
+.planner-header{position:sticky;top:68px;z-index:90;max-width:100%;overflow-x:auto;overflow-y:hidden;background:#fff;border:1px solid var(--line);border-bottom:0;border-radius:24px 24px 0 0;box-shadow:0 10px 24px rgba(23,32,51,.08);scrollbar-width:none}
+.planner-header::-webkit-scrollbar{display:none}
+.planner{background:#fff;border:1px solid var(--line);border-radius:0 0 24px 24px;box-shadow:0 14px 38px rgba(23,32,51,.09);overflow-x:auto;max-width:100%}
 .timeline{width:max-content;min-width:100%}
-.days{display:grid;grid-template-columns:var(--people) repeat(var(--day-count, 7),var(--day));position:sticky;top:0;z-index:30;background:#fffaf2;border-bottom:1px solid var(--line)}
+.days{display:grid;grid-template-columns:var(--people) repeat(var(--day-count, 7),var(--day));position:relative;z-index:30;background:#fffaf2;border-bottom:1px solid var(--line)}
 .corner,.day-head{min-height:76px;border-right:1px solid var(--line);padding:14px;background:#fffaf2}
 .corner{position:sticky;left:0;z-index:35;display:flex;align-items:center;font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:950;color:#5f6673}
 .day-head.weekend{background:#f4f1ec;color:#8a8173}.day-head.today{background:#f2f6fc}.day-cap{float:right;border:1px solid #eadfcd;background:#fff;border-radius:999px;padding:4px 8px;font-size:12px;font-weight:950}.day-head.today .day-cap{border-color:#c8d7ed;background:#e7eef9;color:#35557c}.day-name{font-weight:950;font-size:18px;letter-spacing:-.04em}.day-date{display:block;color:#64748b;font-size:12px;font-weight:850;margin-top:3px}
@@ -166,11 +176,13 @@ h2{margin:0 0 6px;font-size:23px;letter-spacing:-.05em}
 .cell.today.weekend{background:repeating-linear-gradient(-45deg,rgba(242,246,252,.94),rgba(242,246,252,.94) 7px,rgba(226,233,243,.94) 7px,rgba(226,233,243,.94) 14px)}
 .cell.today.blocked-day{background:repeating-linear-gradient(-45deg,#fff4f5,#fff4f5 7px,#fbdfe3 7px,#fbdfe3 14px)}
 .cell.today.rostered-off{background:repeating-linear-gradient(-45deg,#f3f5f8,#f3f5f8 7px,#dde3ea 7px,#dde3ea 14px)}
+.cell.over-capacity{background:#fff3f3;box-shadow:inset 0 0 0 2px rgba(201,55,55,.12)}
+.cell.over-capacity.today{background:#ffeded}
 .cell.drop-active{box-shadow:inset 0 0 0 3px rgba(23,32,51,.14)}.cell.drop-top{box-shadow:inset 0 4px 0 rgba(23,32,51,.22), inset 0 0 0 3px rgba(23,32,51,.10)}.cell.drop-bottom{box-shadow:inset 0 -4px 0 rgba(23,32,51,.22), inset 0 0 0 3px rgba(23,32,51,.10)}
-.badge{display:inline-flex;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:950;border:1px solid #c6ecd7;background:#eaf8f0;color:#17613b}.badge.tight{border-color:#f2d894;background:#fff4da;color:#8a5a00}.badge.off{border-color:#ded6c9;background:#f4f1ec;color:#9a8d7c}.badge.sick{border-color:#fecaca;background:#fff1f2;color:#b42318}.badge.away{border-color:#ddd6fe;background:#f5f3ff;color:#6d28d9}.badge.holiday{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8}.badge.rdo{border-color:#fed7aa;background:#fff7ed;color:#c2410c}
+.badge{display:inline-flex;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:950;border:1px solid #c6ecd7;background:#eaf8f0;color:#17613b}.badge.over{border-color:#f1aaaa;background:#fff0f0;color:#a51d1d}.badge.tight{border-color:#f2d894;background:#fff4da;color:#8a5a00}.badge.off{border-color:#ded6c9;background:#f4f1ec;color:#9a8d7c}.badge.sick{border-color:#fecaca;background:#fff1f2;color:#b42318}.badge.away{border-color:#ddd6fe;background:#f5f3ff;color:#6d28d9}.badge.holiday{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8}.badge.rdo{border-color:#fed7aa;background:#fff7ed;color:#c2410c}
 .bars{position:absolute;left:var(--people);right:0;top:0;bottom:0;z-index:10;pointer-events:none}
 .bar{position:absolute;height:36px;border-radius:14px;padding:0 12px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 8px 15px rgba(23,32,51,.10);border:1px solid rgba(0,0,0,.05);cursor:pointer;pointer-events:auto}
-.bar:hover{transform:translateY(-1px);box-shadow:0 12px 22px rgba(23,32,51,.14);outline:2px solid rgba(23,32,51,.14)}.bar.dragging{opacity:.55;pointer-events:none!important}.bar.split{box-shadow:0 8px 15px rgba(23,32,51,.10), inset 5px 0 0 rgba(23,32,51,.28)}.bar.no-capacity{border-style:dashed;box-shadow:none}
+.bar:hover{transform:translateY(-1px);box-shadow:0 12px 22px rgba(23,32,51,.14);outline:2px solid rgba(23,32,51,.14)}.bar.over-capacity{border-color:#d66a6a;box-shadow:0 6px 14px rgba(170,35,35,.16),inset 0 0 0 2px rgba(255,255,255,.55)}.bar.dragging{opacity:.55;pointer-events:none!important}.bar.split{box-shadow:0 8px 15px rgba(23,32,51,.10), inset 5px 0 0 rgba(23,32,51,.28)}.bar.no-capacity{border-style:dashed;box-shadow:none}
 .dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:0 0 auto}.bar-main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bar-time{margin-left:auto;flex:0 0 auto;font-weight:950;opacity:.86}.split-chip,.no-cap-chip{flex:0 0 auto;border:1px solid rgba(23,32,51,.12);background:rgba(255,255,255,.72);border-radius:999px;padding:2px 6px;font-size:10px;font-weight:950;color:inherit}
 .blue{background:#d9ebff;color:#075985}.green{background:#d9f5e7;color:#12633c}.orange{background:#ffe8cc;color:#9a4f00}.grey{background:#f4f1ec;color:#5f6673}.purple{background:#f4e8ff;color:#7b43af}.yellow{background:#fef3c7;color:#92400e}
 .stage-check{background:#fff4da;color:#8a5a00}.stage-ordering{background:#fde7f3;color:#9d174d}.stage-drafting{background:#d9ebff;color:#075985}.stage-machining{background:#f4e8ff;color:#7b43af}.stage-assembly{background:#d9f5e7;color:#12633c}.stage-loading{background:#ffe8cc;color:#9a4f00}.stage-delivery{background:#dff7f6;color:#0f766e}.stage-install{background:#e8e6ff;color:#4338ca}.stage-2pak{background:#ffe4e6;color:#9f1239}.stage-stone{background:#efe6ff;color:#6d28d9}.stage-custom{background:#edf2f7;color:#475569}
@@ -384,7 +396,8 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
 
 /* Schedule */
 .schedule-tools{gap:9px}.schedule-range{color:#718095}
-.planner{border-color:#d9e2e8;border-radius:15px;box-shadow:var(--shadow-md);scrollbar-color:#9aa8b4 #eef2f4}
+.planner-header{border-color:#d9e2e8;border-radius:15px 15px 0 0}
+.planner{border-color:#d9e2e8;border-radius:0 0 15px 15px;box-shadow:var(--shadow-md);scrollbar-color:#9aa8b4 #eef2f4}
 .days{background:#f5f8fa;border-color:#dbe3ea}
 .corner,.day-head{background:#f5f8fa;border-color:#dbe3ea;padding:13px 14px}
 .corner{color:#68788b}.day-head.weekend{background:#f0f3f4;color:#7b8793}.day-head.today{background:#eaf4f3}
@@ -432,6 +445,7 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
   .settings-menu button{text-align:center}
 }
 @media(max-width:620px){
+  .header{align-items:stretch;flex-direction:column}.header-actions{justify-content:stretch}.view-search{min-width:100%;width:100%}
   .cards{grid-template-columns:1fr 1fr;gap:10px}
   .metric{padding:13px}.metric strong{font-size:20px}
   h1{font-size:27px}.panel{padding:15px;border-radius:14px}
@@ -461,7 +475,7 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
   <section id="homeView" class="view active">
     <div class="header">
       <div><h1>Home</h1><p class="sub">A clear view of production capacity, upcoming work and team availability.</p></div>
-      <div class="week-switch"><button id="homeThisWeek" class="active" onclick="setHomeWeek('this')">This week</button><button id="homeNextWeek" onclick="setHomeWeek('next')">Next week</button></div>
+      <div class="header-actions"><label class="view-search"><input id="homeSearch" type="search" aria-label="Search Home" placeholder="Job, builder, address or employee" oninput="renderHome()"></label><div class="week-switch"><button id="homeThisWeek" class="active" onclick="setHomeWeek('this')">This week</button><button id="homeNextWeek" onclick="setHomeWeek('next')">Next week</button></div></div>
     </div>
     <section class="panel">
       <div class="panel-head"><div><h2>Department capacity</h2><p>Reads from employee hours and scheduled capacity work. The light gap shows unused capacity.</p></div></div>
@@ -482,7 +496,7 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
   </section>
 
   <section id="jobsView" class="view">
-    <div class="header"><div><h1>Jobs</h1><p class="sub">Job list and task counts.</p></div><button class="primary" onclick="openAddJob()">Add job</button></div>
+    <div class="header"><div><h1>Jobs</h1><p class="sub">Job list and task counts.</p></div><div class="header-actions"><label class="view-search"><input id="jobsSearch" type="search" aria-label="Search Jobs" placeholder="Job, builder, address or employee" oninput="renderJobs()"></label><button class="primary" onclick="openAddJob()">Add job</button></div></div>
     <section class="cards">
       <div class="metric"><small>Active jobs</small><strong id="jobMetric">0</strong></div>
       <div class="metric"><small>Capacity tasks</small><strong id="capTaskMetric">0</strong></div>
@@ -492,7 +506,7 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
     <section class="panel">
       <div class="panel-head"><div><h2>Job list</h2><p>The Milestones column includes every stage shown on Calendar. Capacity tasks continue to feed Schedule.</p></div></div>
       <div class="jobs-table">
-        <div class="table-head"><div>Job</div><div>Address</div><div>Install</div><div>Capacity hours</div><div>Milestones</div></div>
+        <div class="table-head"><div>Job</div><div>Builder / Client</div><div>Address</div><div>Install</div><div>Capacity hours</div><div>Milestones</div></div>
         <div id="jobRows"></div>
       </div>
     </section>
@@ -567,7 +581,7 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
   </section>
 
   <section id="calendarView" class="view">
-    <div class="header"><div><h1>Calendar</h1><p class="sub">Monthly view for installs, milestones and calendar-only work. Click a day to add an item.</p></div></div>
+    <div class="header"><div><h1>Calendar</h1><p class="sub">Monthly view for installs, milestones and calendar-linked capacity work. Click a day to add an item.</p></div><div class="header-actions"><label class="view-search"><input id="calendarSearch" type="search" aria-label="Search Calendar" placeholder="Job, task, employee or stone mason" oninput="renderCalendar()"></label></div></div>
     <section class="cards">
       <div class="metric"><small>Calendar items</small><strong id="calendarItemMetric">0</strong></div>
       <div class="metric"><small>Check measures</small><strong id="calendarCheckMetric">0</strong></div>
@@ -581,19 +595,14 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
         <div class="month-actions"><button onclick="goToday()">Today</button><button onclick="changeMonth(1)">Next</button></div>
       </div>
       <div class="month-grid" id="monthGrid"></div>
-      <div class="note" style="margin-top:12px">Calendar shows milestones and other non-capacity dates only. Capacity tasks stay in Schedule.</div>
+      <div class="note" style="margin-top:12px">Calendar shows milestones plus any capacity task created here or marked “Show on Calendar”. Capacity tasks also remain in Schedule.</div>
     </section>
   </section>
 
   <section id="scheduleView" class="view">
     <div class="header">
       <div><h1>Schedule</h1><p class="sub">Capacity planning only: drag tasks, split across employees, and update calendar-linked custom tasks.</p><div class="schedule-range" id="scheduleRangeLabel"></div></div>
-      <div class="schedule-tools">
-        <button onclick="changeScheduleWeek(-1)">Previous</button>
-        <button onclick="goScheduleToday()">Today</button>
-        <button onclick="changeScheduleWeek(1)">Next</button>
-        
-      </div>
+      <div class="schedule-tools"><label class="view-search"><input id="scheduleSearch" type="search" aria-label="Search Schedule" placeholder="Job, task or employee" oninput="renderSchedule()"></label><button onclick="changeScheduleWeek(-1)">Previous</button><button onclick="goScheduleToday()">Today</button><button onclick="changeScheduleWeek(1)">Next</button></div>
     </div>
     <section class="cards">
       <div class="metric"><small>Total capacity booked</small><strong id="bookedMetric">0%</strong></div>
@@ -602,12 +611,8 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
       <div class="metric"><small>Split tasks</small><strong id="splitMetric">0</strong></div>
     </section>
     <div class="note" id="scheduleWarning" style="display:none;margin-bottom:12px"></div>
-    <section class="planner" id="planner">
-      <div class="timeline">
-        <div class="days" id="daysHeader"></div>
-        <div id="rows"></div>
-      </div>
-    </section>
+    <div class="planner-header" id="plannerHeader"><div class="timeline"><div class="days" id="daysHeader"></div></div></div>
+    <section class="planner" id="planner"><div class="timeline"><div id="rows"></div></div></section>
   </section>
 
 
@@ -678,7 +683,8 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
           <div class="form-row"><label>Job</label><input id="taskJob" maxlength="160" placeholder="Job number or quick-fix description"></div>
           <div class="form-row"><label>Type</label><select id="taskType" onchange="updateTypeHint()"><option value="milestone">Calendar milestone only</option><option value="capacity">Capacity task for schedule</option></select></div>
         </div>
-        <div class="form-row"><label>Task name</label><input id="taskName" placeholder="e.g. Check Measure, Install, Touch up"></div>
+        <div class="form-row"><label>Task name</label><input id="taskName" placeholder="e.g. Check Measure, Install, Touch up" oninput="updateStoneMasonField()"></div>
+        <div class="form-row" id="stoneMasonRow" style="display:none"><label>Stone mason</label><input id="taskStoneMason" maxlength="160" placeholder="Company or person doing the stone work"></div>
         <div class="two-col">
           <div class="form-row"><label>Start day</label><input id="taskDate" type="date"></div>
           <div class="form-row"><label>Hours</label><input id="taskHours" value="2h"></div>
@@ -854,11 +860,12 @@ let calendarEvents = [];
 let activeSettingsSection = "employees";
 let selectedCalendarEventId = null;
 let employeeDragName = null;
+let taskPanelOrigin = "general";
 
 function statePayload(){
   return {
     _revision: stateRevision,
-    version: 7,
+    version: 8,
     people,
     jobs,
     tasks: tasks.map(({parts, unscheduledMinutes, ...task}) => task),
@@ -883,6 +890,7 @@ async function loadSavedState(){
     tasks.forEach(task => {
       if (!task.date && Number.isFinite(Number(task.start))) task.date = toIsoDate(legacyDateForDayIndex(Number(task.start)));
       if (typeof task.showOnCalendar !== "boolean") task.showOnCalendar = false;
+      if (typeof task.stoneMason !== "string") task.stoneMason = "";
     });
     dayStatuses = Array.isArray(state.dayStatuses) ? state.dayStatuses : [];
     calendarEvents = Array.isArray(state.calendarEvents) ? state.calendarEvents : [];
@@ -1069,12 +1077,21 @@ function globalCalendarEventForDate(dateObj){
 }
 function employeeCountsCapacity(person){ return !!person && person.role !== "Admin" && person.countsCapacity !== false; }
 function calendarTaskVisible(task){ return !!task && (task.type === "milestone" || task.type === "admin" || (task.type === "capacity" && task.showOnCalendar === true)); }
-function capacityForDate(person, dateObj){
-  if (!employeeCountsCapacity(person) || !dateObj || dateObj.getDay()===0 || dateObj.getDay()===6) return 0;
+function rosteredCapacityForDate(person,dateObj){
+  if (!employeeCountsCapacity(person) || !dateObj) return 0;
+  const dayName = dateObj.toLocaleDateString("en-AU",{weekday:"short"});
+  return Math.max(0,Number(weekPatternForDate(person,dateObj)[dayName] || 0));
+}
+function defaultDailyCapacity(person){
+  const values = [person?.week,person?.week1,person?.week2].flatMap(week => Object.values(week || {})).map(Number).filter(value => value > 0);
+  return values.length ? Math.max(...values) : 460;
+}
+function capacityForDate(person,dateObj){
+  const rostered = rosteredCapacityForDate(person,dateObj);
+  if (!rostered) return 0;
   if (globalCalendarEventForDate(dateObj)) return 0;
   if (blockedStatusForDate(person.name,dateObj)) return 0;
-  const dayName = dateObj.toLocaleDateString("en-AU",{weekday:"short"});
-  return weekPatternForDate(person, dateObj)[dayName] || 0;
+  return rostered;
 }
 function capacityFor(person, dayIndex){ return capacityForDate(person, dateForDayIndex(dayIndex)); }
 function weeklyCapacity(person){
@@ -1107,9 +1124,23 @@ function typeColour(task){
   if (task.department === "Installer / Site") return "stage-install";
   return "stage-custom";
 }
-function taskMatchesFilters(){
-  return true;
-
+function normaliseSearch(value){return String(value || "").trim().toLocaleLowerCase();}
+function searchValue(id){return normaliseSearch(document.getElementById(id)?.value || "");}
+function taskSearchText(task){
+  const job = jobById(task?.job);
+  return normaliseSearch([task?.job,task?.name,task?.department,task?.stoneMason,(task?.assigned || []).join(" "),job?.builder,job?.address].filter(Boolean).join(" "));
+}
+function taskMatchesQuery(task,query){return !query || taskSearchText(task).includes(query);}
+function jobSearchText(job){
+  const linked = tasks.filter(task => String(task.job) === String(job.id));
+  return normaliseSearch([job.id,job.builder,job.address,job.status,...linked.flatMap(task => [task.name,task.stoneMason,...(task.assigned || [])])].filter(Boolean).join(" "));
+}
+function jobMatchesQuery(job,query){return !query || jobSearchText(job).includes(query);}
+function taskMatchesFilters(task,rowName="",query=searchValue("scheduleSearch")){
+  if (!query) return true;
+  const person = people.find(item => item.name === rowName);
+  const rowText = normaliseSearch([rowName,person?.role].filter(Boolean).join(" "));
+  return rowText.includes(query) || taskMatchesQuery(task,query);
 }
 
 function calculate(){
@@ -1122,59 +1153,50 @@ function calculate(){
     allocation[person.name] = days.map(() => []);
     usedByDate[person.name] = {};
   });
-
   tasks.filter(task => task.type === "milestone").forEach(task => {
     const dateObj = taskDate(task);
-    const day = scheduleIndexForDate(dateObj);
-    task.parts.push({person:"Milestones", day, date:toIsoDate(dateObj), minutes:0});
+    task.parts.push({person:"Milestones",day:scheduleIndexForDate(dateObj),date:toIsoDate(dateObj),minutes:0});
   });
   tasks.filter(task => task.type === "capacity" && !(task.assigned || []).length).forEach(task => {
     const dateObj = taskDate(task);
-    const day = scheduleIndexForDate(dateObj);
-    task.parts.push({person:"Unassigned", day, date:toIsoDate(dateObj), minutes:Number(task.duration || 0)});
+    task.parts.push({person:"Unassigned",day:scheduleIndexForDate(dateObj),date:toIsoDate(dateObj),minutes:Number(task.duration || 0)});
   });
-
   const ordered = tasks.filter(task => task.type === "capacity").sort((a,b) => taskDate(a)-taskDate(b) || String(a.id).localeCompare(String(b.id)));
   ordered.forEach(task => {
-    const assignedPeople = (task.assigned || []).map(name => people.find(p => p.name === name && employeeCountsCapacity(p))).filter(Boolean);
+    const assignedPeople = (task.assigned || []).map(name => people.find(person => person.name === name && employeeCountsCapacity(person))).filter(Boolean);
     if (!assignedPeople.length) return;
-
-    const customShares = task.assignmentMinutes || {};
-    const hasCustomShares = assignedPeople.some(person => customShares[person.name] != null);
-    const baseShare = Math.floor(Number(task.duration || 0) / assignedPeople.length);
-    let remainder = Number(task.duration || 0) - (baseShare * assignedPeople.length);
-
+    const shares = materialiseAssignmentMinutes(task);
     assignedPeople.forEach(person => {
-      let remaining = hasCustomShares ? Math.max(0,Number(customShares[person.name])||0) : baseShare + (remainder > 0 ? 1 : 0);
-      if (!hasCustomShares && remainder > 0) remainder -= 1;
+      let remaining = Math.max(0,Number(shares[person.name] ?? 0));
       let cursor = taskDateForPerson(task,person.name);
+      let firstDate = true;
       let guard = 0;
-
       while (remaining > 0 && guard < 730) {
         const iso = toIsoDate(cursor);
-        const cap = capacityForDate(person, cursor);
-        const alreadyUsed = usedByDate[person.name][iso] || 0;
-        const spare = Math.max(0, cap - alreadyUsed);
-        if (spare > 0) {
-          const use = Math.min(spare, remaining);
-          usedByDate[person.name][iso] = alreadyUsed + use;
+        let plannedDayMinutes = firstDate ? rosteredCapacityForDate(person,cursor) : capacityForDate(person,cursor);
+        // The chosen start date is authoritative, even when that day is closed or
+        // rostered off. Later parts still skip weekends, closures and absences.
+        if (firstDate && plannedDayMinutes <= 0) plannedDayMinutes = defaultDailyCapacity(person);
+        if (plannedDayMinutes > 0) {
+          const use = Math.min(plannedDayMinutes,remaining);
+          usedByDate[person.name][iso] = (usedByDate[person.name][iso] || 0) + use;
           remaining -= use;
           const visibleDay = scheduleIndexForDate(cursor);
-          const part = {person:person.name, day:visibleDay, date:iso, minutes:use};
-          task.parts.push(part);
+          task.parts.push({person:person.name,day:visibleDay,date:iso,minutes:use});
           if (visibleDay >= 0 && visibleDay < days.length) {
             used[person.name][visibleDay] += use;
-            allocation[person.name][visibleDay].push({task, minutes:use});
+            allocation[person.name][visibleDay].push({task,minutes:use});
           }
         }
+        firstDate = false;
         cursor = addCalendarDays(cursor,1);
         guard++;
       }
-      if (remaining > 0) task.unscheduledMinutes = Number(task.unscheduledMinutes || 0) + remaining;
+      if (remaining > 0) task.unscheduledMinutes = Number(task.unscheduledMinutes || 0)+remaining;
     });
     task.parts.sort((a,b) => String(a.date).localeCompare(String(b.date)) || a.person.localeCompare(b.person));
   });
-  return {used, allocation};
+  return {used,allocation,usedByDate};
 }
 
 function segmentsForTask(task, rowName){
@@ -1284,20 +1306,21 @@ function renderHome(){
   document.getElementById("homeMachining").textContent = `${fmt(m)} / ${fmt(cap.Machining)}`;
   document.getElementById("homeInstaller").textContent = `${fmt(i)} / ${fmt(cap["Installer / Site"])}`;
   document.getElementById("homeJobsTitle").textContent = homeWeek === "this" ? "This week’s jobs" : "Next week’s jobs";
-  const relevant = jobs.filter(job => jobTouchesWeek(job,range.startIso,range.endIso));
+  const homeQuery = searchValue("homeSearch");
+  const relevant = jobs.filter(job => jobTouchesWeek(job,range.startIso,range.endIso) && jobMatchesQuery(job,homeQuery));
   const container = document.getElementById("homeJobs");
   container.innerHTML = relevant.map((job, idx) => {
     const jobTasks = tasks.filter(task => task.job === job.id && ((task.date >= range.startIso && task.date <= range.endIso) || (task.parts || []).some(part => part.date >= range.startIso && part.date <= range.endIso))).slice(0,6);
     return `<div class="home-job ${idx === 0 ? "open" : ""}">
       <div class="home-job-head" data-home-toggle>
-        <div><div class="home-job-title">${escapeHtml(job.id)} · ${escapeHtml(job.address)}</div><div class="home-job-sub">${jobTasks.length} scheduled items · ${escapeHtml(job.status || "Active")}</div></div>
+        <div><div class="home-job-title">${escapeHtml(job.id)} · ${escapeHtml(job.address)}</div><div class="home-job-sub">${escapeHtml(job.builder || "No builder/client")} · ${jobTasks.length} scheduled items · ${escapeHtml(job.status || "Active")}</div></div>
         <span>⌃</span>
       </div>
       <div class="home-job-detail">
         ${jobTasks.map(task => `<div class="mini-detail"><span>${escapeHtml(task.name)}</span><strong>${(task.assigned || []).length ? (task.assigned || []).map(escapeHtml).join(", ") : "Calendar"}</strong></div>`).join("") || `<div class="note">No scheduled items in this week.</div>`}
       </div>
     </div>`;
-  }).join("") || `<div class="note">No jobs are scheduled in this week.</div>`;
+  }).join("") || `<div class="note">${homeQuery ? "No jobs match this search in the selected week." : "No jobs are scheduled in this week."}</div>`;
   container.querySelectorAll("[data-home-toggle]").forEach(element => element.addEventListener("click", () => element.parentElement.classList.toggle("open")));
 }
 
@@ -1511,7 +1534,7 @@ function buildAddJobStages(){
     const plannedDate = toIsoDate(dateObj);
     const assignments = countsCapacity ? normaliseStageAssignments(old, totalHours) : [];
     assignments.forEach(item => { if (!item.date || item.date === old.date) item.date = plannedDate; });
-    return {name,department,date:plannedDate,endDate:plannedDate,hours:totalHours,countsCapacity,notes,status:old.status||"Planned",assignments};
+    return {name,department,date:plannedDate,endDate:plannedDate,hours:totalHours,countsCapacity,notes,status:old.status||"Planned",stoneMason:old.stoneMason||"",assignments};
   };
   let stages = [
     stage("Forward Ordering","Drafting",forwardDate,.5,true,"Standard 30 minutes from Drafting capacity."),
@@ -1597,6 +1620,7 @@ function stagesFromJobTasks(jobTasks){
     countsCapacity:false,
     notes:task.notes || "",
     status:task.status || "Planned",
+    stoneMason:task.stoneMason || "",
     assignments:[]
   }));
   const grouped = new Map();
@@ -1629,6 +1653,7 @@ function stagesFromJobTasks(jobTasks){
       countsCapacity:true,
       notes:base.notes || "",
       status:base.status || "Planned",
+      stoneMason:base.stoneMason || "",
       assignments
     };
   });
@@ -1810,8 +1835,8 @@ async function saveAddJob(){
   const builder = document.getElementById("ajBuilder").value.trim();
   const installValue = document.getElementById("ajInstallDate").value;
   const installDate = parseIsoDate(installValue);
-  if (!jobNumber || !address || !builder || !installDate) {
-    showAddJobMessage("Complete the job number, site address, builder/client and predicted install date.",true);
+  if (!jobNumber || !address || !installDate) {
+    showAddJobMessage("Complete the job number, site address and predicted install date.",true);
     window.scrollTo({top:0,behavior:"smooth"});
     return;
   }
@@ -1901,6 +1926,7 @@ async function saveAddJob(){
         assignmentDates:{},
         status:stage.status || "Planned",
         notes:stage.notes || "",
+        stoneMason:stage.stoneMason || "",
         custom:false,
         generated:true,
         parts:[]
@@ -1936,6 +1962,7 @@ async function saveAddJob(){
       assignmentDates:Object.fromEntries(capacityAssignments.map(item=>[item.person,item.date || stage.date])),
       status:stage.status || "Planned",
       notes:stage.notes || "",
+      stoneMason:stage.stoneMason || "",
       custom:false,
       generated:true,
       parts:[]
@@ -1965,6 +1992,7 @@ async function saveAddJob(){
         assignmentDates:{[assignment.person]:assignmentDate ? toIsoDate(assignmentDate) : stage.date},
         status:stage.status || "Planned",
         notes:`Admin calendar task for ${stage.name}.`,
+        stoneMason:stage.stoneMason || "",
         custom:false,
         generated:true,
         adminTask:true,
@@ -2054,23 +2082,26 @@ function calendarStageNamesForJob(jobId){
 }
 function renderJobs(){
   const rows = document.getElementById("jobRows");
-  rows.innerHTML = jobs.map(job => {
+  const query = searchValue("jobsSearch");
+  const visibleJobs = jobs.filter(job => jobMatchesQuery(job,query));
+  rows.innerHTML = visibleJobs.map(job => {
     const jobTasks = tasks.filter(task => String(task.job) === String(job.id));
-    const capMins = jobTasks.filter(task => task.type === "capacity").reduce((sum,task) => sum + Number(task.duration || 0), 0);
+    const capMins = jobTasks.filter(task => task.type === "capacity").reduce((sum,task) => sum+Number(task.duration || 0),0);
     const milestones = calendarStageNamesForJob(job.id).join(", ") || "None";
     return `<div class="job-row" data-job-id="${escapeHtml(encodeURIComponent(job.id))}">
       <div><div class="job-title">${escapeHtml(job.id)}</div><div class="job-sub">${jobTasks.length} tasks · ${escapeHtml(job.status || "Active")}</div></div>
+      <div><span class="job-sub">${escapeHtml(job.builder || "—")}</span></div>
       <div><span class="job-sub">${escapeHtml(job.address)}</span></div>
       <div><span class="pill ${job.status === "Forecast" ? "yellow" : "grey"}">${escapeHtml(job.install || "")}</span></div>
       <div><span class="pill green">${fmt(capMins)}</span></div>
       <div><span class="job-sub">${escapeHtml(milestones)}</span></div>
     </div>`;
-  }).join("");
-  rows.querySelectorAll("[data-job-id]").forEach(row => row.addEventListener("click", () => openEditJob(decodeURIComponent(row.dataset.jobId))));
-  document.getElementById("jobMetric").textContent = jobs.length;
-  document.getElementById("capTaskMetric").textContent = tasks.filter(task => task.type === "capacity").length;
-  document.getElementById("milestoneMetric").textContent = tasks.filter(calendarTaskVisible).length;
-  document.getElementById("customMetric").textContent = tasks.filter(task => task.custom).length;
+  }).join("") || `<div class="search-empty">${query ? "No jobs match this search." : "No jobs have been added yet."}</div>`;
+  rows.querySelectorAll("[data-job-id]").forEach(row => row.addEventListener("click",()=>openEditJob(decodeURIComponent(row.dataset.jobId))));
+  document.getElementById("jobMetric").textContent=jobs.length;
+  document.getElementById("capTaskMetric").textContent=tasks.filter(task=>task.type === "capacity").length;
+  document.getElementById("milestoneMetric").textContent=tasks.filter(calendarTaskVisible).length;
+  document.getElementById("customMetric").textContent=tasks.filter(task=>task.custom).length;
 }
 
 /* Calendar */
@@ -2080,7 +2111,8 @@ function renderCalendar(){
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
   document.getElementById("monthTitle").textContent = monthDate.toLocaleString("en-AU", {month:"long", year:"numeric"});
-  const firstDay = new Date(year, month, 1);
+  const calendarQuery = searchValue("calendarSearch");
+  const firstDay = new Date(year,month,1);
   const firstGridDate = new Date(firstDay);
   const mondayOffset = (firstDay.getDay() + 6) % 7;
   firstGridDate.setDate(firstDay.getDate() - mondayOffset);
@@ -2095,7 +2127,7 @@ function renderCalendar(){
     const now = new Date();
     const isToday = d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
     const items = tasks.filter(task => {
-      if (!calendarTaskVisible(task)) return false;
+      if (!calendarTaskVisible(task) || !taskMatchesQuery(task,calendarQuery)) return false;
       const taskDate = task.date ? parseIsoDate(task.date) : new Date(baseYear,baseMonth,task.monthDay);
       return taskDate && taskDate.getFullYear() === d.getFullYear() && taskDate.getMonth() === d.getMonth() && taskDate.getDate() === d.getDate();
     });
@@ -2109,7 +2141,7 @@ function renderCalendar(){
         const cls = task.type === "admin" ? "admin" : lower.includes("install") ? "install" : lower.includes("stone") ? "stone" : lower.includes("check") ? "check" : "";
         const assignee = task.type === "admin" ? ((task.assigned || [])[0] || task.adminEmployee || "Admin") : (task.assigned || []).join(", ");
         const calendarKind = task.type === "capacity" ? "Capacity" : "";
-        const subtitle = [assignee, calendarKind, job ? job.address : ""].filter(Boolean).join(" · ");
+        const subtitle = [task.stoneMason ? `Stone: ${task.stoneMason}` : "",assignee,calendarKind,job?.builder,job ? job.address : ""].filter(Boolean).join(" · ");
         return `<div class="month-item ${cls}" draggable="true" data-task-id="${escapeHtml(task.id)}" data-task-type="${escapeHtml(task.type)}" data-job-id="${escapeHtml(encodeURIComponent(task.job))}">
           <div class="month-item-title">${escapeHtml(task.job)} · ${escapeHtml(task.name)}</div>
           <div class="month-item-sub">${escapeHtml(subtitle)}</div>
@@ -2130,7 +2162,7 @@ function renderCalendar(){
     grid.querySelectorAll("[onclick]").forEach(element => {element.onclick = null; element.removeAttribute("onclick");});
     grid.querySelectorAll("[draggable]").forEach(element => {element.draggable = false; element.removeAttribute("draggable");});
   }
-  const calendarItems = tasks.filter(calendarTaskVisible);
+  const calendarItems = tasks.filter(task => calendarTaskVisible(task) && taskMatchesQuery(task,calendarQuery));
   const datedItems = calendarItems.filter(task => task.type !== "admin");
   document.getElementById("calendarItemMetric").textContent = calendarItems.length + calendarEvents.length;
   document.getElementById("calendarCheckMetric").textContent = datedItems.filter(t => t.name.toLowerCase().includes("check")).length;
@@ -2220,121 +2252,72 @@ function goToday(){visibleMonthOffset = 0; renderCalendar()}
 function renderSchedule(){
   buildScheduleDays();
   updateScheduleDayWidth();
-  const result = calculate();
-  const rangeStart = dateForDayIndex(0);
-  const rangeEnd = dateForDayIndex(days.length-1);
-  document.getElementById("scheduleRangeLabel").textContent = `${rangeStart.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})} – ${rangeEnd.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})}`;
-  const today = new Date();
-  document.getElementById("daysHeader").innerHTML = `<div class="corner">Employees</div>` + days.map(day => {
-    const dateObj = parseIsoDate(day.iso);
-    const isToday = isSameDate(dateObj, today);
-    const closure = globalCalendarEventForDate(dateObj);
-    return `
-    <div class="day-head ${day.working ? "" : "weekend"} ${isToday ? "today" : ""} ${closure ? "closed" : ""}" title="${closure ? escapeHtml(closure.name) : ""}">
-      <span class="day-cap">${closure ? "Closed" : isToday ? "Today" : day.working ? "Work" : "Off"}</span>
-      <div class="day-name">${day.name}<span class="day-date">${day.date}</span></div>
-    </div>`;
+  const result=calculate();
+  const query=searchValue("scheduleSearch");
+  const rangeStart=dateForDayIndex(0);
+  const rangeEnd=dateForDayIndex(days.length-1);
+  document.getElementById("scheduleRangeLabel").textContent=`${rangeStart.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})} – ${rangeEnd.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})}`;
+  const today=new Date();
+  document.getElementById("daysHeader").innerHTML=`<div class="corner">Employees</div>`+days.map(day=>{
+    const dateObj=parseIsoDate(day.iso);const isToday=isSameDate(dateObj,today);const closure=globalCalendarEventForDate(dateObj);
+    return `<div class="day-head ${day.working ? "" : "weekend"} ${isToday ? "today" : ""} ${closure ? "closed" : ""}" title="${closure ? escapeHtml(closure.name) : ""}"><span class="day-cap">${closure ? "Closed" : isToday ? "Today" : day.working ? "Work" : "Off"}</span><div class="day-name">${day.name}<span class="day-date">${day.date}</span></div></div>`;
   }).join("");
-
-  const rows = document.getElementById("rows");
-  rows.innerHTML = "";
-  const rowNames = people.filter(employeeCountsCapacity).map(person => person.name);
-  let totalCap = 0;
-  let totalUsed = 0;
-
-  rowNames.forEach(rowName => {
-    const isMilestoneRow = rowName === "Milestones";
-    const isUnassignedRow = rowName === "Unassigned";
-    const isSpecialRow = isMilestoneRow || isUnassignedRow;
-    const person = people.find(p => p.name === rowName);
-    const encodedRowName = encodeURIComponent(rowName);
-    const laneItems = [];
-    tasks.filter(taskMatchesFilters).forEach(task => {
-      segmentsForTask(task, rowName).forEach(seg => laneItems.push({task, ...seg}));
-    });
-    laneItems.sort((a,b) => a.start - b.start || a.span-b.span || taskLabel(a.task).localeCompare(taskLabel(b.task)));
-    const laneCount = assignScheduleLanes(laneItems);
-    const rowH = Math.max(124, 58 + laneCount * 42 + 18);
-
-    const row = document.createElement("div");
-    row.className = "row";
-    row.style.minHeight = rowH + "px";
-    row.innerHTML = `
-      <div class="person" ${isMilestoneRow ? "" : `onclick="openDayPanel(decodeURIComponent('${encodedRowName}'),0)"`}>
-        <strong>${escapeHtml(rowName)}</strong>
-        <span>${isMilestoneRow ? "No capacity items" : isUnassignedRow ? "Needs assignment" : escapeHtml(person.role)}</span>
-      </div>
-      ${days.map((day,index) => {
-        if (isMilestoneRow) {
-          const count = tasks.filter(task => task.type === "milestone" && scheduleIndexForDate(taskDate(task)) === index).length;
-          return `<div class="cell ${day.working ? "" : "weekend"}" data-person="Milestones" data-day="${index}" onclick="openDayPanel('Milestones',${index})"><span class="badge">${count} items</span></div>`;
-        }
-        if (isUnassignedRow) {
-          const count = tasks.filter(task => task.type === "capacity" && !(task.assigned || []).length && scheduleIndexForDate(taskDate(task)) === index).length;
-          return `<div class="cell ${day.working ? "" : "weekend"}" data-person="Unassigned" data-day="${index}" onclick="openDayPanel('Unassigned',${index})"><span class="badge ${count ? "tight" : "off"}">${count ? `${count} waiting` : "None"}</span></div>`;
-        }
-        const dateObj = dateForDayIndex(index);
-        const blockedStatus = blockedStatusForDate(rowName,dateObj);
-        const calendarEvent = globalCalendarEventForDate(dateObj);
-        const cap = capacityFor(person,index);
-        const booked = (result.used[rowName] && result.used[rowName][index]) || 0;
-        const rosteredOff = day.working && !blockedStatus && !calendarEvent && cap === 0;
-        const isTodayCell = isSameDate(dateObj,today);
-        if (day.working) { totalCap += cap; totalUsed += booked; }
-        const badgeClass = calendarEvent ? "closure" : blockedStatus ? String(blockedStatus.type || "").toLowerCase() : rosteredOff ? "rdo" : booked >= cap - 10 ? "tight" : "";
-        const badgeText = calendarEvent ? calendarEvent.name : blockedStatus ? blockedStatus.type : rosteredOff ? "RDO" : day.working ? `${fmt(booked)} / ${fmt(cap)}` : "Weekend";
-        return `<div class="cell ${day.working ? "" : "weekend"} ${calendarEvent ? "calendar-event-day" : ""} ${blockedStatus ? "blocked-day" : ""} ${rosteredOff ? "rostered-off" : ""} ${isTodayCell ? "today" : ""}" data-person="${escapeHtml(rowName)}" data-day="${index}" onclick="openDayPanel(decodeURIComponent('${encodedRowName}'),${index})" title="${calendarEvent ? escapeHtml(calendarEvent.name) : ""}"><span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span></div>`;
-      }).join("")}
-      <div class="bars"></div>
-    `;
-    const bars = row.querySelector(".bars");
-    laneItems.forEach(item => {
-      const minutes = (item.task.parts || []).filter(part => part.person === rowName && part.day >= item.start && part.day < item.start + item.span).reduce((sum,part)=>sum+part.minutes,0);
-      const bar = document.createElement("div");
-      bar.className = `bar ${typeColour(item.task)} ${item.task.type === "milestone" ? "no-capacity" : ""} ${(item.task.assigned || []).length > 1 ? "split" : ""}`;
-      bar.style.left = `${item.start * scheduleDayWidth + 10}px`;
-      bar.style.width = `${Math.max(96, item.span * scheduleDayWidth - 20)}px`;
-      bar.style.top = `${56 + item.lane * 42}px`;
-      bar.innerHTML = `<span class="dot"></span><span class="bar-main">${escapeHtml(taskLabel(item.task))}</span>${item.task.type === "milestone" ? `<span class="no-cap-chip">No capacity</span>` : ``}${(item.task.assigned || []).length > 1 ? `<span class="split-chip">Split</span>` : ``}<span class="bar-time">${item.task.type === "milestone" ? "" : fmt(minutes)}</span>`;
-      bar.title = "Click to edit task";
-      bar.setAttribute("aria-label", `Edit ${taskLabel(item.task)}`);
-      bar.onclick = (event) => {event.stopPropagation(); openTaskPanel(item.task.id)};
-      if (item.task.type === "capacity") {
-        bar.draggable = true;
-        bar.addEventListener("dragstart", event => {
-          currentDragTask = item.task;
-          currentDragPerson = rowName;
-          event.dataTransfer.setData("text/plain", item.task.id);
-          setTimeout(() => bar.classList.add("dragging"), 0);
-        });
-        bar.addEventListener("dragend", () => {
-          bar.classList.remove("dragging");
-          setTimeout(() => {currentDragTask = null; currentDragPerson = null; clearDropClasses();}, 0);
-        });
+  const rows=document.getElementById("rows");rows.innerHTML="";
+  const rowNames=people.filter(employeeCountsCapacity).filter(person=>{
+    if(!query) return true;
+    return normaliseSearch(`${person.name} ${person.role}`).includes(query) || tasks.some(task=>(task.assigned || []).includes(person.name) && taskMatchesQuery(task,query));
+  }).map(person=>person.name);
+  const matchingUnassigned=tasks.some(task=>task.type === "capacity" && !(task.assigned || []).length && taskMatchesQuery(task,query));
+  if(matchingUnassigned) rowNames.unshift("Unassigned");
+  let totalCap=0,totalUsed=0,overbookedDays=0;
+  rowNames.forEach(rowName=>{
+    const isUnassignedRow=rowName === "Unassigned";
+    const person=people.find(item=>item.name === rowName);
+    const encodedRowName=encodeURIComponent(rowName);
+    const rowMatchesQuery=query && normaliseSearch(`${rowName} ${person?.role || ""}`).includes(query);
+    const laneItems=[];
+    tasks.filter(task=>!query || rowMatchesQuery || taskMatchesQuery(task,query)).forEach(task=>segmentsForTask(task,rowName).forEach(segment=>laneItems.push({task,...segment})));
+    laneItems.sort((a,b)=>a.start-b.start || a.span-b.span || taskLabel(a.task).localeCompare(taskLabel(b.task)));
+    const laneCount=assignScheduleLanes(laneItems);
+    const row=document.createElement("div");row.className="row";row.style.minHeight=`${Math.max(124,58+laneCount*42+18)}px`;
+    row.innerHTML=`<div class="person" onclick="openDayPanel(decodeURIComponent('${encodedRowName}'),0)"><strong>${escapeHtml(rowName)}</strong><span>${isUnassignedRow ? "Needs assignment" : escapeHtml(person.role)}</span></div>${days.map((day,index)=>{
+      if(isUnassignedRow){
+        const count=tasks.filter(task=>task.type === "capacity" && !(task.assigned || []).length && scheduleIndexForDate(taskDate(task)) === index && taskMatchesQuery(task,query)).length;
+        return `<div class="cell ${day.working ? "" : "weekend"}" data-person="Unassigned" data-day="${index}" onclick="openDayPanel('Unassigned',${index})"><span class="badge ${count ? "tight" : "off"}">${count ? `${count} waiting` : "None"}</span></div>`;
       }
-      bars.appendChild(bar);
-    });
-    rows.appendChild(row);
+      const dateObj=dateForDayIndex(index),blockedStatus=blockedStatusForDate(rowName,dateObj),calendarEvent=globalCalendarEventForDate(dateObj);
+      const cap=capacityFor(person,index),booked=(result.used[rowName] && result.used[rowName][index]) || 0,over=booked > cap+1;
+      const rosteredOff=day.working && !blockedStatus && !calendarEvent && cap === 0,isTodayCell=isSameDate(dateObj,today);
+      totalCap+=cap;totalUsed+=booked;if(over) overbookedDays++;
+      const badgeClass=over ? "over" : calendarEvent ? "closure" : blockedStatus ? String(blockedStatus.type || "").toLowerCase() : rosteredOff ? "rdo" : booked >= cap-10 ? "tight" : "";
+      const badgeText=calendarEvent && !booked ? calendarEvent.name : blockedStatus && !booked ? blockedStatus.type : rosteredOff && !booked ? "RDO" : `${fmt(booked)} / ${fmt(cap)}${over ? ` · +${fmt(booked-cap)}` : ""}`;
+      return `<div class="cell ${day.working ? "" : "weekend"} ${calendarEvent ? "calendar-event-day" : ""} ${blockedStatus ? "blocked-day" : ""} ${rosteredOff ? "rostered-off" : ""} ${over ? "over-capacity" : ""} ${isTodayCell ? "today" : ""}" data-person="${escapeHtml(rowName)}" data-day="${index}" onclick="openDayPanel(decodeURIComponent('${encodedRowName}'),${index})" title="${over ? `Over capacity by ${escapeHtml(fmt(booked-cap))}` : calendarEvent ? escapeHtml(calendarEvent.name) : ""}"><span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span></div>`;
+    }).join("")}<div class="bars"></div>`;
+    const bars=row.querySelector(".bars");
+    laneItems.forEach(item=>{
+      const relevantParts=(item.task.parts || []).filter(part=>part.person === rowName && part.day >= item.start && part.day < item.start+item.span);
+      const minutes=relevantParts.reduce((sum,part)=>sum+part.minutes,0);
+      const over=!isUnassignedRow && relevantParts.some(part=>((result.used[rowName] || [])[part.day] || 0) > capacityFor(person,part.day)+1);
+      const bar=document.createElement("div");
+      bar.className=`bar ${typeColour(item.task)} ${(item.task.assigned || []).length > 1 ? "split" : ""} ${over ? "over-capacity" : ""}`;
+      bar.style.left=`${item.start*scheduleDayWidth+10}px`;bar.style.width=`${Math.max(96,item.span*scheduleDayWidth-20)}px`;bar.style.top=`${56+item.lane*42}px`;
+      bar.innerHTML=`<span class="dot"></span><span class="bar-main">${escapeHtml(taskLabel(item.task))}</span>${(item.task.assigned || []).length > 1 ? `<span class="split-chip">Split</span>` : ``}${over ? `<span class="split-chip">Over</span>` : ``}<span class="bar-time">${fmt(minutes)}</span>`;
+      bar.title=over ? "Over capacity · click to edit or drag to move" : "Click to edit or drag to move";bar.setAttribute("aria-label",`Edit ${taskLabel(item.task)}`);
+      bar.onclick=event=>{event.stopPropagation();openTaskPanel(item.task.id);};bar.draggable=true;
+      bar.addEventListener("dragstart",event=>{currentDragTask=item.task;currentDragPerson=rowName;event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",item.task.id);setTimeout(()=>bar.classList.add("dragging"),0);});
+      bar.addEventListener("dragend",()=>{bar.classList.remove("dragging");setTimeout(()=>{currentDragTask=null;currentDragPerson=null;clearDropClasses();},0);});bars.appendChild(bar);
+    });rows.appendChild(row);
   });
-  if (isAdmin) {
-    wireScheduleDrops();
-  } else {
-    rows.querySelectorAll("[onclick]").forEach(element => {element.onclick = null; element.removeAttribute("onclick");});
-    rows.querySelectorAll("[draggable]").forEach(element => {element.draggable = false; element.removeAttribute("draggable");});
-  }
-  const bookedPercent = totalCap ? Math.round((totalUsed / totalCap) * 100) : 0;
-  document.getElementById("bookedMetric").textContent = `${bookedPercent}%`;
-  document.getElementById("spareMetric").textContent = fmt(Math.max(0,totalCap-totalUsed));
-  document.getElementById("scheduleCustomMetric").textContent = tasks.filter(task => task.custom && task.type === "capacity").length;
-  document.getElementById("splitMetric").textContent = tasks.filter(task => task.type === "capacity" && (task.assigned || []).length > 1).length;
-  const unscheduled = tasks.filter(task => Number(task.unscheduledMinutes || 0) > 0);
-  const warning = document.getElementById("scheduleWarning");
-  if (unscheduled.length) {
-    warning.style.display = "block";
-    warning.textContent = `${unscheduled.length} task${unscheduled.length === 1 ? "" : "s"} could not be fully scheduled because no capacity was available within two years. Review employee hours or task assignments.`;
-  } else warning.style.display = "none";
+  if(!rowNames.length) rows.innerHTML=`<div class="search-empty">No employees or tasks match this search.</div>`;
+  if(isAdmin) wireScheduleDrops();else{rows.querySelectorAll("[onclick]").forEach(element=>{element.onclick=null;element.removeAttribute("onclick");});rows.querySelectorAll("[draggable]").forEach(element=>{element.draggable=false;element.removeAttribute("draggable");});}
+  const bookedPercent=totalCap ? Math.round((totalUsed/totalCap)*100) : totalUsed ? 100 : 0;
+  document.getElementById("bookedMetric").textContent=`${bookedPercent}%`;document.getElementById("spareMetric").textContent=fmt(Math.max(0,totalCap-totalUsed));
+  document.getElementById("scheduleCustomMetric").textContent=tasks.filter(task=>task.custom && task.type === "capacity").length;document.getElementById("splitMetric").textContent=tasks.filter(task=>task.type === "capacity" && (task.assigned || []).length > 1).length;
+  const warning=document.getElementById("scheduleWarning");
+  if(overbookedDays){warning.style.display="block";warning.textContent=`${overbookedDays} employee-day${overbookedDays === 1 ? " is" : "s are"} over capacity and highlighted in red. Tasks remain on their selected dates.`;}else warning.style.display="none";
   syncFloatingScrollWidth();
 }
+
 function clearDropClasses(){document.querySelectorAll(".cell").forEach(cell => cell.classList.remove("drop-active","drop-top","drop-bottom"))}
 function materialiseAssignmentMinutes(task){
   const names = [...new Set((task.assigned || []).filter(Boolean))];
@@ -2394,22 +2377,18 @@ function reassignDraggedShare(task,sourcePerson,newPerson,newDate){
   task.assignmentDates = {[newPerson]:newIso};
   return true;
 }
-function moveTaskToCell(task, cell, sourcePerson=currentDragPerson){
-  const newDay = Number(cell.dataset.day);
-  const newPerson = cell.dataset.person;
-  const newDate = dateForDayIndex(newDay);
-  if (!task || task.type !== "capacity" || newPerson === "Milestones") {showToast("Only capacity tasks can be moved here."); return;}
-  const independentShare = (task.assigned || []).length > 1 && sourcePerson && (task.assigned || []).includes(sourcePerson);
-  if (independentShare) {
-    const moved = reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);
-    if (!moved) { clearDropClasses(); return; }
-  } else {
-    setTaskDate(task,newDate);
-    reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);
-  }
+async function moveTaskToCell(task,cell,sourcePerson=currentDragPerson){
+  const newDay=Number(cell.dataset.day),newPerson=cell.dataset.person,newDate=dateForDayIndex(newDay);
+  if(!task || task.type !== "capacity" || newPerson === "Milestones"){showToast("Only capacity tasks can be moved here.");return;}
+  const previousTasks=JSON.parse(JSON.stringify(tasks));
+  const independentShare=(task.assigned || []).length > 1 && sourcePerson && (task.assigned || []).includes(sourcePerson);
+  if(independentShare){const moved=reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);if(!moved){clearDropClasses();return;}}
+  else{setTaskDate(task,newDate);reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);}
   renderAll();
-  saveState(independentShare ? "Employee share moved and saved" : "Task moved and saved");
+  const saved=await queueStateSave(independentShare ? "Employee share moved" : "Task moved");
+  if(!saved){tasks=previousTasks;renderAll();showToast("Move failed. The task was returned to its previous date.");}
 }
+
 function wireScheduleDrops(){
   document.querySelectorAll("#rows .cell").forEach(cell => {
     cell.ondragover = event => {
@@ -2434,13 +2413,14 @@ function wireScheduleDrops(){
 
 /* Task panel */
 function fillPanelOptions(){}
-function openDayTaskPanel(year, month, day){
-  openCustomTaskPanel();
+function openDayTaskPanel(year,month,day){
+  openCustomTaskPanel("calendar");
   document.getElementById("taskDate").value = toIsoDate(new Date(year,month,day));
   document.getElementById("panelTitle").textContent = `Add task · ${day} ${new Date(year,month,day).toLocaleString("en-AU",{month:"short"})}`;
   document.getElementById("panelSub").textContent = "Calendar milestone or schedule capacity task";
 }
-function openCustomTaskPanel(){
+function openCustomTaskPanel(origin="general"){
+  taskPanelOrigin=origin;
   selectedTaskId = null;
   fillPanelOptions();
   document.getElementById("panelTitle").textContent = "Add task";
@@ -2452,14 +2432,15 @@ function openCustomTaskPanel(){
   document.getElementById("taskHours").value = "2h";
   document.getElementById("taskDepartment").value = "Milestone";
   document.getElementById("taskStatus").value = "Planned";
-  document.getElementById("taskShowOnCalendar").checked = false;
+  document.getElementById("taskShowOnCalendar").checked = origin === "calendar";
+  document.getElementById("taskStoneMason").value = "";
   renderEmployeeChoices([]);
   updateTypeHint();
   updateAllocationSummary(null);
   openPanel("taskPanel");
 }
-function openScheduleTaskPanel(personName, dayIndex){
-  openCustomTaskPanel();
+function openScheduleTaskPanel(personName,dayIndex){
+  openCustomTaskPanel("schedule");
   const person = people.find(item => item.name === personName);
   const dateObj = dateForDayIndex(dayIndex);
   document.getElementById("panelTitle").textContent = `Add task · ${personName}`;
@@ -2474,6 +2455,7 @@ function openScheduleStatusPanel(personName, dayIndex){
   openStatusPanel(personName, dayIndex);
 }
 function openTaskPanel(id){
+  taskPanelOrigin="edit";
   const task = tasks.find(t => t.id === id);
   if (!task) return;
   selectedTaskId = id;
@@ -2488,6 +2470,7 @@ function openTaskPanel(id){
   document.getElementById("taskDepartment").value = task.department;
   document.getElementById("taskStatus").value = task.status || "Planned";
   document.getElementById("taskShowOnCalendar").checked = task.showOnCalendar === true;
+  document.getElementById("taskStoneMason").value = task.stoneMason || "";
   renderEmployeeChoices(task.assigned);
   updateTypeHint();
   updateAllocationSummary(task);
@@ -2505,31 +2488,31 @@ function renderEmployeeChoices(selected){
     </div>`).join("");
   document.getElementById("employeeChoices").innerHTML = choices || `<div class="note">${type === "capacity" ? "No capacity employees are available." : "No non-capacity installers have been added yet."}</div>`;
 }
-function updateTypeHint(){
-  const type = document.getElementById("taskType").value;
-  const selected = [...document.querySelectorAll("#employeeChoices input:checked")].map(input => input.value);
-  const employeeCard = document.getElementById("employeeCard");
-  const hoursInput = document.getElementById("taskHours");
-  const department = document.getElementById("taskDepartment");
-  const calendarRow = document.getElementById("showOnCalendarRow");
-  employeeCard.style.display = "block";
-  if (type === "milestone") {
-    hoursInput.value = "0h";
-    department.value = "Milestone";
-    calendarRow.style.display = "none";
-    document.getElementById("employeeCardTitle").textContent = "Non-capacity installer (optional)";
-    document.getElementById("employeeCardNote").textContent = "Choose a subcontractor here so their name appears on the Calendar without using company capacity.";
-    document.getElementById("typeHint").textContent = "Calendar milestone only: shows on Calendar and does not use employee capacity.";
-  } else {
-    calendarRow.style.display = "block";
-    if (hoursInput.value === "0h") hoursInput.value = "2h";
-    if (department.value === "Milestone") department.value = "Cabinet Making";
-    document.getElementById("employeeCardTitle").textContent = "Assigned capacity employees";
-    document.getElementById("employeeCardNote").textContent = "Assignment is optional. Leave everyone unticked to place the task in Schedule's Unassigned row, or choose multiple employees to split it evenly.";
-    document.getElementById("typeHint").textContent = "Capacity task: uses employee capacity once assigned. Tick the Calendar option when the same task must also appear on Calendar.";
-  }
-  renderEmployeeChoices(selected);
+function isStoneTaskName(value){return normaliseSearch(value).includes("stone");}
+function updateStoneMasonField(){
+  const visible=isStoneTaskName(document.getElementById("taskName")?.value);
+  const row=document.getElementById("stoneMasonRow");if(row) row.style.display=visible ? "grid" : "none";
 }
+function updateTypeHint(){
+  const type=document.getElementById("taskType").value;
+  const selected=[...document.querySelectorAll("#employeeChoices input:checked")].map(input=>input.value);
+  const employeeCard=document.getElementById("employeeCard"),hoursInput=document.getElementById("taskHours"),department=document.getElementById("taskDepartment"),calendarRow=document.getElementById("showOnCalendarRow"),calendarCheckbox=document.getElementById("taskShowOnCalendar");
+  employeeCard.style.display="block";
+  if(type === "milestone"){
+    hoursInput.value="0h";department.value="Milestone";calendarRow.style.display="none";calendarCheckbox.disabled=false;
+    document.getElementById("employeeCardTitle").textContent="Non-capacity installer (optional)";
+    document.getElementById("employeeCardNote").textContent="Choose a subcontractor here so their name appears on the Calendar without using company capacity.";
+    document.getElementById("typeHint").textContent="Calendar milestone only: shows on Calendar and does not use employee capacity.";
+  }else{
+    calendarRow.style.display="block";if(hoursInput.value === "0h") hoursInput.value="2h";if(department.value === "Milestone") department.value="Cabinet Making";
+    const createdFromCalendar=taskPanelOrigin === "calendar" && !selectedTaskId;if(createdFromCalendar) calendarCheckbox.checked=true;calendarCheckbox.disabled=createdFromCalendar;
+    document.getElementById("employeeCardTitle").textContent="Assigned capacity employees";
+    document.getElementById("employeeCardNote").textContent="Assignment is optional. Leave everyone unticked to place the task in Schedule's Unassigned row, or choose multiple employees to split it evenly.";
+    document.getElementById("typeHint").textContent=createdFromCalendar ? "Created from Calendar: this capacity task will appear on both Calendar and Schedule." : "Capacity task: stays on the selected date even when over capacity. Tick the Calendar option when it must also appear on Calendar.";
+  }
+  renderEmployeeChoices(selected);updateStoneMasonField();
+}
+
 function savePanelTask(){
   const type = document.getElementById("taskType").value;
   const selected = [...document.querySelectorAll("#employeeChoices input:checked")].map(input => input.value);
@@ -2548,7 +2531,8 @@ function savePanelTask(){
   task.assigned = selected;
   task.assignmentMinutes = {};
   task.assignmentDates = Object.fromEntries(selected.map(name => [name,toIsoDate(selectedDate)]));
-  task.showOnCalendar = type === "capacity" && document.getElementById("taskShowOnCalendar").checked;
+  task.showOnCalendar = type === "capacity" && (taskPanelOrigin === "calendar" || document.getElementById("taskShowOnCalendar").checked);
+  task.stoneMason = isStoneTaskName(task.name) ? document.getElementById("taskStoneMason").value.trim() : "";
   task.status = document.getElementById("taskStatus").value;
   if (!selectedTaskId) tasks.push(task);
   calculate();
@@ -2600,9 +2584,10 @@ function openDayPanel(personName, dayIndex){
     const booked = (result.used[personName] && result.used[personName][dayIndex]) || 0;
     const cap = capacityFor(person, dayIndex);
     const items = (result.allocation[personName] && result.allocation[personName][dayIndex]) || [];
-    const blocked = blockedStatusForDate(personName,dateForDayIndex(dayIndex));
+    const blocked=blockedStatusForDate(personName,dateForDayIndex(dayIndex));
+    const over=Math.max(0,booked-cap);
     body.innerHTML = `
-      <div class="detail-card"><h3>Capacity</h3><div class="note">${blocked ? `${blocked.type} · capacity blocked` : `${fmt(booked)} booked / ${fmt(cap)} available`}</div>${blocked ? `<button class="danger" style="margin-top:10px;width:100%" data-day-action="remove-status">Remove ${blocked.type} from this day</button>` : ""}</div>
+      <div class="detail-card"><h3>Capacity</h3><div class="note">${blocked && !booked ? `${blocked.type} · capacity blocked` : `${fmt(booked)} booked / ${fmt(cap)} available${over ? ` · Over by ${fmt(over)}` : ""}`}</div>${blocked ? `<button class="danger" style="margin-top:10px;width:100%" data-day-action="remove-status">Remove ${blocked.type} from this day</button>` : ""}</div>
       <div class="detail-card"><h3>Tasks</h3>${items.map(item => `<div class="mini-detail"><span>${escapeHtml(taskLabel(item.task))}</span><strong>${fmt(item.minutes)}</strong></div>`).join("") || `<div class="note">No work allocated.</div>`}</div>
       <div class="detail-card"><h3>Add to this day</h3><div class="action-row"><button class="primary" data-day-action="task">Add custom task</button><button data-day-action="status">Sick / Away</button></div></div>`;
     body.querySelector('[data-day-action="task"]').addEventListener("click", () => openScheduleTaskPanel(personName, dayIndex));
@@ -3137,23 +3122,20 @@ function closeAllPanels(closeBackdrop=true){
   if (closeBackdrop) document.getElementById("panelBackdrop").classList.remove("open");
 }
 function syncFloatingScrollWidth(){
-  const planner = document.getElementById("planner");
-  const floatScroll = document.getElementById("floatScroll");
-  const inner = document.getElementById("floatScrollInner");
-  if (!planner || !floatScroll || !inner) return;
-  inner.style.width = Math.max(planner.scrollWidth, planner.clientWidth + 1) + "px";
-  const scheduleActive = document.getElementById("scheduleView")?.classList.contains("active");
-  floatScroll.style.display = scheduleActive && planner.scrollWidth > planner.clientWidth + 2 ? "block" : "none";
-  floatScroll.scrollLeft = planner.scrollLeft;
+  const planner=document.getElementById("planner"),plannerHeader=document.getElementById("plannerHeader"),floatScroll=document.getElementById("floatScroll"),inner=document.getElementById("floatScrollInner");
+  if(!planner || !floatScroll || !inner) return;
+  inner.style.width=Math.max(planner.scrollWidth,planner.clientWidth+1)+"px";
+  const scheduleActive=document.getElementById("scheduleView")?.classList.contains("active");
+  floatScroll.style.display=scheduleActive && planner.scrollWidth > planner.clientWidth+2 ? "block" : "none";
+  floatScroll.scrollLeft=planner.scrollLeft;if(plannerHeader) plannerHeader.scrollLeft=planner.scrollLeft;
 }
 function setupScrollSync(){
-  const planner = document.getElementById("planner");
-  const floatScroll = document.getElementById("floatScroll");
-  if (!planner || !floatScroll) return;
-  let locking = false;
-  planner.addEventListener("scroll", () => {if(locking)return; locking=true; floatScroll.scrollLeft=planner.scrollLeft; locking=false;});
-  floatScroll.addEventListener("scroll", () => {if(locking)return; locking=true; planner.scrollLeft=floatScroll.scrollLeft; locking=false;});
+  const planner=document.getElementById("planner"),plannerHeader=document.getElementById("plannerHeader"),floatScroll=document.getElementById("floatScroll");
+  if(!planner || !floatScroll) return;let locking=false;
+  const syncFrom=(source,targetA,targetB)=>{if(locking)return;locking=true;if(targetA)targetA.scrollLeft=source.scrollLeft;if(targetB)targetB.scrollLeft=source.scrollLeft;locking=false;};
+  planner.addEventListener("scroll",()=>syncFrom(planner,floatScroll,plannerHeader));floatScroll.addEventListener("scroll",()=>syncFrom(floatScroll,planner,plannerHeader));plannerHeader?.addEventListener("scroll",()=>syncFrom(plannerHeader,planner,floatScroll));
 }
+
 function showToast(message){
   const toast = document.getElementById("toast");
   toast.textContent = message;

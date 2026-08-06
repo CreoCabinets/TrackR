@@ -76,7 +76,7 @@ ALLOWED_DAY_STATUS_TYPES = {"Sick", "Away", "Holiday", "RDO"}
 ALLOWED_EVENT_TYPES = {"Factory Closure", "Public Holiday", "Company Event"}
 WEEK_DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri")
 TEXT_MAX = 500
-STATE_VERSION = 7
+STATE_VERSION = 8
 MAX_PEOPLE = 250
 MAX_JOBS = 5000
 MAX_TASKS = 30000
@@ -90,7 +90,7 @@ LOGIN_MAX_FAILURES = 8
 DUMMY_PASSWORD_HASH = generate_password_hash(secrets.token_urlsafe(24))
 
 DEFAULT_STATE = {
-  "version": 7,
+  "version": 8,
   "people": [
     {
       "customStart": "2026-06-08",
@@ -494,6 +494,7 @@ def validate_state(payload: object) -> dict:
         if task_status not in ALLOWED_TASK_STATUSES:
             raise ValueError(f"Invalid status for {task_id}.")
         clean_text(task.get("notes", ""), f"Notes for {task_id}", max_length=2000)
+        task["stoneMason"] = clean_text(task.get("stoneMason", ""), f"Stone mason for {task_id}", max_length=160)
         require_number(task.get("duration", 0), f"Duration for {task_id}", 0, 5_000_000)
         if task.get("date") and not valid_iso_date(task.get("date")):
             raise ValueError(f"Invalid date for {task_id}.")
@@ -592,6 +593,25 @@ def migrate_state(state: object) -> tuple[dict, bool]:
             if isinstance(task, dict) and not isinstance(task.get("showOnCalendar"), bool):
                 task["showOnCalendar"] = False
                 changed = True
+    if current_version < 8:
+        # Capacity placement used to search forward for spare time. Reset active
+        # task shares to the date users originally selected so the new planner
+        # starts from the stored planned date and permits over-capacity stacking.
+        for task in state.get("tasks", []):
+            if not isinstance(task, dict):
+                continue
+            if not isinstance(task.get("stoneMason"), str):
+                task["stoneMason"] = ""
+                changed = True
+            if task.get("type") != "capacity" or task.get("status") == "Complete":
+                continue
+            planned_date = task.get("date")
+            assigned = [name for name in task.get("assigned", []) if isinstance(name, str) and name]
+            if valid_iso_date(planned_date) and assigned:
+                reset_dates = {name: planned_date for name in assigned}
+                if task.get("assignmentDates") != reset_dates:
+                    task["assignmentDates"] = reset_dates
+                    changed = True
     if current_version < STATE_VERSION:
         state["version"] = STATE_VERSION
         changed = True
@@ -740,6 +760,13 @@ def init_db() -> None:
                 stored_state = copy.deepcopy(DEFAULT_STATE)
                 changed = True
             else:
+                try:
+                    stored_version = int(stored_state.get("version", 0) or 0) if isinstance(stored_state, dict) else 0
+                except (TypeError, ValueError):
+                    stored_version = 0
+                if stored_version < 8:
+                    conn.commit()
+                    backup_database(label="pre-v8-schedule-reset", force=True)
                 stored_state, changed = migrate_state(stored_state)
             try:
                 validated_state = validate_state(stored_state)
@@ -1166,7 +1193,7 @@ def delete_user(user_id: int):
 def filtered_state_for_user(state: dict) -> dict:
     filtered = copy.deepcopy(state)
     filtered["jobs"] = [
-        {key: job.get(key) for key in ("id", "address", "install", "installDate", "status") if key in job}
+        {key: job.get(key) for key in ("id", "address", "builder", "install", "installDate", "status") if key in job}
         for job in filtered.get("jobs", [])
     ]
     for task in filtered.get("tasks", []):
