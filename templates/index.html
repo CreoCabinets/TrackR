@@ -460,6 +460,8 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
 .aj-workflow-card .missing-field{border-color:#d9a526!important;background:#fffdf2!important;box-shadow:0 0 0 2px rgba(217,165,38,.10)!important}
 .aj-card-options{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:end}
 .aj-card-options .aj-check{min-height:39px;padding:8px 10px;font-size:11px}
+.aj-card-status{max-width:220px}
+.aj-card-status select{width:100%}
 .aj-stone-assignment-row{display:grid;grid-template-columns:minmax(0,1fr) 34px;gap:7px;align-items:end}
 .aj-stone-assignment-row select{width:100%;min-width:0;border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:#fff;font-weight:800;color:#172033}
 .aj-stone-assignment-row button{width:34px;height:39px;padding:0;border-radius:9px}
@@ -467,7 +469,7 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
 .bar.details-required{background:#fff1c7!important;border:1px solid #d9a526!important;color:#6f4a00!important;box-shadow:0 4px 10px rgba(122,82,0,.12)}
 .month-item.details-required{box-shadow:inset 3px 0 0 #d9a526,0 1px 2px rgba(20,34,53,.035)}
 .details-chip{background:#fff3cd!important;border-color:#e8c76f!important;color:#7a5200!important}
-@media(max-width:560px){.aj-card-options{grid-template-columns:1fr}}
+@media(max-width:560px){.aj-card-options{grid-template-columns:1fr}.aj-card-status{max-width:none}}
 
 </style>
 </head>
@@ -579,7 +581,7 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
 
     <section class="panel">
       <div class="panel-head">
-        <div><h2>3. Production workflow</h2><p>Employee assignments are optional. Unassigned capacity stages can be assigned later from Schedule. Admin assignments are non-capacity and appear on Calendar instead of Schedule.</p></div>
+        <div><h2>3. Production workflow</h2><p>Employee assignments are optional. Unassigned capacity stages can be assigned later from Schedule. Check Measure, Delivery and Install appear on Calendar automatically; other capacity stages can be added to Calendar from Schedule.</p></div>
         <div class="aj-stage-toolbar"><button onclick="assignAllStagesByDepartment()">Assign all by department</button><button onclick="refreshAddJobPlan()">Regenerate stages</button></div>
       </div>
       <div id="ajRemovedStages" class="aj-removed-stages" aria-live="polite"></div>
@@ -1801,7 +1803,7 @@ function renderAddJobStages(){
       return `<article class="aj-workflow-card ${cardClass}">
         <div class="aj-workflow-head"><div><div class="aj-workflow-title">${escapeHtml(stage.name)}</div><div class="aj-workflow-meta"><span class="pill ${departmentClass}">${escapeHtml(stage.department)}</span><span class="pill grey">${Math.round(Number(stage.hours||0)*100)/100}h total</span>${stage.showOnCalendar?`<span class="pill yellow">Calendar</span>`:``}</div></div><div class="aj-workflow-head-actions"><span class="aj-allocation-status ${statusClass}">${statusText}</span><button type="button" class="aj-stage-remove" title="Remove ${escapeHtml(stage.name)} from this job" aria-label="Remove ${escapeHtml(stage.name)} from this job" onclick="removeAddJobStage(${index})">×</button></div></div>
         <div class="aj-workflow-fields"><div class="aj-mini-field"><label>Planned date</label><input type="date" value="${stage.date}" onchange="updateAddJobStage(${index},'date',this.value)"></div><div class="aj-mini-field"><label>Total hours</label><input class="${Number(stage.hours||0)<=0?"missing-field":""}" type="number" min="0" step="0.25" value="${stage.hours}" onchange="updateAddJobStage(${index},'hours',this.value)"></div></div>
-        <div class="aj-card-options"><div class="aj-mini-field"><label>Status</label><select onchange="updateAddJobStage(${index},'status',this.value)">${["Planned","Forecast","In Progress","Complete","Waiting","Active","On Hold"].map(value=>`<option ${stage.status===value?"selected":""}>${value}</option>`).join("")}</select></div><label class="aj-check"><input type="checkbox" ${stage.showOnCalendar?"checked":""} onchange="updateAddJobStage(${index},'showOnCalendar',this.checked)">Show on Calendar</label></div>
+        <div class="aj-mini-field aj-card-status"><label>Status</label><select onchange="updateAddJobStage(${index},'status',this.value)">${["Planned","Forecast","In Progress","Complete","Waiting","Active","On Hold"].map(value=>`<option ${stage.status===value?"selected":""}>${value}</option>`).join("")}</select></div>
         ${detailsRequired?`<div class="aj-detail-warning">⚠ Details required: ${escapeHtml(missing.join(" and "))}</div>`:``}
         <div><div class="aj-assignment-labels"><span>Employee</span><span>Hours</span><span></span></div><div class="aj-assignment-list">${assignmentRows}</div></div>
         <div class="aj-progress"><span style="width:${progress}%"></span></div>
