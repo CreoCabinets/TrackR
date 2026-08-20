@@ -110,6 +110,8 @@ h2{margin:0 0 6px;font-size:23px;letter-spacing:-.05em}
 .job-row{min-height:72px;border-bottom:1px solid var(--line);cursor:pointer}
 .job-row:last-child{border-bottom:none}.job-row:hover{background:#fffdfa}
 .job-title{font-weight:950;font-size:15px}.job-sub{font-size:12px;color:#64748b;font-weight:800;margin-top:3px}
+.jobs-mode-switch{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.jobs-mode-switch button{padding:7px 11px;font-size:11px}
 .pill{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:12px;font-weight:950;background:#fff}
 .pill.blue{background:#eaf1ff;border-color:#cadbff;color:#2452b8}.pill.green{background:#eaf8f0;border-color:#c6ecd7;color:#17613b}.pill.grey{background:#f4f1ec;border-color:#ded6c9;color:#5f6673}.pill.yellow{background:#fef3c7;border-color:#f2d894;color:#92400e}.pill.purple{background:#f4e8ff;border-color:#dfc5f5;color:#7b43af}
 
@@ -517,13 +519,13 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
   <section id="jobsView" class="view">
     <div class="header"><div><h1>Jobs</h1><p class="sub">Job list and task counts.</p></div><div class="header-actions"><label class="view-search"><input id="jobsSearch" type="search" aria-label="Search Jobs" placeholder="Job, builder, address or employee" oninput="renderJobs()"></label><button class="primary" onclick="openAddJob()">Add job</button></div></div>
     <section class="cards">
-      <div class="metric"><small>Active jobs</small><strong id="jobMetric">0</strong></div>
+      <div class="metric"><small>Current jobs</small><strong id="jobMetric">0</strong></div>
       <div class="metric"><small>Capacity tasks</small><strong id="capTaskMetric">0</strong></div>
       <div class="metric"><small>Milestones</small><strong id="milestoneMetric">0</strong></div>
       <div class="metric"><small>Custom tasks</small><strong id="customMetric">0</strong></div>
     </section>
     <section class="panel">
-      <div class="panel-head"><div><h2>Job list</h2><p>The Milestones column includes every stage shown on Calendar. Capacity tasks continue to feed Schedule.</p></div></div>
+      <div class="panel-head"><div><h2>Job list</h2><p>Current jobs stay here until 60 days after their latest scheduled task. Older jobs move to Archive automatically.</p></div><div class="jobs-mode-switch" aria-label="Job list view"><button id="jobsCurrentBtn" class="active" onclick="setJobsViewMode('current')">Current</button><button id="jobsArchiveBtn" onclick="setJobsViewMode('archive')">Archive</button></div></div>
       <div class="jobs-table">
         <div class="table-head"><div>Job</div><div>Builder / Client</div><div>Address</div><div>Install</div><div>Capacity hours</div><div>Milestones</div></div>
         <div id="jobRows"></div>
@@ -864,6 +866,8 @@ let currentDragPerson = null;
 let calendarDragTask = null;
 let calendarDragSuppressClick = false;
 let homeWeek = "this";
+let jobsViewMode = "current";
+const JOB_ARCHIVE_AFTER_DAYS = 60;
 let dayStatuses = [];
 let saveTimer = null;
 let saveChain = Promise.resolve();
@@ -2183,6 +2187,34 @@ async function deleteEditingJob(){
 }
 
 /* Jobs */
+function setJobsViewMode(mode){
+  jobsViewMode = mode === "archive" ? "archive" : "current";
+  document.getElementById("jobsCurrentBtn")?.classList.toggle("active", jobsViewMode === "current");
+  document.getElementById("jobsArchiveBtn")?.classList.toggle("active", jobsViewMode === "archive");
+  renderJobs();
+}
+function scheduledDatesForJob(jobId){
+  const dates = [];
+  const addDate = value => {
+    const parsed = parseIsoDate(value);
+    if (parsed) dates.push(parsed);
+  };
+  tasks.filter(task => String(task.job) === String(jobId)).forEach(task => {
+    addDate(task.date);
+    Object.values(task.assignmentDates || {}).forEach(addDate);
+    (task.parts || []).forEach(part => addDate(part.date));
+  });
+  return dates;
+}
+function jobIsArchived(job){
+  const dates = scheduledDatesForJob(job.id);
+  if (!dates.length) return false;
+  const latest = new Date(Math.max(...dates.map(dateObj => dateObj.getTime())));
+  const today = new Date();
+  const todayLocal = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const cutoff = addCalendarDays(todayLocal, -JOB_ARCHIVE_AFTER_DAYS);
+  return latest < cutoff;
+}
 function calendarStageNamesForJob(jobId){
   const seen = new Set();
   return tasks
@@ -2204,7 +2236,13 @@ function calendarStageNamesForJob(jobId){
 function renderJobs(){
   const rows = document.getElementById("jobRows");
   const query = searchValue("jobsSearch");
-  const visibleJobs = jobs.filter(job => jobMatchesQuery(job,query));
+  const currentJobs = jobs.filter(job => !jobIsArchived(job));
+  const archiveJobs = jobs.filter(job => jobIsArchived(job));
+  // Search intentionally spans both Current and Archive so old work is always easy to find.
+  const sourceJobs = query ? jobs : (jobsViewMode === "archive" ? archiveJobs : currentJobs);
+  const visibleJobs = sourceJobs.filter(job => jobMatchesQuery(job,query));
+  document.getElementById("jobsCurrentBtn")?.classList.toggle("active", jobsViewMode === "current");
+  document.getElementById("jobsArchiveBtn")?.classList.toggle("active", jobsViewMode === "archive");
   rows.innerHTML = visibleJobs.map(job => {
     const jobTasks = tasks.filter(task => String(task.job) === String(job.id));
     const capMins = jobTasks.filter(task => task.type === "capacity").reduce((sum,task) => sum+Number(task.duration || 0),0);
@@ -2218,9 +2256,9 @@ function renderJobs(){
       <div><span class="pill green">${fmt(capMins)}</span></div>
       <div><span class="job-sub">${escapeHtml(milestones)}</span></div>
     </div>`;
-  }).join("") || `<div class="search-empty">${query ? "No jobs match this search." : "No jobs have been added yet."}</div>`;
+  }).join("") || `<div class="search-empty">${query ? "No jobs match this search." : (jobsViewMode === "archive" ? "No jobs have moved to Archive yet." : "No current jobs to show.")}</div>`;
   rows.querySelectorAll("[data-job-id]").forEach(row => row.addEventListener("click",()=>openEditJob(decodeURIComponent(row.dataset.jobId))));
-  document.getElementById("jobMetric").textContent=jobs.length;
+  document.getElementById("jobMetric").textContent=currentJobs.length;
   document.getElementById("capTaskMetric").textContent=tasks.filter(task=>task.type === "capacity").length;
   document.getElementById("milestoneMetric").textContent=tasks.filter(calendarTaskVisible).length;
   document.getElementById("customMetric").textContent=tasks.filter(task=>task.custom).length;
