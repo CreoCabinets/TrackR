@@ -112,7 +112,9 @@ h2{margin:0 0 6px;font-size:23px;letter-spacing:-.05em}
 .job-title{font-weight:950;font-size:15px}.job-sub{font-size:12px;color:#64748b;font-weight:800;margin-top:3px}
 .jobs-mode-switch{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .jobs-mode-switch button{padding:7px 11px;font-size:11px}
-.jobs-summary-cards{grid-template-columns:minmax(210px,300px);justify-content:start;margin-bottom:14px}
+.jobs-compact-toolbar{display:flex;align-items:center;justify-content:flex-start;margin:-4px 0 10px}
+.jobs-compact-toolbar .jobs-mode-switch button{padding:8px 13px}
+.jobs-list-panel{padding-top:14px}
 .pill{display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:999px;padding:6px 10px;font-size:12px;font-weight:950;background:#fff}
 .pill.blue{background:#eaf1ff;border-color:#cadbff;color:#2452b8}.pill.green{background:#eaf8f0;border-color:#c6ecd7;color:#17613b}.pill.grey{background:#f4f1ec;border-color:#ded6c9;color:#5f6673}.pill.yellow{background:#fef3c7;border-color:#f2d894;color:#92400e}.pill.purple{background:#f4e8ff;border-color:#dfc5f5;color:#7b43af}
 
@@ -519,11 +521,10 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
 
   <section id="jobsView" class="view">
     <div class="header"><div><h1>Jobs</h1></div><div class="header-actions"><label class="view-search"><input id="jobsSearch" type="search" aria-label="Search Jobs" placeholder="Job, builder, address or employee" oninput="renderJobs()"></label><button class="primary" onclick="openAddJob()">Add job</button></div></div>
-    <section class="cards jobs-summary-cards">
-      <div class="metric"><small>Current jobs</small><strong id="jobMetric">0</strong></div>
-    </section>
-    <section class="panel">
-      <div class="panel-head"><div><h2>Job list</h2></div><div class="jobs-mode-switch" aria-label="Job list view"><button id="jobsCurrentBtn" class="active" onclick="setJobsViewMode('current')">Current</button><button id="jobsArchiveBtn" onclick="setJobsViewMode('archive')">Archive</button></div></div>
+    <div class="jobs-compact-toolbar">
+      <div class="jobs-mode-switch" aria-label="Job list view"><button id="jobsCurrentBtn" class="active" onclick="setJobsViewMode('current')">Current 0</button><button id="jobsArchiveBtn" onclick="setJobsViewMode('archive')">Archive</button></div>
+    </div>
+    <section class="panel jobs-list-panel">
       <div class="jobs-table">
         <div class="table-head"><div>Job</div><div>Builder / Client</div><div>Address</div><div>Install</div><div>Capacity hours</div><div>Milestones</div></div>
         <div id="jobRows"></div>
@@ -600,13 +601,7 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
   </section>
 
   <section id="calendarView" class="view">
-    <div class="header"><div><h1>Calendar</h1><p class="sub">Monthly view for installs, milestones and calendar-linked capacity work. Click a day to add an item.</p></div><div class="header-actions"><label class="view-search"><input id="calendarSearch" type="search" aria-label="Search Calendar" placeholder="Job, task, employee or stone mason" oninput="renderCalendar()"></label></div></div>
-    <section class="cards">
-      <div class="metric"><small>Calendar items</small><strong id="calendarItemMetric">0</strong></div>
-      <div class="metric"><small>Check measures</small><strong id="calendarCheckMetric">0</strong></div>
-      <div class="metric"><small>Installs</small><strong id="calendarInstallMetric">0</strong></div>
-      <div class="metric"><small>Stone items</small><strong id="calendarStoneMetric">0</strong></div>
-    </section>
+    <div class="header"><div><h1>Calendar</h1></div><div class="header-actions"><label class="view-search"><input id="calendarSearch" type="search" aria-label="Search Calendar" placeholder="Job, task, employee or stone mason" oninput="renderCalendar()"></label></div></div>
     <section class="panel">
       <div class="month-toolbar">
         <button onclick="changeMonth(-1)">Previous</button>
@@ -614,7 +609,6 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
         <div class="month-actions"><button onclick="goToday()">Today</button><button onclick="changeMonth(1)">Next</button></div>
       </div>
       <div class="month-grid" id="monthGrid"></div>
-      <div class="note" style="margin-top:12px">Calendar shows milestones plus any capacity task created here or marked “Show on Calendar”. Capacity tasks also remain in Schedule.</div>
     </section>
   </section>
 
@@ -2239,7 +2233,9 @@ function renderJobs(){
   // Search intentionally spans both Current and Archive so old work is always easy to find.
   const sourceJobs = query ? jobs : (jobsViewMode === "archive" ? archiveJobs : currentJobs);
   const visibleJobs = sourceJobs.filter(job => jobMatchesQuery(job,query));
-  document.getElementById("jobsCurrentBtn")?.classList.toggle("active", jobsViewMode === "current");
+  const currentButton = document.getElementById("jobsCurrentBtn");
+  currentButton?.classList.toggle("active", jobsViewMode === "current");
+  if (currentButton) currentButton.textContent = `Current ${currentJobs.length}`;
   document.getElementById("jobsArchiveBtn")?.classList.toggle("active", jobsViewMode === "archive");
   rows.innerHTML = visibleJobs.map(job => {
     const jobTasks = tasks.filter(task => String(task.job) === String(job.id));
@@ -2256,7 +2252,6 @@ function renderJobs(){
     </div>`;
   }).join("") || `<div class="search-empty">${query ? "No jobs match this search." : (jobsViewMode === "archive" ? "No jobs have moved to Archive yet." : "No current jobs to show.")}</div>`;
   rows.querySelectorAll("[data-job-id]").forEach(row => row.addEventListener("click",()=>openEditJob(decodeURIComponent(row.dataset.jobId))));
-  document.getElementById("jobMetric").textContent=currentJobs.length;
 }
 
 /* Calendar */
@@ -2320,12 +2315,6 @@ function renderCalendar(){
     grid.querySelectorAll("[onclick]").forEach(element => {element.onclick = null; element.removeAttribute("onclick");});
     grid.querySelectorAll("[draggable]").forEach(element => {element.draggable = false; element.removeAttribute("draggable");});
   }
-  const calendarItems = tasks.filter(task => calendarTaskVisible(task) && taskMatchesQuery(task,calendarQuery));
-  const datedItems = calendarItems.filter(task => task.type !== "admin");
-  document.getElementById("calendarItemMetric").textContent = calendarItems.length + calendarEvents.length;
-  document.getElementById("calendarCheckMetric").textContent = datedItems.filter(t => t.name.toLowerCase().includes("check")).length;
-  document.getElementById("calendarInstallMetric").textContent = datedItems.filter(t => t.name.toLowerCase().includes("install") && !t.name.toLowerCase().includes("stone")).length;
-  document.getElementById("calendarStoneMetric").textContent = datedItems.filter(t => t.name.toLowerCase().includes("stone")).length;
 }
 function clearCalendarDropClasses(){
   document.querySelectorAll("#monthGrid .month-day").forEach(day => day.classList.remove("calendar-drop-active"));
