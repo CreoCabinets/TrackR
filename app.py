@@ -426,6 +426,15 @@ def validate_state(payload: object) -> dict:
             validate_week(person.get("week2", person.get("week", {})), f"{name} week 2")
             if person.get("customStart") and not valid_iso_date(person.get("customStart")):
                 raise ValueError(f"Invalid custom roster start date for {name}.")
+        capacity_overrides = person.get("capacityOverrides", {}) or {}
+        if not isinstance(capacity_overrides, dict) or len(capacity_overrides) > 2000:
+            raise ValueError(f"Invalid capacity overrides for {name}.")
+        cleaned_overrides: dict[str, int] = {}
+        for iso_value, minutes in capacity_overrides.items():
+            if not valid_iso_date(iso_value):
+                raise ValueError(f"Invalid capacity override date for {name}.")
+            cleaned_overrides[iso_value] = int(round(require_number(minutes, f"Capacity override for {name} on {iso_value}", 0, 24 * 60)))
+        person["capacityOverrides"] = cleaned_overrides
 
     job_ids: set[str] = set()
     for index, job in enumerate(state["jobs"]):

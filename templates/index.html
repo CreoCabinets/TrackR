@@ -187,6 +187,7 @@ h2{margin:0 0 6px;font-size:23px;letter-spacing:-.05em}
 .cell.today.rostered-off{background:repeating-linear-gradient(-45deg,#f3f5f8,#f3f5f8 7px,#dde3ea 7px,#dde3ea 14px)}
 .cell.over-capacity{background:#fff3f3;box-shadow:inset 0 0 0 2px rgba(201,55,55,.12)}
 .cell.over-capacity.today{background:#ffeded}
+.cell.capacity-adjusted:not(.over-capacity){box-shadow:inset 0 0 0 2px rgba(15,118,110,.10)}
 .cell.drop-active{box-shadow:inset 0 0 0 3px rgba(23,32,51,.22);background-image:linear-gradient(rgba(23,32,51,.025),rgba(23,32,51,.025))}.planner.schedule-dragging .cell{cursor:copy}
 .badge{display:inline-flex;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:950;border:1px solid #c6ecd7;background:#eaf8f0;color:#17613b}.badge.over{border-color:#f1aaaa;background:#fff0f0;color:#a51d1d}.badge.tight{border-color:#f2d894;background:#fff4da;color:#8a5a00}.badge.off{border-color:#ded6c9;background:#f4f1ec;color:#9a8d7c}.badge.sick{border-color:#fecaca;background:#fff1f2;color:#b42318}.badge.away{border-color:#ddd6fe;background:#f5f3ff;color:#6d28d9}.badge.holiday{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8}.badge.rdo{border-color:#fed7aa;background:#fff7ed;color:#c2410c}
 .bars{position:absolute;left:var(--people);right:0;top:0;bottom:0;z-index:10;pointer-events:none}
@@ -623,7 +624,7 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
   <section id="scheduleView" class="view">
     <div class="header">
       <div><h1>Schedule</h1><div class="schedule-range" id="scheduleRangeLabel"></div></div>
-      <div class="schedule-tools"><label class="schedule-search"><input id="scheduleSearch" type="search" aria-label="Search Schedule" placeholder="Search job, task or employee" oninput="renderSchedule()"></label><button onclick="changeScheduleWeek(-1)">Previous</button><button onclick="goScheduleToday()">Today</button><button onclick="changeScheduleWeek(1)">Next</button></div>
+      <div class="schedule-tools"><label class="schedule-search"><input id="scheduleSearch" type="search" aria-label="Search Schedule" placeholder="Search job, task or employee" oninput="renderSchedule()"></label>{% if current_user.role == 'admin' %}<button onclick="openCapacityOverridePanel()">Adjust hours</button>{% endif %}<button onclick="changeScheduleWeek(-1)">Previous</button><button onclick="goScheduleToday()">Today</button><button onclick="changeScheduleWeek(1)">Next</button></div>
     </div>
     <div class="planner-header" id="plannerHeader"><div class="timeline"><div class="days" id="daysHeader"></div></div></div>
     <section class="planner" id="planner"><div class="timeline"><div id="rows"></div></div></section>
@@ -826,6 +827,37 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
   </div>
 </aside>
 
+<aside class="side-panel" id="capacityOverridePanel">
+  <div class="side-head">
+    <div><div class="panel-title">Adjust available hours</div><div class="panel-sub">Bulk overtime / daily capacity</div></div>
+    <button class="close-btn" onclick="closeCapacityOverridePanel()">×</button>
+  </div>
+  <div class="side-body">
+    <div class="detail-card">
+      <h3>Date range</h3>
+      <div class="two-col">
+        <div class="form-row"><label>From</label><input id="capacityOverrideStart" type="date"></div>
+        <div class="form-row"><label>To</label><input id="capacityOverrideEnd" type="date"></div>
+      </div>
+    </div>
+    <div class="detail-card">
+      <h3>Hours</h3>
+      <div class="form-grid">
+        <div class="form-row"><label>Change</label><select id="capacityOverrideMode" onchange="updateCapacityOverrideModeHint()"><option value="add">Add overtime to normal hours</option><option value="set">Set available hours</option></select></div>
+        <div class="form-row"><label id="capacityOverrideAmountLabel">Overtime per day</label><input id="capacityOverrideAmount" value="2h" placeholder="e.g. 2h"></div>
+      </div>
+      <div class="note" id="capacityOverrideHint" style="margin-top:10px">Adds the entered overtime to each selected employee's normal capacity for every date in the range.</div>
+    </div>
+    <div class="detail-card">
+      <div class="panel-head" style="margin-bottom:10px"><div><h3 style="margin:0">Employees</h3></div><div style="display:flex;gap:6px"><button type="button" onclick="setCapacityOverrideEmployees(true)">All</button><button type="button" onclick="setCapacityOverrideEmployees(false)">Clear</button></div></div>
+      <div class="employee-list" id="capacityOverrideEmployees"></div>
+    </div>
+    <div class="detail-card">
+      <div class="action-row"><button onclick="resetCapacityOverrides()">Reset selected days</button><button class="primary" onclick="applyCapacityOverrides()">Apply hours</button></div>
+    </div>
+  </div>
+</aside>
+
 <script>
 const currentUser = {{ current_user|tojson }};
 const isAdmin = currentUser.role === "admin";
@@ -915,6 +947,7 @@ async function loadSavedState(){
     people.forEach(person => {
       if (typeof person.countsCapacity !== "boolean") person.countsCapacity = person.role !== "Admin";
       if (person.role === "Admin") person.countsCapacity = false;
+      if (!person.capacityOverrides || typeof person.capacityOverrides !== "object" || Array.isArray(person.capacityOverrides)) person.capacityOverrides = {};
     });
     jobs = Array.isArray(state.jobs) ? state.jobs : [];
     tasks = Array.isArray(state.tasks) ? state.tasks : [];
@@ -1128,12 +1161,24 @@ function defaultDailyCapacity(person){
   const values = [person?.week,person?.week1,person?.week2].flatMap(week => Object.values(week || {})).map(Number).filter(value => value > 0);
   return values.length ? Math.max(...values) : 460;
 }
-function capacityForDate(person,dateObj){
-  const rostered = rosteredCapacityForDate(person,dateObj);
-  if (!rostered) return 0;
+function capacityOverrideForDate(person,dateObj){
+  if (!person || !dateObj || !person.capacityOverrides) return null;
+  const iso = toIsoDate(dateObj);
+  if (!Object.prototype.hasOwnProperty.call(person.capacityOverrides,iso)) return null;
+  const value = Number(person.capacityOverrides[iso]);
+  return Number.isFinite(value) ? Math.max(0,value) : null;
+}
+function normalCapacityForDate(person,dateObj){
+  if (!employeeCountsCapacity(person) || !dateObj) return 0;
   if (globalCalendarEventForDate(dateObj)) return 0;
+  return rosteredCapacityForDate(person,dateObj);
+}
+function capacityForDate(person,dateObj){
+  if (!employeeCountsCapacity(person) || !dateObj) return 0;
   if (blockedStatusForDate(person.name,dateObj)) return 0;
-  return rostered;
+  const override = capacityOverrideForDate(person,dateObj);
+  if (override !== null) return override;
+  return normalCapacityForDate(person,dateObj);
 }
 function capacityFor(person, dayIndex){ return capacityForDate(person, dateForDayIndex(dayIndex)); }
 function weeklyCapacity(person){
@@ -1221,7 +1266,8 @@ function calculate(){
       }
       while (remaining > 0 && guard < 730) {
         const iso = toIsoDate(cursor);
-        let plannedDayMinutes = firstDate ? rosteredCapacityForDate(person,cursor) : capacityForDate(person,cursor);
+        const explicitOverride = capacityOverrideForDate(person,cursor);
+        let plannedDayMinutes = firstDate ? (explicitOverride !== null ? explicitOverride : rosteredCapacityForDate(person,cursor)) : capacityForDate(person,cursor);
         // The chosen start date is authoritative, even when that day is closed or
         // rostered off. Later parts still skip weekends, closures and absences.
         if (firstDate && plannedDayMinutes <= 0) plannedDayMinutes = defaultDailyCapacity(person);
@@ -2462,10 +2508,13 @@ function renderSchedule(){
       }
       const dateObj=dateForDayIndex(index),blockedStatus=blockedStatusForDate(rowName,dateObj),calendarEvent=globalCalendarEventForDate(dateObj);
       const cap=capacityFor(person,index),booked=(result.used[rowName] && result.used[rowName][index]) || 0,over=booked > cap+1;
+      const override=capacityOverrideForDate(person,dateObj),normalCap=normalCapacityForDate(person,dateObj);
+      const adjusted=override !== null,adjustmentLabel=adjusted ? (override > normalCap ? "OT" : "Adj") : "";
       const rosteredOff=day.working && !blockedStatus && !calendarEvent && cap === 0,isTodayCell=isSameDate(dateObj,today);
-      const badgeClass=over ? "over" : calendarEvent ? "closure" : blockedStatus ? String(blockedStatus.type || "").toLowerCase() : rosteredOff ? "rdo" : booked >= cap-10 ? "tight" : "";
-      const badgeText=calendarEvent && !booked ? calendarEvent.name : blockedStatus && !booked ? blockedStatus.type : rosteredOff && !booked ? "RDO" : `${fmt(booked)} / ${fmt(cap)}${over ? ` · +${fmt(booked-cap)}` : ""}`;
-      return `<div class="cell ${day.working ? "" : "weekend"} ${calendarEvent ? "calendar-event-day" : ""} ${blockedStatus ? "blocked-day" : ""} ${rosteredOff ? "rostered-off" : ""} ${over ? "over-capacity" : ""} ${isTodayCell ? "today" : ""}" data-person="${escapeHtml(rowName)}" data-day="${index}" onclick="openDayPanel(decodeURIComponent('${encodedRowName}'),${index})" title="${over ? `Over capacity by ${escapeHtml(fmt(booked-cap))}` : calendarEvent ? escapeHtml(calendarEvent.name) : ""}"><span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span></div>`;
+      const badgeClass=over ? "over" : calendarEvent && !adjusted ? "closure" : blockedStatus ? String(blockedStatus.type || "").toLowerCase() : rosteredOff ? "rdo" : booked >= cap-10 ? "tight" : "";
+      const badgeText=calendarEvent && !booked && !adjusted ? calendarEvent.name : blockedStatus && !booked ? blockedStatus.type : rosteredOff && !booked && !adjusted ? "RDO" : `${fmt(booked)} / ${fmt(cap)}${adjustmentLabel ? ` · ${adjustmentLabel}` : ""}${over ? ` · +${fmt(booked-cap)}` : ""}`;
+      const cellTitle=[adjusted ? `${adjustmentLabel === "OT" ? "Overtime" : "Adjusted"} availability: ${fmt(cap)}` : "",over ? `Over capacity by ${fmt(booked-cap)}` : "",calendarEvent ? calendarEvent.name : ""].filter(Boolean).join(" · ");
+      return `<div class="cell ${day.working ? "" : "weekend"} ${calendarEvent ? "calendar-event-day" : ""} ${blockedStatus ? "blocked-day" : ""} ${rosteredOff ? "rostered-off" : ""} ${over ? "over-capacity" : ""} ${adjusted ? "capacity-adjusted" : ""} ${isTodayCell ? "today" : ""}" data-person="${escapeHtml(rowName)}" data-day="${index}" onclick="openDayPanel(decodeURIComponent('${encodedRowName}'),${index})" title="${escapeHtml(cellTitle)}"><span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span></div>`;
     }).join("")}<div class="bars"></div>`;
     const bars=row.querySelector(".bars");
     laneItems.forEach(item=>{
@@ -3458,6 +3507,71 @@ function removeEmployee(){
   saveState("Employee removed");
 }
 
+/* Bulk available-hours overrides */
+function openCapacityOverridePanel(){
+  if(!isAdmin) return;
+  const start=dateForDayIndex(0);
+  document.getElementById("capacityOverrideStart").value=toIsoDate(start);
+  document.getElementById("capacityOverrideEnd").value=toIsoDate(addCalendarDays(start,4));
+  document.getElementById("capacityOverrideMode").value="add";
+  document.getElementById("capacityOverrideAmount").value="2h";
+  updateCapacityOverrideModeHint();
+  const capacityPeople=people.filter(employeeCountsCapacity);
+  document.getElementById("capacityOverrideEmployees").innerHTML=capacityPeople.map(person=>`<div class="employee-choice"><label><input type="checkbox" data-capacity-override-person="${escapeHtml(person.name)}"><strong>${escapeHtml(person.name)}</strong></label><span>${escapeHtml(person.role)}</span></div>`).join("") || `<div class="note">No capacity employees available.</div>`;
+  openPanel("capacityOverridePanel");
+}
+function updateCapacityOverrideModeHint(){
+  const mode=document.getElementById("capacityOverrideMode")?.value || "add";
+  const label=document.getElementById("capacityOverrideAmountLabel"),hint=document.getElementById("capacityOverrideHint");
+  if(label) label.textContent=mode === "set" ? "Available hours per day" : "Overtime per day";
+  if(hint) hint.textContent=mode === "set" ? "Sets the selected employees to this exact available capacity on every date in the range." : "Adds the entered overtime to each selected employee's normal capacity for every date in the range.";
+}
+function setCapacityOverrideEmployees(checked){
+  document.querySelectorAll("#capacityOverrideEmployees input[data-capacity-override-person]").forEach(input=>{input.checked=checked;});
+}
+function selectedCapacityOverridePeople(){
+  return [...document.querySelectorAll("#capacityOverrideEmployees input[data-capacity-override-person]:checked")].map(input=>input.dataset.capacityOverridePerson).filter(Boolean);
+}
+function capacityOverrideDateRange(){
+  const start=parseIsoDate(document.getElementById("capacityOverrideStart")?.value),end=parseIsoDate(document.getElementById("capacityOverrideEnd")?.value);
+  if(!start || !end || end < start){showToast("Choose a valid date range.");return null;}
+  const dates=[];let guard=0;for(let cursor=new Date(start);cursor<=end && guard<366;cursor=addCalendarDays(cursor,1),guard++) dates.push(new Date(cursor));
+  if(!dates.length || guard>=366){showToast("Choose a date range of less than one year.");return null;}
+  return dates;
+}
+function applyCapacityOverrides(){
+  if(!isAdmin) return;
+  const names=selectedCapacityOverridePeople();
+  if(!names.length){showToast("Select at least one employee.");return;}
+  const dates=capacityOverrideDateRange();if(!dates) return;
+  const amountText=String(document.getElementById("capacityOverrideAmount")?.value || "").trim().toLowerCase();
+  const minutes=parseHours(amountText);
+  const zeroValue=/^0(?:\.0+)?(?:\s*[hm])?$/.test(amountText);
+  if(!amountText || minutes < 0 || minutes > 24*60 || (!minutes && !zeroValue)){showToast("Enter valid hours, for example 2h or 10h.");return;}
+  const mode=document.getElementById("capacityOverrideMode")?.value || "add";
+  names.forEach(name=>{
+    const person=people.find(item=>item.name===name);if(!person) return;
+    if(!person.capacityOverrides || typeof person.capacityOverrides !== "object") person.capacityOverrides={};
+    dates.forEach(dateObj=>{
+      const iso=toIsoDate(dateObj);
+      const value=mode === "set" ? minutes : Math.min(24*60,normalCapacityForDate(person,dateObj)+minutes);
+      person.capacityOverrides[iso]=Math.round(value);
+    });
+  });
+  closeCapacityOverridePanel();renderAll();saveState("Available hours updated");
+}
+function resetCapacityOverrides(){
+  if(!isAdmin) return;
+  const names=selectedCapacityOverridePeople();
+  if(!names.length){showToast("Select at least one employee.");return;}
+  const dates=capacityOverrideDateRange();if(!dates) return;
+  names.forEach(name=>{
+    const person=people.find(item=>item.name===name);if(!person?.capacityOverrides) return;
+    dates.forEach(dateObj=>delete person.capacityOverrides[toIsoDate(dateObj)]);
+  });
+  closeCapacityOverridePanel();renderAll();saveState("Available hours reset to normal");
+}
+
 /* Panels and scroll */
 function openPanel(panelId){
   closeAllPanels(false);
@@ -3467,11 +3581,13 @@ function openPanel(panelId){
 function closeTaskPanel(closeBackdrop=true){document.getElementById("taskPanel").classList.remove("open"); if(closeBackdrop) document.getElementById("panelBackdrop").classList.remove("open")}
 function closeDayPanel(closeBackdrop=true){document.getElementById("dayPanel").classList.remove("open"); if(closeBackdrop) document.getElementById("panelBackdrop").classList.remove("open")}
 function closeEmployeePanel(closeBackdrop=true){document.getElementById("employeePanel").classList.remove("open"); if(closeBackdrop) document.getElementById("panelBackdrop").classList.remove("open")}
+function closeCapacityOverridePanel(closeBackdrop=true){document.getElementById("capacityOverridePanel").classList.remove("open"); if(closeBackdrop) document.getElementById("panelBackdrop").classList.remove("open")}
 function closeAllPanels(closeBackdrop=true){
   document.getElementById("taskPanel").classList.remove("open");
   document.getElementById("dayPanel").classList.remove("open");
   document.getElementById("statusPanel").classList.remove("open");
   document.getElementById("employeePanel").classList.remove("open");
+  document.getElementById("capacityOverridePanel").classList.remove("open");
   if (closeBackdrop) document.getElementById("panelBackdrop").classList.remove("open");
 }
 function syncFloatingScrollWidth(){
