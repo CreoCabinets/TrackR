@@ -161,6 +161,10 @@ h2{margin:0 0 6px;font-size:23px;letter-spacing:-.05em}
 /* Schedule */
 .schedule-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .schedule-tools input,.schedule-tools select{border:1px solid var(--line);border-radius:999px;padding:10px 12px;font-weight:850;background:#fff}
+.schedule-search{display:block;min-width:min(270px,38vw)}
+.schedule-search input{width:100%;min-width:0;border:1px solid var(--line);border-radius:999px;padding:10px 14px;font:inherit;font-weight:800;color:var(--ink);background:#fff;outline:0;box-shadow:0 4px 12px rgba(23,32,51,.04)}
+.schedule-search input:focus{border-color:#80aaa5;box-shadow:0 0 0 3px rgba(15,118,110,.10)}
+.schedule-search input::placeholder{color:#98a3af;font-weight:750}
 .schedule-range{font-size:12px;color:#64748b;font-weight:850;margin-top:5px}
 .planner-header{position:sticky;top:68px;z-index:90;max-width:100%;overflow-x:auto;overflow-y:hidden;background:#fff;border:1px solid var(--line);border-bottom:0;border-radius:24px 24px 0 0;box-shadow:0 10px 24px rgba(23,32,51,.08);scrollbar-width:none}
 .planner-header::-webkit-scrollbar{display:none}
@@ -454,7 +458,7 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
   .settings-menu button{text-align:center}
 }
 @media(max-width:620px){
-  .header{align-items:stretch;flex-direction:column}.header-actions{justify-content:stretch}.view-search{min-width:100%;width:100%}
+  .header{align-items:stretch;flex-direction:column}.header-actions{justify-content:stretch}.view-search{min-width:100%;width:100%}.schedule-search{min-width:100%;width:100%}
   .cards{grid-template-columns:1fr 1fr;gap:10px}
   .metric{padding:13px}.metric strong{font-size:20px}
   h1{font-size:27px}.panel{padding:15px;border-radius:14px}
@@ -618,16 +622,9 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
 
   <section id="scheduleView" class="view">
     <div class="header">
-      <div><h1>Schedule</h1><p class="sub">Capacity planning only: drag tasks, split across employees, and update calendar-linked custom tasks.</p><div class="schedule-range" id="scheduleRangeLabel"></div></div>
-      <div class="schedule-tools"><label class="view-search"><input id="scheduleSearch" type="search" aria-label="Search Schedule" placeholder="Job, task or employee" oninput="renderSchedule()"></label><button onclick="changeScheduleWeek(-1)">Previous</button><button onclick="goScheduleToday()">Today</button><button onclick="changeScheduleWeek(1)">Next</button></div>
+      <div><h1>Schedule</h1><div class="schedule-range" id="scheduleRangeLabel"></div></div>
+      <div class="schedule-tools"><label class="schedule-search"><input id="scheduleSearch" type="search" aria-label="Search Schedule" placeholder="Search job, task or employee" oninput="renderSchedule()"></label><button onclick="changeScheduleWeek(-1)">Previous</button><button onclick="goScheduleToday()">Today</button><button onclick="changeScheduleWeek(1)">Next</button></div>
     </div>
-    <section class="cards">
-      <div class="metric"><small>Total capacity booked</small><strong id="bookedMetric">0%</strong></div>
-      <div class="metric"><small>Available spare</small><strong id="spareMetric">0h</strong></div>
-      <div class="metric"><small>Custom capacity tasks</small><strong id="scheduleCustomMetric">0</strong></div>
-      <div class="metric"><small>Split tasks</small><strong id="splitMetric">0</strong></div>
-    </section>
-    <div class="note" id="scheduleWarning" style="display:none;margin-bottom:12px"></div>
     <div class="planner-header" id="plannerHeader"><div class="timeline"><div class="days" id="daysHeader"></div></div></div>
     <section class="planner" id="planner"><div class="timeline"><div id="rows"></div></div></section>
   </section>
@@ -2431,7 +2428,6 @@ function renderSchedule(){
   }).map(person=>person.name);
   const matchingUnassigned=tasks.some(task=>task.type === "capacity" && !(task.assigned || []).length && taskMatchesQuery(task,query));
   if(matchingUnassigned) rowNames.unshift("Unassigned");
-  let totalCap=0,totalUsed=0,overbookedDays=0;
   rowNames.forEach(rowName=>{
     const isUnassignedRow=rowName === "Unassigned";
     const person=people.find(item=>item.name === rowName);
@@ -2451,7 +2447,6 @@ function renderSchedule(){
       const dateObj=dateForDayIndex(index),blockedStatus=blockedStatusForDate(rowName,dateObj),calendarEvent=globalCalendarEventForDate(dateObj);
       const cap=capacityFor(person,index),booked=(result.used[rowName] && result.used[rowName][index]) || 0,over=booked > cap+1;
       const rosteredOff=day.working && !blockedStatus && !calendarEvent && cap === 0,isTodayCell=isSameDate(dateObj,today);
-      totalCap+=cap;totalUsed+=booked;if(over) overbookedDays++;
       const badgeClass=over ? "over" : calendarEvent ? "closure" : blockedStatus ? String(blockedStatus.type || "").toLowerCase() : rosteredOff ? "rdo" : booked >= cap-10 ? "tight" : "";
       const badgeText=calendarEvent && !booked ? calendarEvent.name : blockedStatus && !booked ? blockedStatus.type : rosteredOff && !booked ? "RDO" : `${fmt(booked)} / ${fmt(cap)}${over ? ` · +${fmt(booked-cap)}` : ""}`;
       return `<div class="cell ${day.working ? "" : "weekend"} ${calendarEvent ? "calendar-event-day" : ""} ${blockedStatus ? "blocked-day" : ""} ${rosteredOff ? "rostered-off" : ""} ${over ? "over-capacity" : ""} ${isTodayCell ? "today" : ""}" data-person="${escapeHtml(rowName)}" data-day="${index}" onclick="openDayPanel(decodeURIComponent('${encodedRowName}'),${index})" title="${over ? `Over capacity by ${escapeHtml(fmt(booked-cap))}` : calendarEvent ? escapeHtml(calendarEvent.name) : ""}"><span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span></div>`;
@@ -2510,11 +2505,6 @@ function renderSchedule(){
   });
   if(!rowNames.length) rows.innerHTML=`<div class="search-empty">No employees or tasks match this search.</div>`;
   if(isAdmin) wireScheduleDrops();else{rows.querySelectorAll("[onclick]").forEach(element=>{element.onclick=null;element.removeAttribute("onclick");});rows.querySelectorAll("[draggable]").forEach(element=>{element.draggable=false;element.removeAttribute("draggable");});}
-  const bookedPercent=totalCap ? Math.round((totalUsed/totalCap)*100) : totalUsed ? 100 : 0;
-  document.getElementById("bookedMetric").textContent=`${bookedPercent}%`;document.getElementById("spareMetric").textContent=fmt(Math.max(0,totalCap-totalUsed));
-  document.getElementById("scheduleCustomMetric").textContent=tasks.filter(task=>task.custom && task.type === "capacity").length;document.getElementById("splitMetric").textContent=tasks.filter(task=>task.type === "capacity" && (task.assigned || []).length > 1).length;
-  const warning=document.getElementById("scheduleWarning");
-  if(overbookedDays){warning.style.display="block";warning.textContent=`${overbookedDays} employee-day${overbookedDays === 1 ? " is" : "s are"} over capacity and highlighted in red. Tasks remain on their selected dates.`;}else warning.style.display="none";
   syncFloatingScrollWidth();
 }
 
