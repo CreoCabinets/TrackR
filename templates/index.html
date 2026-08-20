@@ -208,6 +208,9 @@ h2{margin:0 0 6px;font-size:23px;letter-spacing:-.05em}
 .side-body{padding:18px 20px;display:grid;gap:14px;overflow:auto}.detail-card{border:1px solid var(--line);border-radius:16px;padding:14px;background:#fffaf2}.detail-card h3{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:#64748b}
 .form-grid{display:grid;gap:10px}.form-row{display:grid;gap:5px}.form-row label{font-size:11px;font-weight:950;color:#64748b;text-transform:uppercase;letter-spacing:.05em}.form-row input,.form-row select{border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-weight:850;color:#172033;background:#fff;width:100%}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .employee-list{display:grid;gap:8px}.employee-choice{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:#fff}.employee-choice label{display:flex;align-items:center;gap:10px;font-weight:900;cursor:pointer}.employee-choice input{width:18px;height:18px}.employee-choice span{color:#64748b;font-size:12px;font-weight:850}
+#taskPanel #panelSub{display:none}
+.calendar-toggle-row{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-top:10px;padding:9px 2px 0;border-top:1px solid #e2e8ee}.calendar-toggle-label{font-size:11px;font-weight:950;color:#536579;text-transform:uppercase;letter-spacing:.05em}.switch-control{display:inline-flex;align-items:center;gap:8px;cursor:pointer;text-transform:none!important;letter-spacing:0!important}.switch-control input{position:absolute;opacity:0;pointer-events:none}.toggle-track{position:relative;width:38px;height:22px;border-radius:999px;background:#cbd5df;box-shadow:inset 0 0 0 1px rgba(15,28,43,.08);transition:.16s ease}.toggle-track::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(15,28,43,.24);transition:.16s ease}.switch-control input:checked + .toggle-track{background:#16856b}.switch-control input:checked + .toggle-track::after{transform:translateX(16px)}.switch-control input:focus-visible + .toggle-track{outline:3px solid rgba(22,133,107,.22);outline-offset:2px}.switch-control input:disabled + .toggle-track{opacity:.55;cursor:not-allowed}
+.employee-card-collapse{padding:0;overflow:hidden}.employee-card-collapse summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 14px;cursor:pointer;user-select:none}.employee-card-collapse summary::-webkit-details-marker{display:none}.employee-card-collapse summary::marker{display:none}.employee-summary-title{font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:#64748b;font-weight:950}.employee-summary-meta{display:flex;align-items:center;gap:8px;color:#536579;font-size:12px;font-weight:900}.employee-count{font-variant-numeric:tabular-nums}.employee-chevron{display:inline-block;font-size:16px;line-height:1;transition:transform .16s ease}.employee-card-collapse[open] .employee-chevron{transform:rotate(180deg)}.employee-collapse-body{padding:0 14px 14px;border-top:1px solid #e2e8ee}.employee-collapse-body .employee-list{padding-top:12px}
 .note{border:1px solid var(--line);background:#fff;border-radius:14px;padding:10px 12px;color:#64748b;font-size:12px;font-weight:850;line-height:1.45}.action-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(20px);background:#172033;color:#fff;border-radius:999px;padding:11px 16px;font-weight:850;box-shadow:0 20px 50px rgba(23,32,51,.25);z-index:300;opacity:0;pointer-events:none;transition:.16s ease}.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .float-scroll{position:fixed;left:24px;right:24px;bottom:8px;height:16px;z-index:200;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:999px;overflow-x:auto;overflow-y:hidden;box-shadow:0 10px 28px rgba(23,32,51,.12)}.float-scroll-inner{height:1px}
@@ -708,15 +711,26 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
           <div class="form-row"><label>Status</label><select id="taskStatus"><option>Planned</option><option>Forecast</option><option>In Progress</option><option>Complete</option><option>Waiting</option></select></div>
         </div>
       </div>
-      <div class="form-row" id="showOnCalendarRow" style="display:none;margin-top:12px"><label>Calendar</label><label class="aj-check"><input id="taskShowOnCalendar" type="checkbox">Show on Calendar</label></div>
-      <div class="note" id="typeHint" style="margin-top:10px">Calendar milestone only: shows on Calendar and does not use employee capacity.</div>
+      <div class="calendar-toggle-row" id="showOnCalendarRow" style="display:none">
+        <span class="calendar-toggle-label">Show on Calendar</span>
+        <label class="switch-control" title="Show this task on Calendar">
+          <input id="taskShowOnCalendar" type="checkbox" aria-label="Show on Calendar">
+          <span class="toggle-track" aria-hidden="true"></span>
+        </label>
+      </div>
+      <div id="typeHint" style="display:none" aria-hidden="true"></div>
     </div>
 
-    <div class="detail-card" id="employeeCard">
-      <h3 id="employeeCardTitle">Assigned employees</h3>
-      <div class="employee-list" id="employeeChoices"></div>
-      <div class="note" id="employeeCardNote" style="margin-top:10px">When more than one employee is selected, TrackR splits the task evenly and marks it as Split.</div>
-    </div>
+    <details class="detail-card employee-card-collapse" id="employeeCard">
+      <summary>
+        <span class="employee-summary-title" id="employeeCardTitle">Assigned employees</span>
+        <span class="employee-summary-meta"><span class="employee-count" id="employeeAssignedCount">(0)</span><span class="employee-chevron" aria-hidden="true">⌄</span></span>
+      </summary>
+      <div class="employee-collapse-body">
+        <div class="employee-list" id="employeeChoices"></div>
+        <div class="note" id="employeeCardNote" style="margin-top:10px">When more than one employee is selected, TrackR splits the task evenly and marks it as Split.</div>
+      </div>
+    </details>
 
     <div class="detail-card" id="allocationCard">
       <h3>Actual split</h3>
@@ -2649,6 +2663,7 @@ function openCustomTaskPanel(origin="general"){
   document.getElementById("taskStatus").value = "Planned";
   document.getElementById("taskShowOnCalendar").checked = origin === "calendar";
   document.getElementById("taskStoneMason").value = "";
+  document.getElementById("employeeCard").open = false;
   renderEmployeeChoices([]);
   updateTypeHint();
   updateAllocationSummary(null);
@@ -2697,10 +2712,16 @@ function openTaskPanel(id){
   document.getElementById("taskStatus").value = task.status || "Planned";
   document.getElementById("taskShowOnCalendar").checked = task.showOnCalendar === true;
   document.getElementById("taskStoneMason").value = task.stoneMason || "";
+  document.getElementById("employeeCard").open = false;
   renderEmployeeChoices(task.assigned);
   updateTypeHint();
   updateAllocationSummary(task);
   openPanel("taskPanel");
+}
+function updateEmployeeAssignedCount(){
+  const count=document.querySelectorAll("#employeeChoices input:checked").length;
+  const el=document.getElementById("employeeAssignedCount");
+  if(el) el.textContent=`(${count})`;
 }
 function renderEmployeeChoices(selected){
   const type = document.getElementById("taskType").value;
@@ -2709,10 +2730,11 @@ function renderEmployeeChoices(selected){
     : people.filter(person => person.role !== "Admin" && !employeeCountsCapacity(person));
   const choices = available.map(person => `
     <div class="employee-choice">
-      <label><input type="checkbox" value="${escapeHtml(person.name)}" ${selected.includes(person.name) ? "checked" : ""}>${escapeHtml(person.name)}</label>
+      <label><input type="checkbox" value="${escapeHtml(person.name)}" ${selected.includes(person.name) ? "checked" : ""} onchange="updateEmployeeAssignedCount()">${escapeHtml(person.name)}</label>
       <span>${escapeHtml(person.role)}</span>
     </div>`).join("");
   document.getElementById("employeeChoices").innerHTML = choices || `<div class="note">${type === "capacity" ? "No capacity employees are available." : "No non-capacity installers have been added yet."}</div>`;
+  updateEmployeeAssignedCount();
 }
 function isStoneTaskName(value){return normaliseSearch(value).includes("stone");}
 function updateStoneMasonField(){
@@ -2738,7 +2760,7 @@ function updateTypeHint(){
     document.getElementById("employeeCardNote").textContent="Choose a subcontractor here so their name appears on the Calendar without using company capacity.";
     document.getElementById("typeHint").textContent="Calendar milestone only: shows on Calendar and does not use employee capacity.";
   }else{
-    calendarRow.style.display="block";if(hoursInput.value === "0h") hoursInput.value="2h";if(department.value === "Milestone") department.value="Cabinet Making";
+    calendarRow.style.display="flex";if(hoursInput.value === "0h") hoursInput.value="2h";if(department.value === "Milestone") department.value="Cabinet Making";
     const createdFromCalendar=taskPanelOrigin === "calendar" && !selectedTaskId;if(createdFromCalendar) calendarCheckbox.checked=true;calendarCheckbox.disabled=createdFromCalendar;
     document.getElementById("employeeCardTitle").textContent="Assigned capacity employees";
     document.getElementById("employeeCardNote").textContent="Assignment is optional. Leave everyone unticked to place the task in Schedule's Unassigned row, or choose multiple employees to split it evenly.";
