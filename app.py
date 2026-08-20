@@ -519,6 +519,15 @@ def validate_state(payload: object) -> dict:
         if task_type == "admin":
             if len(assigned) != 1 or people_roles.get(assigned[0]) != "Admin":
                 raise ValueError(f"Admin calendar task {task_id} must have one Admin employee.")
+        schedule_order = task.get("scheduleOrder", {}) or {}
+        if not isinstance(schedule_order, dict):
+            raise ValueError(f"Invalid schedule order for {task_id}.")
+        if not set(schedule_order).issubset(set(assigned)):
+            raise ValueError(f"Schedule order for {task_id} contains an unassigned employee.")
+        task["scheduleOrder"] = {
+            employee: require_number(value, f"{task_id} schedule order for {employee}", 0, 1_000_000_000)
+            for employee, value in schedule_order.items()
+        }
         for map_name in ("assignmentMinutes", "assignmentDates"):
             mapping = task.get(map_name, {}) or {}
             if not isinstance(mapping, dict):
