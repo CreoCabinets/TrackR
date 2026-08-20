@@ -178,7 +178,7 @@ h2{margin:0 0 6px;font-size:23px;letter-spacing:-.05em}
 .cell.today.rostered-off{background:repeating-linear-gradient(-45deg,#f3f5f8,#f3f5f8 7px,#dde3ea 7px,#dde3ea 14px)}
 .cell.over-capacity{background:#fff3f3;box-shadow:inset 0 0 0 2px rgba(201,55,55,.12)}
 .cell.over-capacity.today{background:#ffeded}
-.cell.drop-active{box-shadow:inset 0 0 0 3px rgba(23,32,51,.22);background-image:linear-gradient(rgba(23,32,51,.025),rgba(23,32,51,.025))}.planner.schedule-dragging .bar{pointer-events:none!important}.planner.schedule-dragging .cell{cursor:copy}
+.cell.drop-active{box-shadow:inset 0 0 0 3px rgba(23,32,51,.22);background-image:linear-gradient(rgba(23,32,51,.025),rgba(23,32,51,.025))}.planner.schedule-dragging .cell{cursor:copy}
 .badge{display:inline-flex;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:950;border:1px solid #c6ecd7;background:#eaf8f0;color:#17613b}.badge.over{border-color:#f1aaaa;background:#fff0f0;color:#a51d1d}.badge.tight{border-color:#f2d894;background:#fff4da;color:#8a5a00}.badge.off{border-color:#ded6c9;background:#f4f1ec;color:#9a8d7c}.badge.sick{border-color:#fecaca;background:#fff1f2;color:#b42318}.badge.away{border-color:#ddd6fe;background:#f5f3ff;color:#6d28d9}.badge.holiday{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8}.badge.rdo{border-color:#fed7aa;background:#fff7ed;color:#c2410c}
 .bars{position:absolute;left:var(--people);right:0;top:0;bottom:0;z-index:10;pointer-events:none}
 .bar{position:absolute;height:46px;border-radius:14px;padding:6px 10px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:950;overflow:hidden;box-shadow:0 8px 15px rgba(23,32,51,.10);border:1px solid rgba(0,0,0,.05);cursor:grab;pointer-events:auto}
@@ -699,9 +699,10 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
       <h3>Task details</h3>
       <div class="form-grid">
         <div class="two-col">
-          <div class="form-row"><label>Job</label><input id="taskJob" maxlength="160" placeholder="Job number or quick-fix description"></div>
+          <div class="form-row"><label>Job</label><input id="taskJob" maxlength="160" placeholder="Job number or quick-fix description" oninput="updateTaskJobMeta()"></div>
           <div class="form-row"><label>Type</label><select id="taskType" onchange="updateTypeHint()"><option value="milestone">Calendar milestone only</option><option value="capacity">Capacity task for schedule</option></select></div>
         </div>
+        <div class="form-row" id="taskBuilderClientRow" style="display:none"><label id="taskBuilderClientLabel">Builder / Client</label><input id="taskBuilderClient" readonly></div>
         <div class="form-row"><label>Task name</label><input id="taskName" placeholder="e.g. Check Measure, Install, Touch up" oninput="updateStoneMasonField()"></div>
         <div class="form-row" id="stoneMasonRow" style="display:none"><label>Stone mason</label><input id="taskStoneMason" maxlength="160" placeholder="Company or person doing the stone work"></div>
         <div class="two-col">
@@ -2399,8 +2400,26 @@ function renderSchedule(){
       bar.title=`${taskLabel(item.task)} · ${fmt(minutes)}${detailsRequired ? " · Details required" : ""}${over ? " · Over capacity" : ""} · Drag to move`;
       bar.setAttribute("aria-label",`Edit ${taskLabel(item.task)}`);
       bar.onclick=event=>{event.stopPropagation();openTaskPanel(item.task.id);};bar.draggable=true;
-      bar.addEventListener("dragstart",event=>{currentDragTask=item.task;currentDragPerson=rowName;event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",item.task.id);document.getElementById("planner")?.classList.add("schedule-dragging");setTimeout(()=>bar.classList.add("dragging"),0);});
-      bar.addEventListener("dragend",()=>{bar.classList.remove("dragging");document.getElementById("planner")?.classList.remove("schedule-dragging");setTimeout(()=>{currentDragTask=null;currentDragPerson=null;clearDropClasses();},0);});bars.appendChild(bar);
+      bar.addEventListener("dragstart",event=>{
+        currentDragTask=item.task;currentDragPerson=rowName;
+        event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",item.task.id);
+        setTimeout(()=>bar.classList.add("dragging"),0);
+      });
+      bar.addEventListener("dragover",event=>{
+        if(!currentDragTask) return;
+        event.preventDefault();event.stopPropagation();event.dataTransfer.dropEffect="move";
+        const cell=scheduleCellAtPointer(row,event.clientX);
+        if(cell) highlightScheduleDropCell(cell);
+      });
+      bar.addEventListener("drop",event=>{
+        if(!currentDragTask) return;
+        event.preventDefault();event.stopPropagation();
+        const cell=scheduleCellAtPointer(row,event.clientX);
+        const draggedTask=currentDragTask,sourcePerson=currentDragPerson;
+        currentDragTask=null;currentDragPerson=null;clearDropClasses();
+        if(cell) moveTaskToCell(draggedTask,cell,sourcePerson);
+      });
+      bar.addEventListener("dragend",()=>{bar.classList.remove("dragging");setTimeout(()=>{currentDragTask=null;currentDragPerson=null;clearDropClasses();},0);});bars.appendChild(bar);
     });rows.appendChild(row);
   });
   if(!rowNames.length) rows.innerHTML=`<div class="search-empty">No employees or tasks match this search.</div>`;
@@ -2413,7 +2432,22 @@ function renderSchedule(){
   syncFloatingScrollWidth();
 }
 
-function clearDropClasses(){document.querySelectorAll(".cell").forEach(cell => cell.classList.remove("drop-active"));document.getElementById("planner")?.classList.remove("schedule-dragging")}
+function clearDropClasses(){document.querySelectorAll(".cell").forEach(cell => cell.classList.remove("drop-active"));}
+function highlightScheduleDropCell(cell){
+  if(!cell) return;
+  document.querySelectorAll("#rows .cell.drop-active").forEach(other=>{if(other!==cell) other.classList.remove("drop-active");});
+  cell.classList.add("drop-active");
+}
+function scheduleCellAtPointer(row,clientX){
+  const cells=[...row.querySelectorAll(".cell")];
+  if(!cells.length) return null;
+  const exact=cells.find(cell=>{const rect=cell.getBoundingClientRect();return clientX>=rect.left && clientX<rect.right;});
+  if(exact) return exact;
+  const firstRect=cells[0].getBoundingClientRect(),lastRect=cells[cells.length-1].getBoundingClientRect();
+  if(clientX<firstRect.left) return cells[0];
+  if(clientX>=lastRect.right) return cells[cells.length-1];
+  return null;
+}
 function materialiseAssignmentMinutes(task){
   const names = [...new Set((task.assigned || []).filter(Boolean))];
   const existing = task.assignmentMinutes || {};
@@ -2490,9 +2524,7 @@ function wireScheduleDrops(){
       if (!currentDragTask) return;
       event.preventDefault();
       event.dataTransfer.dropEffect = "move";
-      document.getElementById("planner")?.classList.add("schedule-dragging");
-      document.querySelectorAll("#rows .cell.drop-active").forEach(other => {if(other !== cell) other.classList.remove("drop-active");});
-      cell.classList.add("drop-active");
+      highlightScheduleDropCell(cell);
     };
     cell.ondrop = event => {
       event.preventDefault();
@@ -2521,6 +2553,7 @@ function openCustomTaskPanel(origin="general"){
   document.getElementById("panelTitle").textContent = "Add task";
   document.getElementById("panelSub").textContent = "Calendar milestone or schedule capacity task";
   document.getElementById("taskJob").value = "";
+  updateTaskJobMeta();
   document.getElementById("taskType").value = "milestone";
   document.getElementById("taskName").value = "";
   document.getElementById("taskDate").value = toIsoDate(new Date());
@@ -2549,6 +2582,16 @@ function openScheduleTaskPanel(personName,dayIndex){
 function openScheduleStatusPanel(personName, dayIndex){
   openStatusPanel(personName, dayIndex);
 }
+function updateTaskJobMeta(task=null){
+  const row=document.getElementById("taskBuilderClientRow"),label=document.getElementById("taskBuilderClientLabel"),input=document.getElementById("taskBuilderClient");
+  if(!row || !label || !input) return;
+  const jobText=(task?.job || document.getElementById("taskJob")?.value || "").trim();
+  const job=jobs.find(item=>normaliseSearch(item.id)===normaliseSearch(jobText));
+  if(!job || !String(job.builder || "").trim()){row.style.display="none";input.value="";label.textContent="Builder / Client";return;}
+  row.style.display="grid";
+  input.value=job.builder || "";
+  label.textContent=job.jobType === "private" ? "Client" : job.jobType === "builder" ? "Builder" : "Builder / Client";
+}
 function openTaskPanel(id){
   taskPanelOrigin="edit";
   const task = tasks.find(t => t.id === id);
@@ -2558,6 +2601,7 @@ function openTaskPanel(id){
   document.getElementById("panelTitle").textContent = "Edit task";
   document.getElementById("panelSub").textContent = `${taskLabel(task)} · ${task.type === "milestone" ? "Calendar milestone only" : "Capacity task"}`;
   document.getElementById("taskJob").value = task.job;
+  updateTaskJobMeta(task);
   document.getElementById("taskType").value = task.type;
   document.getElementById("taskName").value = task.name;
   document.getElementById("taskDate").value = toIsoDate(taskDate(task));
