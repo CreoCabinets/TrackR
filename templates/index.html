@@ -178,12 +178,12 @@ h2{margin:0 0 6px;font-size:23px;letter-spacing:-.05em}
 .cell.today.rostered-off{background:repeating-linear-gradient(-45deg,#f3f5f8,#f3f5f8 7px,#dde3ea 7px,#dde3ea 14px)}
 .cell.over-capacity{background:#fff3f3;box-shadow:inset 0 0 0 2px rgba(201,55,55,.12)}
 .cell.over-capacity.today{background:#ffeded}
-.cell.drop-active{box-shadow:inset 0 0 0 3px rgba(23,32,51,.14)}.cell.drop-top{box-shadow:inset 0 4px 0 rgba(23,32,51,.22), inset 0 0 0 3px rgba(23,32,51,.10)}.cell.drop-bottom{box-shadow:inset 0 -4px 0 rgba(23,32,51,.22), inset 0 0 0 3px rgba(23,32,51,.10)}
+.cell.drop-active{box-shadow:inset 0 0 0 3px rgba(23,32,51,.22);background-image:linear-gradient(rgba(23,32,51,.025),rgba(23,32,51,.025))}.planner.schedule-dragging .bar{pointer-events:none!important}.planner.schedule-dragging .cell{cursor:copy}
 .badge{display:inline-flex;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:950;border:1px solid #c6ecd7;background:#eaf8f0;color:#17613b}.badge.over{border-color:#f1aaaa;background:#fff0f0;color:#a51d1d}.badge.tight{border-color:#f2d894;background:#fff4da;color:#8a5a00}.badge.off{border-color:#ded6c9;background:#f4f1ec;color:#9a8d7c}.badge.sick{border-color:#fecaca;background:#fff1f2;color:#b42318}.badge.away{border-color:#ddd6fe;background:#f5f3ff;color:#6d28d9}.badge.holiday{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8}.badge.rdo{border-color:#fed7aa;background:#fff7ed;color:#c2410c}
 .bars{position:absolute;left:var(--people);right:0;top:0;bottom:0;z-index:10;pointer-events:none}
-.bar{position:absolute;height:36px;border-radius:14px;padding:0 12px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 8px 15px rgba(23,32,51,.10);border:1px solid rgba(0,0,0,.05);cursor:pointer;pointer-events:auto}
-.bar:hover{transform:translateY(-1px);box-shadow:0 12px 22px rgba(23,32,51,.14);outline:2px solid rgba(23,32,51,.14)}.bar.over-capacity{border-color:#d66a6a;box-shadow:0 6px 14px rgba(170,35,35,.16),inset 0 0 0 2px rgba(255,255,255,.55)}.bar.dragging{opacity:.55;pointer-events:none!important}.bar.split{box-shadow:0 8px 15px rgba(23,32,51,.10), inset 5px 0 0 rgba(23,32,51,.28)}.bar.no-capacity{border-style:dashed;box-shadow:none}
-.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:0 0 auto}.bar-main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bar-time{margin-left:auto;flex:0 0 auto;font-weight:950;opacity:.86}.split-chip,.no-cap-chip{flex:0 0 auto;border:1px solid rgba(23,32,51,.12);background:rgba(255,255,255,.72);border-radius:999px;padding:2px 6px;font-size:10px;font-weight:950;color:inherit}
+.bar{position:absolute;height:46px;border-radius:14px;padding:6px 10px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:950;overflow:hidden;box-shadow:0 8px 15px rgba(23,32,51,.10);border:1px solid rgba(0,0,0,.05);cursor:grab;pointer-events:auto}
+.bar:active{cursor:grabbing}.bar:hover{transform:translateY(-1px);box-shadow:0 12px 22px rgba(23,32,51,.14);outline:2px solid rgba(23,32,51,.14)}.bar.over-capacity{border-color:#d66a6a;box-shadow:0 6px 14px rgba(170,35,35,.16),inset 0 0 0 2px rgba(255,255,255,.55)}.bar.dragging{opacity:.45;pointer-events:none!important}.bar.split{box-shadow:0 8px 15px rgba(23,32,51,.10), inset 5px 0 0 rgba(23,32,51,.28)}.bar.no-capacity{border-style:dashed;box-shadow:none}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:0 0 auto}.bar-copy{min-width:0;flex:1;display:grid;gap:2px;line-height:1.05}.bar-main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bar-meta{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:850;opacity:.78}.split-chip,.no-cap-chip{display:inline-flex;align-items:center;border:1px solid rgba(23,32,51,.12);background:rgba(255,255,255,.72);border-radius:999px;padding:1px 5px;font-size:9px;font-weight:950;color:inherit}
 .blue{background:#d9ebff;color:#075985}.green{background:#d9f5e7;color:#12633c}.orange{background:#ffe8cc;color:#9a4f00}.grey{background:#f4f1ec;color:#5f6673}.purple{background:#f4e8ff;color:#7b43af}.yellow{background:#fef3c7;color:#92400e}
 .stage-check{background:#fff4da;color:#8a5a00}.stage-ordering{background:#fde7f3;color:#9d174d}.stage-drafting{background:#d9ebff;color:#075985}.stage-machining{background:#f4e8ff;color:#7b43af}.stage-assembly{background:#d9f5e7;color:#12633c}.stage-loading{background:#ffe8cc;color:#9a4f00}.stage-delivery{background:#dff7f6;color:#0f766e}.stage-install{background:#e8e6ff;color:#4338ca}.stage-2pak{background:#ffe4e6;color:#9f1239}.stage-stone{background:#efe6ff;color:#6d28d9}.stage-custom{background:#edf2f7;color:#475569}
 
@@ -2367,7 +2367,8 @@ function renderSchedule(){
     tasks.filter(task=>!query || rowMatchesQuery || taskMatchesQuery(task,query)).forEach(task=>segmentsForTask(task,rowName).forEach(segment=>laneItems.push({task,...segment})));
     laneItems.sort((a,b)=>a.start-b.start || a.span-b.span || taskLabel(a.task).localeCompare(taskLabel(b.task)));
     const laneCount=assignScheduleLanes(laneItems);
-    const row=document.createElement("div");row.className="row";row.style.minHeight=`${Math.max(124,58+laneCount*42+18)}px`;
+    const lanePitch=54;
+    const row=document.createElement("div");row.className="row";row.style.minHeight=`${Math.max(124,56+laneCount*lanePitch+16)}px`;
     row.innerHTML=`<div class="person" onclick="openDayPanel(decodeURIComponent('${encodedRowName}'),0)"><strong>${escapeHtml(rowName)}</strong><span>${isUnassignedRow ? "Needs assignment" : escapeHtml(person.role)}</span></div>${days.map((day,index)=>{
       if(isUnassignedRow){
         const count=tasks.filter(task=>task.type === "capacity" && !(task.assigned || []).length && scheduleIndexForDate(taskDate(task)) === index && taskMatchesQuery(task,query)).length;
@@ -2389,12 +2390,17 @@ function renderSchedule(){
       const detailsRequired=taskNeedsDetails(item.task);
       const bar=document.createElement("div");
       bar.className=`bar ${typeColour(item.task)} ${(item.task.assigned || []).length > 1 ? "split" : ""} ${over ? "over-capacity" : ""} ${detailsRequired ? "details-required" : ""}`;
-      bar.style.left=`${item.start*scheduleDayWidth+10}px`;bar.style.width=`${Math.max(96,item.span*scheduleDayWidth-20)}px`;bar.style.top=`${56+item.lane*42}px`;
-      bar.innerHTML=`<span class="dot"></span><span class="bar-main">${escapeHtml(taskLabel(item.task))}</span>${(item.task.assigned || []).length > 1 ? `<span class="split-chip">Split</span>` : ``}${over ? `<span class="split-chip">Over</span>` : ``}${detailsRequired ? `<span class="split-chip details-chip">Details</span>` : ``}<span class="bar-time">${fmt(minutes)}</span>`;
-      bar.title=detailsRequired ? "Details required · add hours and an employee" : over ? "Over capacity · click to edit or drag to move" : "Click to edit or drag to move";bar.setAttribute("aria-label",`Edit ${taskLabel(item.task)}`);
+      bar.style.left=`${item.start*scheduleDayWidth+10}px`;bar.style.width=`${Math.max(96,item.span*scheduleDayWidth-20)}px`;bar.style.top=`${56+item.lane*lanePitch}px`;
+      const metaBits=[fmt(minutes)];
+      if((item.task.assigned || []).length > 1) metaBits.push("Split");
+      if(over) metaBits.push("Over capacity");
+      if(detailsRequired) metaBits.push("Details required");
+      bar.innerHTML=`<span class="dot"></span><span class="bar-copy"><span class="bar-main">${escapeHtml(taskLabel(item.task))}</span><span class="bar-meta">${escapeHtml(metaBits.join(" · "))}</span></span>`;
+      bar.title=`${taskLabel(item.task)} · ${fmt(minutes)}${detailsRequired ? " · Details required" : ""}${over ? " · Over capacity" : ""} · Drag to move`;
+      bar.setAttribute("aria-label",`Edit ${taskLabel(item.task)}`);
       bar.onclick=event=>{event.stopPropagation();openTaskPanel(item.task.id);};bar.draggable=true;
-      bar.addEventListener("dragstart",event=>{currentDragTask=item.task;currentDragPerson=rowName;event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",item.task.id);setTimeout(()=>bar.classList.add("dragging"),0);});
-      bar.addEventListener("dragend",()=>{bar.classList.remove("dragging");setTimeout(()=>{currentDragTask=null;currentDragPerson=null;clearDropClasses();},0);});bars.appendChild(bar);
+      bar.addEventListener("dragstart",event=>{currentDragTask=item.task;currentDragPerson=rowName;event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",item.task.id);document.getElementById("planner")?.classList.add("schedule-dragging");setTimeout(()=>bar.classList.add("dragging"),0);});
+      bar.addEventListener("dragend",()=>{bar.classList.remove("dragging");document.getElementById("planner")?.classList.remove("schedule-dragging");setTimeout(()=>{currentDragTask=null;currentDragPerson=null;clearDropClasses();},0);});bars.appendChild(bar);
     });rows.appendChild(row);
   });
   if(!rowNames.length) rows.innerHTML=`<div class="search-empty">No employees or tasks match this search.</div>`;
@@ -2407,7 +2413,7 @@ function renderSchedule(){
   syncFloatingScrollWidth();
 }
 
-function clearDropClasses(){document.querySelectorAll(".cell").forEach(cell => cell.classList.remove("drop-active","drop-top","drop-bottom"))}
+function clearDropClasses(){document.querySelectorAll(".cell").forEach(cell => cell.classList.remove("drop-active"));document.getElementById("planner")?.classList.remove("schedule-dragging")}
 function materialiseAssignmentMinutes(task){
   const names = [...new Set((task.assigned || []).filter(Boolean))];
   const existing = task.assignmentMinutes || {};
@@ -2483,10 +2489,10 @@ function wireScheduleDrops(){
     cell.ondragover = event => {
       if (!currentDragTask) return;
       event.preventDefault();
-      clearDropClasses();
+      event.dataTransfer.dropEffect = "move";
+      document.getElementById("planner")?.classList.add("schedule-dragging");
+      document.querySelectorAll("#rows .cell.drop-active").forEach(other => {if(other !== cell) other.classList.remove("drop-active");});
       cell.classList.add("drop-active");
-      const rect = cell.getBoundingClientRect();
-      cell.classList.add((event.clientY - rect.top) < rect.height / 2 ? "drop-top" : "drop-bottom");
     };
     cell.ondrop = event => {
       event.preventDefault();
@@ -2496,7 +2502,7 @@ function wireScheduleDrops(){
       currentDragPerson = null;
       clearDropClasses();
     };
-    cell.ondragleave = () => cell.classList.remove("drop-active","drop-top","drop-bottom");
+    cell.ondragleave = event => {if(!cell.contains(event.relatedTarget)) cell.classList.remove("drop-active");};
   });
 }
 
