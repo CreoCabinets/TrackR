@@ -190,8 +190,8 @@ h2{margin:0 0 6px;font-size:23px;letter-spacing:-.05em}
 .cell.drop-active{box-shadow:inset 0 0 0 3px rgba(23,32,51,.22);background-image:linear-gradient(rgba(23,32,51,.025),rgba(23,32,51,.025))}.planner.schedule-dragging .cell{cursor:copy}
 .badge{display:inline-flex;border-radius:999px;padding:4px 8px;font-size:11px;font-weight:950;border:1px solid #c6ecd7;background:#eaf8f0;color:#17613b}.badge.over{border-color:#f1aaaa;background:#fff0f0;color:#a51d1d}.badge.tight{border-color:#f2d894;background:#fff4da;color:#8a5a00}.badge.off{border-color:#ded6c9;background:#f4f1ec;color:#9a8d7c}.badge.sick{border-color:#fecaca;background:#fff1f2;color:#b42318}.badge.away{border-color:#ddd6fe;background:#f5f3ff;color:#6d28d9}.badge.holiday{border-color:#bfdbfe;background:#eff6ff;color:#1d4ed8}.badge.rdo{border-color:#fed7aa;background:#fff7ed;color:#c2410c}
 .bars{position:absolute;left:var(--people);right:0;top:0;bottom:0;z-index:10;pointer-events:none}
-.bar{position:absolute;height:46px;border-radius:14px;padding:6px 10px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:950;overflow:hidden;box-shadow:0 8px 15px rgba(23,32,51,.10);border:1px solid rgba(0,0,0,.05);cursor:grab;pointer-events:auto}
-.bar:active{cursor:grabbing}.bar:hover{transform:translateY(-1px);box-shadow:0 12px 22px rgba(23,32,51,.14);outline:2px solid rgba(23,32,51,.14)}.bar.over-capacity{border-color:#d66a6a;box-shadow:0 6px 14px rgba(170,35,35,.16),inset 0 0 0 2px rgba(255,255,255,.55)}.bar.dragging{opacity:.45;pointer-events:none!important}.bar.split{box-shadow:0 8px 15px rgba(23,32,51,.10), inset 5px 0 0 rgba(23,32,51,.28)}.bar.no-capacity{border-style:dashed;box-shadow:none}.bar.reorder-before{box-shadow:inset 0 4px 0 #172033,0 8px 15px rgba(23,32,51,.10)!important}.bar.reorder-after{box-shadow:inset 0 -4px 0 #172033,0 8px 15px rgba(23,32,51,.10)!important}
+.bar{position:absolute;height:46px;border-radius:14px;padding:6px 10px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:950;overflow:hidden;box-shadow:0 8px 15px rgba(23,32,51,.10);border:1px solid rgba(0,0,0,.05);cursor:grab;pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none}
+.bar:active{cursor:grabbing}.bar:hover{transform:translateY(-1px);box-shadow:0 12px 22px rgba(23,32,51,.14);outline:2px solid rgba(23,32,51,.14)}.bar.over-capacity{border-color:#d66a6a;box-shadow:0 6px 14px rgba(170,35,35,.16),inset 0 0 0 2px rgba(255,255,255,.55)}.bar.dragging{opacity:.28;pointer-events:none!important;transform:none!important;outline:none!important}.bar.split{box-shadow:0 8px 15px rgba(23,32,51,.10), inset 5px 0 0 rgba(23,32,51,.28)}.bar.no-capacity{border-style:dashed;box-shadow:none}.bar.reorder-before{box-shadow:inset 0 4px 0 #172033,0 8px 15px rgba(23,32,51,.10)!important}.bar.reorder-after{box-shadow:inset 0 -4px 0 #172033,0 8px 15px rgba(23,32,51,.10)!important}.schedule-drag-ghost{position:fixed!important;left:0!important;top:0!important;z-index:500!important;pointer-events:none!important;margin:0!important;opacity:.94!important;transform:none;box-shadow:0 18px 44px rgba(23,32,51,.24)!important;outline:2px solid rgba(23,32,51,.18)!important;will-change:transform}.planner.schedule-dragging{cursor:grabbing}.planner.schedule-dragging .bar:not(.dragging){transition:none}.planner.schedule-dragging .bar:hover{transform:none;outline:none}
 .dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex:0 0 auto}.bar-copy{min-width:0;flex:1;display:grid;gap:2px;line-height:1.05}.bar-main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bar-meta{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:850;opacity:.78}.split-chip,.no-cap-chip{display:inline-flex;align-items:center;border:1px solid rgba(23,32,51,.12);background:rgba(255,255,255,.72);border-radius:999px;padding:1px 5px;font-size:9px;font-weight:950;color:inherit}
 .blue{background:#d9ebff;color:#075985}.green{background:#d9f5e7;color:#12633c}.orange{background:#ffe8cc;color:#9a4f00}.grey{background:#f4f1ec;color:#5f6673}.purple{background:#f4e8ff;color:#7b43af}.yellow{background:#fef3c7;color:#92400e}
 .stage-check{background:#fff4da;color:#8a5a00}.stage-ordering{background:#fde7f3;color:#9d174d}.stage-drafting{background:#d9ebff;color:#075985}.stage-machining{background:#f4e8ff;color:#7b43af}.stage-assembly{background:#d9f5e7;color:#12633c}.stage-loading{background:#ffe8cc;color:#9a4f00}.stage-delivery{background:#dff7f6;color:#0f766e}.stage-install{background:#e8e6ff;color:#4338ca}.stage-2pak{background:#ffe4e6;color:#9f1239}.stage-stone{background:#efe6ff;color:#6d28d9}.stage-custom{background:#edf2f7;color:#475569}
@@ -867,6 +867,9 @@ let selectedEmployeeName = null;
 let visibleMonthOffset = 0;
 let currentDragTask = null;
 let currentDragPerson = null;
+let schedulePointerDrag = null;
+let schedulePointerFrame = 0;
+let scheduleSuppressClickUntil = 0;
 let calendarDragTask = null;
 let calendarDragSuppressClick = false;
 let homeWeek = "this";
@@ -1272,19 +1275,32 @@ function compareScheduleTaskPriority(a,b,rowName){
   return dateDiff || String(a.id).localeCompare(String(b.id));
 }
 function assignScheduleLanes(items,rowName){
-  const lanes=[];
-  const ordered=[...items].sort((a,b)=>{
+  // Manual schedule order is authoritative. A lower-priority task must never be
+  // packed back above a higher-priority task when their visible spans overlap.
+  // Grouping segments by task also keeps one task on the same visual lane when
+  // weekends/closures split its bar into multiple visible segments.
+  const grouped=new Map();
+  items.forEach(item=>{
+    if(!grouped.has(item.task.id)) grouped.set(item.task.id,{task:item.task,items:[]});
+    grouped.get(item.task.id).items.push(item);
+  });
+  const groups=[...grouped.values()].sort((a,b)=>{
     const priority=compareScheduleTaskPriority(a.task,b.task,rowName);
-    return priority || a.start-b.start || a.span-b.span || taskLabel(a.task).localeCompare(taskLabel(b.task));
+    if(priority) return priority;
+    const aStart=Math.min(...a.items.map(item=>item.start)),bStart=Math.min(...b.items.map(item=>item.start));
+    return aStart-bStart || String(a.task.id).localeCompare(String(b.task.id));
   });
-  ordered.forEach(item=>{
-    const end=item.start+item.span;
-    let lane=lanes.findIndex(intervals=>intervals.every(existing=>end<=existing.start || item.start>=existing.end));
-    if(lane<0){lane=lanes.length;lanes.push([]);}
-    item.lane=lane;
-    lanes[lane].push({start:item.start,end});
+  const placed=[];
+  let laneCount=0;
+  const overlaps=(a,b)=>a.items.some(left=>b.items.some(right=>left.start < right.start+right.span && right.start < left.start+left.span));
+  groups.forEach(group=>{
+    let lane=0;
+    placed.forEach(higher=>{if(overlaps(group,higher)) lane=Math.max(lane,higher.lane+1);});
+    group.items.forEach(item=>{item.lane=lane;});
+    placed.push({...group,lane});
+    laneCount=Math.max(laneCount,lane+1);
   });
-  return lanes.length;
+  return laneCount;
 }
 function orderedScheduleTasksForRow(rowName){
   return tasks.filter(task=>task.type === "capacity" && (task.assigned || []).includes(rowName))
@@ -2438,7 +2454,7 @@ function renderSchedule(){
     laneItems.sort((a,b)=>a.start-b.start || a.span-b.span || taskLabel(a.task).localeCompare(taskLabel(b.task)));
     const laneCount=assignScheduleLanes(laneItems,rowName);
     const lanePitch=54;
-    const row=document.createElement("div");row.className="row";row.style.minHeight=`${Math.max(124,56+laneCount*lanePitch+16)}px`;
+    const row=document.createElement("div");row.className="row";row.dataset.person=rowName;row.style.minHeight=`${Math.max(124,56+laneCount*lanePitch+16)}px`;
     row.innerHTML=`<div class="person" onclick="openDayPanel(decodeURIComponent('${encodedRowName}'),0)"><strong>${escapeHtml(rowName)}</strong><span>${isUnassignedRow ? "Needs assignment" : escapeHtml(person.role)}</span></div>${days.map((day,index)=>{
       if(isUnassignedRow){
         const count=tasks.filter(task=>task.type === "capacity" && !(task.assigned || []).length && scheduleIndexForDate(taskDate(task)) === index && taskMatchesQuery(task,query)).length;
@@ -2467,44 +2483,16 @@ function renderSchedule(){
       bar.innerHTML=`<span class="dot"></span><span class="bar-copy"><span class="bar-main">${escapeHtml(taskLabel(item.task))}</span><span class="bar-meta">${escapeHtml(metaBits.join(" · "))}</span></span>`;
       bar.title=`${taskLabel(item.task)} · ${fmt(minutes)}${detailsRequired ? " · Details required" : ""}${over ? " · Over capacity" : ""} · Drag to move`;
       bar.setAttribute("aria-label",`Edit ${taskLabel(item.task)}`);
-      bar.onclick=event=>{event.stopPropagation();openTaskPanel(item.task.id);};bar.draggable=true;
-      bar.addEventListener("dragstart",event=>{
-        currentDragTask=item.task;currentDragPerson=rowName;
-        event.dataTransfer.effectAllowed="move";event.dataTransfer.setData("text/plain",item.task.id);
-        setTimeout(()=>bar.classList.add("dragging"),0);
-      });
-      bar.addEventListener("dragover",event=>{
-        if(!currentDragTask) return;
-        event.preventDefault();event.stopPropagation();event.dataTransfer.dropEffect="move";
-        const cell=scheduleCellAtPointer(row,event.clientX);
-        if(cell) highlightScheduleDropCell(cell);
-        document.querySelectorAll("#rows .bar.reorder-before,#rows .bar.reorder-after").forEach(other=>{if(other!==bar) other.classList.remove("reorder-before","reorder-after");});
-        if(currentDragTask.id !== item.task.id){
-          const rect=bar.getBoundingClientRect();
-          const before=event.clientY < rect.top + rect.height/2;
-          bar.classList.toggle("reorder-before",before);
-          bar.classList.toggle("reorder-after",!before);
-        }
-      });
-      bar.addEventListener("dragleave",event=>{
-        if(!bar.contains(event.relatedTarget)) bar.classList.remove("reorder-before","reorder-after");
-      });
-      bar.addEventListener("drop",event=>{
-        if(!currentDragTask) return;
-        event.preventDefault();event.stopPropagation();
-        const cell=scheduleCellAtPointer(row,event.clientX);
-        const draggedTask=currentDragTask,sourcePerson=currentDragPerson;
-        const rect=bar.getBoundingClientRect();
-        const before=event.clientY < rect.top + rect.height/2;
-        const reorderTarget=draggedTask.id !== item.task.id ? item.task : null;
-        currentDragTask=null;currentDragPerson=null;clearDropClasses();
-        if(cell) moveTaskToCell(draggedTask,cell,sourcePerson,reorderTarget,before);
-      });
-      bar.addEventListener("dragend",()=>{bar.classList.remove("dragging");setTimeout(()=>{currentDragTask=null;currentDragPerson=null;clearDropClasses();},0);});bars.appendChild(bar);
+      bar.dataset.taskId=item.task.id;
+      bar.dataset.person=rowName;
+      bar.draggable=false;
+      bar.onclick=event=>{event.stopPropagation();if(Date.now()<scheduleSuppressClickUntil) return;openTaskPanel(item.task.id);};
+      if(isAdmin) bar.addEventListener("pointerdown",event=>beginSchedulePointerDrag(event,bar,item.task,rowName));
+      bars.appendChild(bar);
     });rows.appendChild(row);
   });
   if(!rowNames.length) rows.innerHTML=`<div class="search-empty">No employees or tasks match this search.</div>`;
-  if(isAdmin) wireScheduleDrops();else{rows.querySelectorAll("[onclick]").forEach(element=>{element.onclick=null;element.removeAttribute("onclick");});rows.querySelectorAll("[draggable]").forEach(element=>{element.draggable=false;element.removeAttribute("draggable");});}
+  if(!isAdmin){rows.querySelectorAll("[onclick]").forEach(element=>{element.onclick=null;element.removeAttribute("onclick");});rows.querySelectorAll("[draggable]").forEach(element=>{element.draggable=false;element.removeAttribute("draggable");});}
   syncFloatingScrollWidth();
 }
 
@@ -2523,6 +2511,136 @@ function scheduleCellAtPointer(row,clientX){
   if(clientX<firstRect.left) return cells[0];
   if(clientX>=lastRect.right) return cells[cells.length-1];
   return null;
+}
+function scheduleRowAtPointer(clientY){
+  const rows=[...document.querySelectorAll("#rows .row")];
+  if(!rows.length) return null;
+  const exact=rows.find(row=>{const rect=row.getBoundingClientRect();return clientY>=rect.top && clientY<=rect.bottom;});
+  if(exact) return exact;
+  let nearest=null,nearestDistance=Infinity;
+  rows.forEach(row=>{
+    const rect=row.getBoundingClientRect();
+    const distance=clientY<rect.top ? rect.top-clientY : clientY>rect.bottom ? clientY-rect.bottom : 0;
+    if(distance<nearestDistance){nearest=row;nearestDistance=distance;}
+  });
+  return nearestDistance<=36 ? nearest : null;
+}
+function scheduleReorderTargetAtPointer(row,clientX,clientY,draggedTaskId){
+  if(!row) return null;
+  const bars=[...row.querySelectorAll(".bar")].filter(bar=>bar.dataset.taskId && bar.dataset.taskId!==draggedTaskId && !bar.classList.contains("dragging"));
+  const direct=bars.filter(bar=>{const rect=bar.getBoundingClientRect();return clientX>=rect.left && clientX<=rect.right && clientY>=rect.top-5 && clientY<=rect.bottom+5;});
+  if(!direct.length) return null;
+  direct.sort((a,b)=>Math.abs(clientY-(a.getBoundingClientRect().top+a.getBoundingClientRect().height/2))-Math.abs(clientY-(b.getBoundingClientRect().top+b.getBoundingClientRect().height/2)));
+  const bar=direct[0],rect=bar.getBoundingClientRect();
+  return {bar,task:tasks.find(task=>task.id===bar.dataset.taskId) || null,before:clientY<rect.top+rect.height/2};
+}
+function createScheduleDragGhost(bar,event){
+  const rect=bar.getBoundingClientRect();
+  const ghost=bar.cloneNode(true);
+  const width=Math.min(Math.max(180,rect.width),420);
+  ghost.classList.remove("dragging","reorder-before","reorder-after");
+  ghost.classList.add("schedule-drag-ghost");
+  ghost.style.width=`${width}px`;
+  ghost.style.height=`${rect.height}px`;
+  document.body.appendChild(ghost);
+  return {ghost,width,grabX:Math.min(Math.max(18,event.clientX-rect.left),width-18),grabY:Math.min(Math.max(8,event.clientY-rect.top),rect.height-8)};
+}
+function beginSchedulePointerDrag(event,bar,task,rowName){
+  if(!isAdmin || event.button!==0 || schedulePointerDrag) return;
+  const rect=bar.getBoundingClientRect();
+  schedulePointerDrag={pointerId:event.pointerId,bar,task,sourcePerson:rowName,startX:event.clientX,startY:event.clientY,clientX:event.clientX,clientY:event.clientY,active:false,targetCell:null,reorderTarget:null,before:true,ghost:null,ghostWidth:0,grabX:event.clientX-rect.left,grabY:event.clientY-rect.top};
+  try{bar.setPointerCapture(event.pointerId);}catch(_){ }
+  bar.addEventListener("pointermove",onSchedulePointerMove);
+  bar.addEventListener("pointerup",onSchedulePointerUp);
+  bar.addEventListener("pointercancel",onSchedulePointerCancel);
+}
+function activateSchedulePointerDrag(event){
+  const drag=schedulePointerDrag;
+  if(!drag || drag.active) return;
+  drag.active=true;
+  currentDragTask=drag.task;currentDragPerson=drag.sourcePerson;
+  const ghostInfo=createScheduleDragGhost(drag.bar,event);
+  drag.ghost=ghostInfo.ghost;drag.ghostWidth=ghostInfo.width;drag.grabX=ghostInfo.grabX;drag.grabY=ghostInfo.grabY;
+  drag.bar.classList.add("dragging");
+  document.getElementById("planner")?.classList.add("schedule-dragging");
+  scheduleSuppressClickUntil=Date.now()+700;
+}
+function onSchedulePointerMove(event){
+  const drag=schedulePointerDrag;
+  if(!drag || event.pointerId!==drag.pointerId) return;
+  drag.clientX=event.clientX;drag.clientY=event.clientY;
+  if(!drag.active){
+    if(Math.hypot(event.clientX-drag.startX,event.clientY-drag.startY)<6) return;
+    activateSchedulePointerDrag(event);
+  }
+  event.preventDefault();
+  if(!schedulePointerFrame) schedulePointerFrame=requestAnimationFrame(refreshSchedulePointerDrag);
+}
+function refreshSchedulePointerDrag(){
+  schedulePointerFrame=0;
+  const drag=schedulePointerDrag;
+  if(!drag || !drag.active) return;
+  if(drag.ghost) drag.ghost.style.transform=`translate3d(${Math.round(drag.clientX-drag.grabX)}px,${Math.round(drag.clientY-drag.grabY)}px,0)`;
+  const planner=document.getElementById("planner");
+  let scrolled=false;
+  if(planner){
+    const rect=planner.getBoundingClientRect(),edge=72;
+    let dx=0;
+    if(drag.clientX<rect.left+edge) dx=-Math.ceil(Math.min(24,(rect.left+edge-drag.clientX)/3));
+    else if(drag.clientX>rect.right-edge) dx=Math.ceil(Math.min(24,(drag.clientX-(rect.right-edge))/3));
+    if(dx){const before=planner.scrollLeft;planner.scrollLeft=Math.max(0,planner.scrollLeft+dx);scrolled=scrolled || before!==planner.scrollLeft;}
+  }
+  const verticalEdge=64;
+  let dy=0;
+  if(drag.clientY<verticalEdge) dy=-Math.ceil(Math.min(18,(verticalEdge-drag.clientY)/3));
+  else if(drag.clientY>window.innerHeight-verticalEdge) dy=Math.ceil(Math.min(18,(drag.clientY-(window.innerHeight-verticalEdge))/3));
+  if(dy){window.scrollBy(0,dy);scrolled=true;}
+  updateSchedulePointerTarget(drag.clientX,drag.clientY);
+  if(scrolled && schedulePointerDrag) schedulePointerFrame=requestAnimationFrame(refreshSchedulePointerDrag);
+}
+function updateSchedulePointerTarget(clientX,clientY){
+  const drag=schedulePointerDrag;
+  if(!drag || !drag.active) return;
+  clearDropClasses();
+  const row=scheduleRowAtPointer(clientY);
+  const cell=row ? scheduleCellAtPointer(row,clientX) : null;
+  drag.targetCell=cell;
+  drag.reorderTarget=null;
+  drag.before=true;
+  if(cell) highlightScheduleDropCell(cell);
+  const target=scheduleReorderTargetAtPointer(row,clientX,clientY,drag.task.id);
+  if(target && target.task){
+    drag.reorderTarget=target.task;
+    drag.before=target.before;
+    target.bar.classList.toggle("reorder-before",target.before);
+    target.bar.classList.toggle("reorder-after",!target.before);
+  }
+}
+function cleanupSchedulePointerDrag(){
+  const drag=schedulePointerDrag;
+  if(!drag) return;
+  drag.bar.removeEventListener("pointermove",onSchedulePointerMove);
+  drag.bar.removeEventListener("pointerup",onSchedulePointerUp);
+  drag.bar.removeEventListener("pointercancel",onSchedulePointerCancel);
+  try{if(drag.bar.hasPointerCapture?.(drag.pointerId)) drag.bar.releasePointerCapture(drag.pointerId);}catch(_){ }
+  drag.bar.classList.remove("dragging");
+  drag.ghost?.remove();
+  document.getElementById("planner")?.classList.remove("schedule-dragging");
+  clearDropClasses();
+  if(schedulePointerFrame){cancelAnimationFrame(schedulePointerFrame);schedulePointerFrame=0;}
+  schedulePointerDrag=null;currentDragTask=null;currentDragPerson=null;
+}
+function onSchedulePointerUp(event){
+  const drag=schedulePointerDrag;
+  if(!drag || event.pointerId!==drag.pointerId) return;
+  const active=drag.active,task=drag.task,sourcePerson=drag.sourcePerson,cell=drag.targetCell,reorderTarget=drag.reorderTarget,before=drag.before;
+  if(active){event.preventDefault();event.stopPropagation();scheduleSuppressClickUntil=Date.now()+700;}
+  cleanupSchedulePointerDrag();
+  if(active && cell) moveTaskToCell(task,cell,sourcePerson,reorderTarget,before);
+}
+function onSchedulePointerCancel(event){
+  if(!schedulePointerDrag || event.pointerId!==schedulePointerDrag.pointerId) return;
+  cleanupSchedulePointerDrag();
 }
 function materialiseAssignmentMinutes(task){
   const names = [...new Set((task.assigned || []).filter(Boolean))];
@@ -2611,23 +2729,9 @@ async function moveTaskToCell(task,cell,sourcePerson=currentDragPerson,reorderTa
 }
 
 function wireScheduleDrops(){
-  document.querySelectorAll("#rows .cell").forEach(cell => {
-    cell.ondragover = event => {
-      if (!currentDragTask) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = "move";
-      highlightScheduleDropCell(cell);
-    };
-    cell.ondrop = event => {
-      event.preventDefault();
-      if (!currentDragTask) return;
-      moveTaskToCell(currentDragTask, cell, currentDragPerson);
-      currentDragTask = null;
-      currentDragPerson = null;
-      clearDropClasses();
-    };
-    cell.ondragleave = event => {if(!cell.contains(event.relatedTarget)) cell.classList.remove("drop-active");};
-  });
+  // Schedule uses pointer-driven dragging rather than the browser's native
+  // HTML drag events. This keeps movement smooth and makes manual ordering
+  // deterministic even when several jobs occupy the same day.
 }
 
 /* Task panel */
