@@ -1237,6 +1237,7 @@ function calculate(){
     allocation[person.name] = days.map(() => []);
     usedByDate[person.name] = {};
   });
+
   tasks.filter(task => task.type === "milestone").forEach(task => {
     const dateObj = taskDate(task);
     task.parts.push({person:"Milestones",day:scheduleIndexForDate(dateObj),date:toIsoDate(dateObj),minutes:0});
@@ -1245,48 +1246,63 @@ function calculate(){
     const dateObj = taskDate(task);
     task.parts.push({person:"Unassigned",day:scheduleIndexForDate(dateObj),date:toIsoDate(dateObj),minutes:Number(task.duration || 0)});
   });
-  const ordered = tasks.filter(task => task.type === "capacity").sort((a,b) => taskDate(a)-taskDate(b) || String(a.id).localeCompare(String(b.id)));
-  ordered.forEach(task => {
-    const assignedPeople = (task.assigned || []).map(name => people.find(person => person.name === name && employeeCountsCapacity(person))).filter(Boolean);
-    if (!assignedPeople.length) return;
-    const shares = materialiseAssignmentMinutes(task);
-    assignedPeople.forEach(person => {
-      let remaining = Math.max(0,Number(shares[person.name] ?? 0));
-      let cursor = taskDateForPerson(task,person.name);
-      let firstDate = true;
-      let guard = 0;
-      if (remaining <= 0) {
-        const iso = toIsoDate(cursor);
-        const visibleDay = scheduleIndexForDate(cursor);
+
+  // Priority-capacity scheduling: each employee/day is a hard capacity limit.
+  // A task's assignment date is its earliest allowed start. From that date on,
+  // eligible work is filled top-to-bottom using the manual Schedule order.
+  // Lower-priority work automatically spills forward instead of overbooking.
+  const capacityTasks = tasks.filter(task => task.type === "capacity");
+  people.filter(employeeCountsCapacity).forEach(person => {
+    const work = [];
+    capacityTasks.forEach(task => {
+      if (!(task.assigned || []).includes(person.name)) return;
+      const shares = materialiseAssignmentMinutes(task);
+      const minutes = Math.max(0,Number(shares[person.name] ?? 0));
+      const startDate = taskDateForPerson(task,person.name);
+      if (minutes <= 0) {
+        const iso = toIsoDate(startDate);
+        const visibleDay = scheduleIndexForDate(startDate);
         task.parts.push({person:person.name,day:visibleDay,date:iso,minutes:0});
         if (visibleDay >= 0 && visibleDay < days.length) allocation[person.name][visibleDay].push({task,minutes:0});
+        return;
       }
-      while (remaining > 0 && guard < 730) {
-        const iso = toIsoDate(cursor);
-        const explicitOverride = capacityOverrideForDate(person,cursor);
-        let plannedDayMinutes = firstDate ? (explicitOverride !== null ? explicitOverride : rosteredCapacityForDate(person,cursor)) : capacityForDate(person,cursor);
-        // The chosen start date is authoritative, even when that day is closed or
-        // rostered off. Later parts still skip weekends, closures and absences.
-        if (firstDate && plannedDayMinutes <= 0) plannedDayMinutes = defaultDailyCapacity(person);
-        if (plannedDayMinutes > 0) {
-          const use = Math.min(plannedDayMinutes,remaining);
-          usedByDate[person.name][iso] = (usedByDate[person.name][iso] || 0) + use;
-          remaining -= use;
+      work.push({task,startDate,remaining:minutes});
+    });
+    if (!work.length) return;
+
+    let cursor = work.reduce((earliest,item) => item.startDate < earliest ? item.startDate : earliest, work[0].startDate);
+    let guard = 0;
+    while (work.some(item => item.remaining > 0) && guard < 730) {
+      let available = Math.max(0,Number(capacityForDate(person,cursor) || 0));
+      if (available > 0) {
+        const eligible = work
+          .filter(item => item.remaining > 0 && item.startDate <= cursor)
+          .sort((a,b) => compareScheduleTaskPriority(a.task,b.task,person.name) || a.startDate-b.startDate || String(a.task.id).localeCompare(String(b.task.id)));
+        for (const item of eligible) {
+          if (available <= 0) break;
+          const use = Math.min(item.remaining,available);
+          if (use <= 0) continue;
+          const iso = toIsoDate(cursor);
           const visibleDay = scheduleIndexForDate(cursor);
-          task.parts.push({person:person.name,day:visibleDay,date:iso,minutes:use});
+          item.remaining -= use;
+          available -= use;
+          usedByDate[person.name][iso] = (usedByDate[person.name][iso] || 0) + use;
+          item.task.parts.push({person:person.name,day:visibleDay,date:iso,minutes:use});
           if (visibleDay >= 0 && visibleDay < days.length) {
             used[person.name][visibleDay] += use;
-            allocation[person.name][visibleDay].push({task,minutes:use});
+            allocation[person.name][visibleDay].push({task:item.task,minutes:use});
           }
         }
-        firstDate = false;
-        cursor = addCalendarDays(cursor,1);
-        guard++;
       }
-      if (remaining > 0) task.unscheduledMinutes = Number(task.unscheduledMinutes || 0)+remaining;
+      cursor = addCalendarDays(cursor,1);
+      guard++;
+    }
+    work.forEach(item => {
+      if (item.remaining > 0) item.task.unscheduledMinutes = Number(item.task.unscheduledMinutes || 0) + item.remaining;
     });
-    task.parts.sort((a,b) => String(a.date).localeCompare(String(b.date)) || a.person.localeCompare(b.person));
   });
+
+  tasks.forEach(task => task.parts.sort((a,b) => String(a.date).localeCompare(String(b.date)) || String(a.person).localeCompare(String(b.person))));
   return {used,allocation,usedByDate};
 }
 
@@ -2594,7 +2610,8 @@ function createScheduleDragGhost(bar,event){
 function beginSchedulePointerDrag(event,bar,task,rowName){
   if(!isAdmin || event.button!==0 || schedulePointerDrag) return;
   const rect=bar.getBoundingClientRect();
-  schedulePointerDrag={pointerId:event.pointerId,bar,task,sourcePerson:rowName,startX:event.clientX,startY:event.clientY,clientX:event.clientX,clientY:event.clientY,active:false,targetCell:null,reorderTarget:null,before:true,ghost:null,ghostWidth:0,grabX:event.clientX-rect.left,grabY:event.clientY-rect.top};
+  const sourceRow=bar.closest(".row"),sourceCell=sourceRow ? scheduleCellAtPointer(sourceRow,event.clientX) : null;
+  schedulePointerDrag={pointerId:event.pointerId,bar,task,sourcePerson:rowName,sourceDay:sourceCell ? Number(sourceCell.dataset.day) : null,startX:event.clientX,startY:event.clientY,clientX:event.clientX,clientY:event.clientY,active:false,targetCell:null,reorderTarget:null,before:true,ghost:null,ghostWidth:0,grabX:event.clientX-rect.left,grabY:event.clientY-rect.top};
   try{bar.setPointerCapture(event.pointerId);}catch(_){ }
   bar.addEventListener("pointermove",onSchedulePointerMove);
   bar.addEventListener("pointerup",onSchedulePointerUp);
@@ -2679,10 +2696,10 @@ function cleanupSchedulePointerDrag(){
 function onSchedulePointerUp(event){
   const drag=schedulePointerDrag;
   if(!drag || event.pointerId!==drag.pointerId) return;
-  const active=drag.active,task=drag.task,sourcePerson=drag.sourcePerson,cell=drag.targetCell,reorderTarget=drag.reorderTarget,before=drag.before;
+  const active=drag.active,task=drag.task,sourcePerson=drag.sourcePerson,sourceDay=drag.sourceDay,cell=drag.targetCell,reorderTarget=drag.reorderTarget,before=drag.before;
   if(active){event.preventDefault();event.stopPropagation();scheduleSuppressClickUntil=Date.now()+700;}
   cleanupSchedulePointerDrag();
-  if(active && cell) moveTaskToCell(task,cell,sourcePerson,reorderTarget,before);
+  if(active && cell) moveTaskToCell(task,cell,sourcePerson,reorderTarget,before,sourceDay);
 }
 function onSchedulePointerCancel(event){
   if(!schedulePointerDrag || event.pointerId!==schedulePointerDrag.pointerId) return;
@@ -2758,18 +2775,21 @@ function reassignDraggedShare(task,sourcePerson,newPerson,newDate){
   task.assignmentDates = {[newPerson]:newIso};
   return true;
 }
-async function moveTaskToCell(task,cell,sourcePerson=currentDragPerson,reorderTarget=null,before=true){
+async function moveTaskToCell(task,cell,sourcePerson=currentDragPerson,reorderTarget=null,before=true,sourceDay=null){
   const newDay=Number(cell.dataset.day),newPerson=cell.dataset.person,newDate=dateForDayIndex(newDay);
   if(!task || task.type !== "capacity" || newPerson === "Milestones"){showToast("Only capacity tasks can be moved here.");return;}
   const previousTasks=JSON.parse(JSON.stringify(tasks));
   const independentShare=(task.assigned || []).length > 1 && sourcePerson && (task.assigned || []).includes(sourcePerson);
-  if(independentShare){const moved=reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);if(!moved){clearDropClasses();return;}}
-  else{setTaskDate(task,newDate);reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);}
+  const priorityOnly=!!reorderTarget && sourcePerson === newPerson && sourceDay != null && Number(sourceDay) === newDay;
+  if(!priorityOnly){
+    if(independentShare){const moved=reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);if(!moved){clearDropClasses();return;}}
+    else{setTaskDate(task,newDate);reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);}
+  }
   if(reorderTarget && newPerson !== "Unassigned" && reorderTarget.id !== task.id){
     setScheduleOrderRelative(task,reorderTarget,newPerson,before);
   }
   renderAll();
-  const action=reorderTarget ? "Task moved and reordered" : (independentShare ? "Employee share moved" : "Task moved");
+  const action=priorityOnly ? "Task priority updated" : reorderTarget ? "Task moved and reprioritised" : (independentShare ? "Employee share moved" : "Task moved");
   const saved=await queueStateSave(action);
   if(!saved){tasks=previousTasks;renderAll();showToast("Move failed. The task was returned to its previous position.");}
 }
@@ -2905,7 +2925,7 @@ function updateTypeHint(){
     const createdFromCalendar=taskPanelOrigin === "calendar" && !selectedTaskId;if(createdFromCalendar) calendarCheckbox.checked=true;calendarCheckbox.disabled=createdFromCalendar;
     document.getElementById("employeeCardTitle").textContent="Assigned capacity employees";
     document.getElementById("employeeCardNote").textContent="Assignment is optional. Leave everyone unticked to place the task in Schedule's Unassigned row, or choose multiple employees to split it evenly.";
-    document.getElementById("typeHint").textContent=createdFromCalendar ? "Created from Calendar: this capacity task will appear on both Calendar and Schedule." : "Capacity task: appears on Schedule and stays on the selected date even when over capacity. Use Show on Calendar when this task must appear in both places.";
+    document.getElementById("typeHint").textContent=createdFromCalendar ? "Created from Calendar: this capacity task will appear on both Calendar and Schedule." : "Capacity task: the selected date is the earliest start. Schedule priority uses available hours first and spills remaining work forward. Use Show on Calendar when this task must appear in both places.";
   }
   renderEmployeeChoices(selected);updateStoneMasonField();
 }
