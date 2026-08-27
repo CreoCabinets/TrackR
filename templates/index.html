@@ -166,7 +166,7 @@ h2{margin:0 0 6px;font-size:23px;letter-spacing:-.05em}
 .schedule-search input:focus{border-color:#80aaa5;box-shadow:0 0 0 3px rgba(15,118,110,.10)}
 .schedule-search input::placeholder{color:#98a3af;font-weight:750}
 .schedule-range{font-size:12px;color:#64748b;font-weight:850;margin-top:5px}
-.planner-header{position:sticky;top:68px;z-index:90;max-width:100%;overflow-x:auto;overflow-y:hidden;background:#fff;border:1px solid var(--line);border-bottom:0;border-radius:24px 24px 0 0;box-shadow:0 10px 24px rgba(23,32,51,.08);scrollbar-width:none}
+.schedule-sticky-stack{position:sticky;top:68px;z-index:95;background:var(--bg);padding-top:6px}.schedule-sticky-stack .header{background:var(--bg);margin-bottom:10px;padding:2px 0 4px}.planner-header{position:relative;top:auto;z-index:90;max-width:100%;overflow-x:auto;overflow-y:hidden;background:#fff;border:1px solid var(--line);border-bottom:0;border-radius:24px 24px 0 0;box-shadow:0 10px 24px rgba(23,32,51,.08);scrollbar-width:none}
 .planner-header::-webkit-scrollbar{display:none}
 .planner{background:#fff;border:1px solid var(--line);border-radius:0 0 24px 24px;box-shadow:0 14px 38px rgba(23,32,51,.09);overflow-x:auto;max-width:100%}
 .timeline{width:max-content;min-width:100%}
@@ -623,11 +623,13 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
   </section>
 
   <section id="scheduleView" class="view">
-    <div class="header">
-      <div><h1>Schedule</h1><div class="schedule-range" id="scheduleRangeLabel"></div></div>
-      <div class="schedule-tools"><label class="schedule-search"><input id="scheduleSearch" type="search" aria-label="Search Schedule" placeholder="Search job, task or employee" oninput="renderSchedule()"></label>{% if current_user.role == 'admin' %}<button onclick="openCapacityOverridePanel()">Overtime</button>{% endif %}<button onclick="changeScheduleWeek(-1)">Previous</button><button onclick="goScheduleToday()">Today</button><button onclick="changeScheduleWeek(1)">Next</button></div>
+    <div class="schedule-sticky-stack">
+      <div class="header">
+        <div><h1>Schedule</h1><div class="schedule-range" id="scheduleRangeLabel"></div></div>
+        <div class="schedule-tools"><label class="schedule-search"><input id="scheduleSearch" type="search" aria-label="Search Schedule" placeholder="Search job, task or employee" oninput="renderSchedule()"></label>{% if current_user.role == 'admin' %}<button onclick="openCapacityOverridePanel()">Overtime</button>{% endif %}<button onclick="changeScheduleWeek(-1)">Previous</button><button onclick="goScheduleToday()">Today</button><button onclick="changeScheduleWeek(1)">Next</button></div>
+      </div>
+      <div class="planner-header" id="plannerHeader"><div class="timeline"><div class="days" id="daysHeader"></div></div></div>
     </div>
-    <div class="planner-header" id="plannerHeader"><div class="timeline"><div class="days" id="daysHeader"></div></div></div>
     <section class="planner" id="planner"><div class="timeline"><div id="rows"></div></div></section>
   </section>
 
@@ -1333,6 +1335,41 @@ function compareScheduleTaskPriority(a,b,rowName){
   const dateDiff=taskDateForPerson(a,rowName)-taskDateForPerson(b,rowName);
   return dateDiff || String(a.id).localeCompare(String(b.id));
 }
+function buildCompactScheduleLaneItems(rowTasks,rowName){
+  // Lay out each visible day independently, then merge adjacent days only while
+  // a task stays on the same lane. This keeps manual priority top-to-bottom on
+  // every day without letting a chain of overlaps create huge empty row gaps.
+  const tasksByDay=Array.from({length:days.length},()=>[]);
+  rowTasks.forEach(task=>{
+    const taskDays=[...new Set((task.parts || [])
+      .filter(part=>part.person === rowName && part.day >= 0 && part.day < days.length)
+      .map(part=>Number(part.day)))];
+    taskDays.forEach(day=>tasksByDay[day].push(task));
+  });
+  const laneByTaskDay=new Map();
+  let laneCount=0;
+  tasksByDay.forEach((dayTasks,day)=>{
+    dayTasks.sort((a,b)=>compareScheduleTaskPriority(a,b,rowName));
+    laneCount=Math.max(laneCount,dayTasks.length);
+    dayTasks.forEach((task,lane)=>laneByTaskDay.set(`${task.id}|${day}`,lane));
+  });
+  const items=[];
+  rowTasks.forEach(task=>{
+    const taskDays=[...new Set((task.parts || [])
+      .filter(part=>part.person === rowName && part.day >= 0 && part.day < days.length)
+      .map(part=>Number(part.day)))].sort((a,b)=>a-b);
+    let current=null;
+    taskDays.forEach(day=>{
+      const lane=laneByTaskDay.get(`${task.id}|${day}`) ?? 0;
+      if(current && current.start+current.span === day && current.lane === lane) current.span += 1;
+      else{if(current) items.push(current);current={task,start:day,span:1,lane};}
+    });
+    if(current) items.push(current);
+  });
+  items.sort((a,b)=>a.start-b.start || a.lane-b.lane || compareScheduleTaskPriority(a.task,b.task,rowName));
+  return {items,laneCount};
+}
+
 function assignScheduleLanes(items,rowName){
   // Manual schedule order is authoritative. A lower-priority task must never be
   // packed back above a higher-priority task when their visible spans overlap.
@@ -2508,10 +2545,10 @@ function renderSchedule(){
     const person=people.find(item=>item.name === rowName);
     const encodedRowName=encodeURIComponent(rowName);
     const rowMatchesQuery=query && normaliseSearch(`${rowName} ${person?.role || ""}`).includes(query);
-    const laneItems=[];
-    tasks.filter(task=>!query || rowMatchesQuery || taskMatchesQuery(task,query)).forEach(task=>segmentsForTask(task,rowName).forEach(segment=>laneItems.push({task,...segment})));
-    laneItems.sort((a,b)=>a.start-b.start || a.span-b.span || taskLabel(a.task).localeCompare(taskLabel(b.task)));
-    const laneCount=assignScheduleLanes(laneItems,rowName);
+    const rowTasks=tasks.filter(task=>(!query || rowMatchesQuery || taskMatchesQuery(task,query)) && (task.parts || []).some(part=>part.person === rowName && part.day >= 0 && part.day < days.length));
+    const compactLayout=buildCompactScheduleLaneItems(rowTasks,rowName);
+    const laneItems=compactLayout.items;
+    const laneCount=compactLayout.laneCount;
     const lanePitch=54;
     const row=document.createElement("div");row.className="row";row.dataset.person=rowName;row.style.minHeight=`${Math.max(124,56+laneCount*lanePitch+16)}px`;
     row.innerHTML=`<div class="person" onclick="openDayPanel(decodeURIComponent('${encodedRowName}'),0)"><strong>${escapeHtml(rowName)}</strong><span>${isUnassignedRow ? "Needs assignment" : escapeHtml(person.role)}</span></div>${days.map((day,index)=>{
