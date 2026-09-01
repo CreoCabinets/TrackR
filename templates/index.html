@@ -166,6 +166,7 @@ h2{margin:0 0 6px;font-size:23px;letter-spacing:-.05em}
 .schedule-search input:focus{border-color:#80aaa5;box-shadow:0 0 0 3px rgba(15,118,110,.10)}
 .schedule-search input::placeholder{color:#98a3af;font-weight:750}
 .schedule-range{font-size:12px;color:#64748b;font-weight:850;margin-top:5px}
+.schedule-save-status{display:inline-flex;align-items:center;min-height:34px;padding:0 9px;border-radius:999px;font-size:11px;font-weight:900;color:#64748b;white-space:nowrap}.schedule-save-status.saving{background:#fff4da;color:#8a5a00}.schedule-save-status.saved{background:#e8f7f2;color:#155f4b}.schedule-save-status.error{background:#fdeaea;color:#a32929}
 .schedule-sticky-stack{position:sticky;top:68px;z-index:95;background:var(--bg);padding-top:6px}.schedule-sticky-stack .header{background:var(--bg);margin-bottom:10px;padding:2px 0 4px}.planner-header{position:relative;top:auto;z-index:90;max-width:100%;overflow-x:auto;overflow-y:hidden;background:#fff;border:1px solid var(--line);border-bottom:0;border-radius:24px 24px 0 0;box-shadow:0 10px 24px rgba(23,32,51,.08);scrollbar-width:none}
 .planner-header::-webkit-scrollbar{display:none}
 .planner{background:#fff;border:1px solid var(--line);border-radius:0 0 24px 24px;box-shadow:0 14px 38px rgba(23,32,51,.09);overflow-x:auto;max-width:100%}
@@ -626,7 +627,7 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
     <div class="schedule-sticky-stack">
       <div class="header">
         <div><h1>Schedule</h1><div class="schedule-range" id="scheduleRangeLabel"></div></div>
-        <div class="schedule-tools"><label class="schedule-search"><input id="scheduleSearch" type="search" aria-label="Search Schedule" placeholder="Search job, task or employee" oninput="renderSchedule()"></label>{% if current_user.role == 'admin' %}<button onclick="openCapacityOverridePanel()">Overtime</button>{% endif %}<button onclick="changeScheduleWeek(-1)">Previous</button><button onclick="goScheduleToday()">Today</button><button onclick="changeScheduleWeek(1)">Next</button></div>
+        <div class="schedule-tools"><label class="schedule-search"><input id="scheduleSearch" type="search" aria-label="Search Schedule" placeholder="Search job, task or employee" oninput="renderSchedule()"></label><span id="scheduleSaveStatus" class="schedule-save-status" aria-live="polite"></span>{% if current_user.role == 'admin' %}<button onclick="openCapacityOverridePanel()">Overtime</button>{% endif %}<button onclick="changeScheduleWeek(-1)">Previous</button><button onclick="goScheduleToday()">Today</button><button onclick="changeScheduleWeek(1)">Next</button></div>
       </div>
       <div class="planner-header" id="plannerHeader"><div class="timeline"><div class="days" id="daysHeader"></div></div></div>
     </div>
@@ -918,23 +919,51 @@ let addJobImportDetails = null;
 let editingJobId = null;
 let addJobSaveInProgress = false;
 let lastStateSaveError = "";
+let pendingStateSaves = 0;
+let scheduleMoveSaving = false;
+let scheduleSaveStatusTimer = null;
 let calendarEvents = [];
 let activeSettingsSection = "employees";
 let selectedCalendarEventId = null;
 let employeeDragName = null;
 let taskPanelOrigin = "general";
 
+function taskPayloadForSave(source){
+  const {parts, unscheduledMinutes, ...task} = source;
+  const assigned = [...new Set((task.assigned || []).filter(Boolean))];
+  const assignedSet = new Set(assigned);
+  const filterAssignedMap = mapping => Object.fromEntries(Object.entries(mapping || {}).filter(([name]) => assignedSet.has(name)));
+  task.assigned = assigned;
+  task.scheduleOrder = filterAssignedMap(task.scheduleOrder);
+  task.assignmentMinutes = filterAssignedMap(task.assignmentMinutes);
+  task.assignmentDates = filterAssignedMap(task.assignmentDates);
+  return task;
+}
 function statePayload(){
   return {
     _revision: stateRevision,
     version: 9,
     people,
     jobs,
-    tasks: tasks.map(({parts, unscheduledMinutes, ...task}) => task),
+    tasks: tasks.map(taskPayloadForSave),
     dayStatuses,
     calendarEvents
   };
 }
+function setScheduleSaveStatus(message="",kind=""){
+  const el=document.getElementById("scheduleSaveStatus");
+  if(!el) return;
+  clearTimeout(scheduleSaveStatusTimer);
+  el.textContent=message;
+  el.className=`schedule-save-status ${kind || ""}`.trim();
+  if(kind === "saved") scheduleSaveStatusTimer=setTimeout(()=>{if(pendingStateSaves===0 && !scheduleMoveSaving){el.textContent="";el.className="schedule-save-status";}},1800);
+}
+window.addEventListener("beforeunload",event=>{
+  if(pendingStateSaves>0 || scheduleMoveSaving){
+    event.preventDefault();
+    event.returnValue="";
+  }
+});
 
 async function loadSavedState(){
   try{
@@ -976,6 +1005,9 @@ async function persistState(message="Saved"){
   if(!stateLoaded || !isAdmin) return false;
   clearTimeout(saveTimer);
   lastStateSaveError = "";
+  pendingStateSaves += 1;
+  setScheduleSaveStatus("Saving…","saving");
+  let successful=false;
   try{
     const response = await apiFetch("/api/state", {
       method: "POST",
@@ -986,18 +1018,24 @@ async function persistState(message="Saved"){
     if (response.status === 409) {
       lastStateSaveError = payload.error || "TrackR changed elsewhere. Refresh TrackR and try again.";
       stateLoaded = false;
+      setScheduleSaveStatus("Not saved","error");
       showToast(lastStateSaveError);
       return false;
     }
     if(!response.ok) throw new Error(payload.error || `Save failed (${response.status})`);
     stateRevision = Number(payload.revision || stateRevision + 1);
+    successful=true;
     showToast(message);
     return true;
   }catch(error){
     console.error(error);
     lastStateSaveError = error?.message || "Save failed";
+    setScheduleSaveStatus("Not saved","error");
     showToast(lastStateSaveError);
     return false;
+  }finally{
+    pendingStateSaves=Math.max(0,pendingStateSaves-1);
+    if(successful && pendingStateSaves===0) setScheduleSaveStatus("Saved","saved");
   }
 }
 
@@ -2646,6 +2684,7 @@ function createScheduleDragGhost(bar,event){
 }
 function beginSchedulePointerDrag(event,bar,task,rowName){
   if(!isAdmin || event.button!==0 || schedulePointerDrag) return;
+  if(scheduleMoveSaving){showToast("Wait for the current Schedule move to finish saving.");return;}
   const rect=bar.getBoundingClientRect();
   const sourceRow=bar.closest(".row"),sourceCell=sourceRow ? scheduleCellAtPointer(sourceRow,event.clientX) : null;
   schedulePointerDrag={pointerId:event.pointerId,bar,task,sourcePerson:rowName,sourceDay:sourceCell ? Number(sourceCell.dataset.day) : null,startX:event.clientX,startY:event.clientY,clientX:event.clientX,clientY:event.clientY,active:false,targetCell:null,reorderTarget:null,before:true,ghost:null,ghostWidth:0,grabX:event.clientX-rect.left,grabY:event.clientY-rect.top};
@@ -2815,21 +2854,36 @@ function reassignDraggedShare(task,sourcePerson,newPerson,newDate){
 async function moveTaskToCell(task,cell,sourcePerson=currentDragPerson,reorderTarget=null,before=true,sourceDay=null){
   const newDay=Number(cell.dataset.day),newPerson=cell.dataset.person,newDate=dateForDayIndex(newDay);
   if(!task || task.type !== "capacity" || newPerson === "Milestones"){showToast("Only capacity tasks can be moved here.");return;}
+  if(scheduleMoveSaving){showToast("Wait for the current Schedule move to finish saving.");return;}
+  scheduleMoveSaving=true;
+  setScheduleSaveStatus("Saving move…","saving");
   const previousTasks=JSON.parse(JSON.stringify(tasks));
-  const independentShare=(task.assigned || []).length > 1 && sourcePerson && (task.assigned || []).includes(sourcePerson);
-  const priorityOnly=!!reorderTarget && sourcePerson === newPerson && sourceDay != null && Number(sourceDay) === newDay;
-  if(!priorityOnly){
-    if(independentShare){const moved=reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);if(!moved){clearDropClasses();return;}}
-    else{setTaskDate(task,newDate);reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);}
+  try{
+    const independentShare=(task.assigned || []).length > 1 && sourcePerson && (task.assigned || []).includes(sourcePerson);
+    const priorityOnly=!!reorderTarget && sourcePerson === newPerson && sourceDay != null && Number(sourceDay) === newDay;
+    if(!priorityOnly){
+      if(independentShare){const moved=reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);if(!moved){tasks=previousTasks;renderAll();return;}}
+      else{setTaskDate(task,newDate);reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);}
+    }
+    if(reorderTarget && newPerson !== "Unassigned" && reorderTarget.id !== task.id){
+      setScheduleOrderRelative(task,reorderTarget,newPerson,before);
+    }
+    renderAll();
+    const action=priorityOnly ? "Task priority updated" : reorderTarget ? "Task moved and reprioritised" : (independentShare ? "Employee share moved" : "Task moved");
+    const saved=await queueStateSave(action);
+    if(!saved){
+      tasks=previousTasks;
+      renderAll();
+      setScheduleSaveStatus("Move not saved","error");
+      showToast("Move failed. The task was returned to its previous position.");
+      return;
+    }
+    setScheduleSaveStatus("Saved","saved");
+  }finally{
+    scheduleMoveSaving=false;
   }
-  if(reorderTarget && newPerson !== "Unassigned" && reorderTarget.id !== task.id){
-    setScheduleOrderRelative(task,reorderTarget,newPerson,before);
-  }
-  renderAll();
-  const action=priorityOnly ? "Task priority updated" : reorderTarget ? "Task moved and reprioritised" : (independentShare ? "Employee share moved" : "Task moved");
-  const saved=await queueStateSave(action);
-  if(!saved){tasks=previousTasks;renderAll();showToast("Move failed. The task was returned to its previous position.");}
 }
+
 
 function wireScheduleDrops(){
   // Schedule uses pointer-driven dragging rather than the browser's native
