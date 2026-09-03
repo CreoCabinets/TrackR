@@ -66,6 +66,7 @@ const names = [
   "deliveryRequiredReadyDate",
   "deliveryProductionTasks",
   "deliveryReadinessStatus",
+  "betaProductionProgress",
   "scheduleOrderFor",
   "compareScheduleTaskPriority",
   "calculate",
@@ -137,6 +138,14 @@ context.tasks = [
 ];
 let readiness = context.deliveryReadinessStatus(deliveryTask, new Date(2026, 8, 10));
 assert(readiness.key === "due" && readiness.incomplete.length === 1 && readiness.incomplete[0].id === "L1", "ready-by day should warn while pre-delivery work is incomplete");
+let productionLabel = context.betaProductionProgress(readiness);
+assert(productionLabel.text === "Not completed", "BETA production summary should be binary while work remains");
+context.tasks[2].status = "Complete";
+readiness = context.deliveryReadinessStatus(deliveryTask, new Date(2026, 8, 10));
+productionLabel = context.betaProductionProgress(readiness);
+assert(productionLabel.text === "Completed", "BETA production summary should say Completed once production work is complete");
+context.tasks[2].status = "In Progress";
+readiness = context.deliveryReadinessStatus(deliveryTask, new Date(2026, 8, 10));
 deliveryTask.deliveryReady = {deliveryDate:"2026-09-14",confirmedAt:"2026-09-10T01:00:00.000Z",confirmedBy:"admin"};
 assert(context.deliveryReadyCurrent(deliveryTask), "manual Ready confirmation should apply to the matching delivery date");
 readiness = context.deliveryReadinessStatus(deliveryTask, new Date(2026, 8, 10));

@@ -59,10 +59,7 @@ function betaConfirmationLabel(task){
   return `Confirmed by ${by}${when ? ` - ${when}` : ""}`;
 }
 function betaProductionProgress(status){
-  if(!status.production.length) return {text:"No pre-delivery capacity tasks",detail:"Confirm manually when the job is ready."};
-  const complete=status.production.length-status.incomplete.length;
-  const detail=status.incomplete.length ? `${status.incomplete.map(item=>item.name).join(", ")} incomplete` : "All pre-delivery production tasks are marked complete.";
-  return {text:`${complete}/${status.production.length} complete`,detail};
+  return {text:status.production.length && !status.incomplete.length ? "Completed" : "Not completed"};
 }
 function renderBeta(){
   if(!isAdmin) return;
@@ -94,7 +91,6 @@ function renderBeta(){
     const job=jobById(task.job);
     const progress=betaProductionProgress(status);
     const confirmed=betaConfirmationLabel(task);
-    const detail=status.key === "ready" ? confirmed : progress.detail;
     const action=status.key === "ready"
       ? `<button class="beta-undo" data-click-action="undoDeliveryReady" data-click-args='${escapeHtml(JSON.stringify([task.id]))}'>Undo Ready</button>`
       : `<button class="primary" data-click-action="confirmDeliveryReady" data-click-args='${escapeHtml(JSON.stringify([task.id]))}'>${status.incomplete.length ? "Confirm Ready Anyway" : "Confirm Ready"}</button>`;
@@ -103,7 +99,7 @@ function renderBeta(){
         <div class="beta-delivery-date"><span>Delivery</span><strong>${escapeHtml(betaDateLabel(taskDate(task)))}</strong></div>
         <div class="beta-delivery-job"><div class="beta-job-title">${escapeHtml(task.job)}</div><div class="beta-job-address">${escapeHtml(job?.address || "No address")}</div>${job?.builder ? `<div class="beta-job-builder">${escapeHtml(job.builder)}</div>` : ""}</div>
         <div class="beta-ready-by"><span>Must be ready</span><strong>${escapeHtml(betaDateLabel(status.readyBy))}</strong></div>
-        <div class="beta-production"><span>Production</span><strong>${escapeHtml(progress.text)}</strong><small>${escapeHtml(detail)}</small></div>
+        <div class="beta-production"><span>Production</span><strong>${escapeHtml(progress.text)}</strong></div>
         <div class="beta-status-wrap"><span class="beta-status beta-status-pill-${status.key}">${escapeHtml(status.label)}</span>${status.key === "ready" ? `<small>${escapeHtml(confirmed)}</small>` : ""}</div>
       </div>
       <div class="beta-delivery-actions"><button data-click-action="openTaskPanel" data-click-args='${escapeHtml(JSON.stringify([task.id]))}'>Open Delivery</button>${action}</div>

@@ -81,6 +81,8 @@ class FrontendStaticTests(unittest.TestCase):
         self.assertIn("function confirmDeliveryReady(taskId)", JS)
         self.assertIn("function undoDeliveryReady(taskId)", JS)
         self.assertIn("deliveryReady", APP)
+        self.assertIn('"Completed" : "Not completed"', JS)
+        self.assertNotIn('progress.detail', JS)
         self.assertIn("@media print", CSS)
 
     def test_workflow_uses_production_day_helper(self):
