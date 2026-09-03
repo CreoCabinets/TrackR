@@ -43,6 +43,8 @@ function extractFunction(name) {
 
 const names = [
   "parseHours",
+  "fmt",
+  "buildTaskSplitForSave",
   "toIsoDate",
   "globalCalendarEventForDate",
   "calendarEventBlocksProduction",
@@ -76,6 +78,17 @@ assert(context.parseHours("1h 30m") === 90, "1h 30m should parse to 90 minutes")
 assert(context.parseHours("2.5") === 150, "2.5 should parse to 150 minutes");
 assert(Number.isNaN(context.parseHours("banana")), "malformed hours must be NaN, not zero");
 assert(Number.isNaN(context.parseHours("1h75")), "minute components must stay below 60");
+
+let split = context.buildTaskSplitForSave(["Ben","Luke"], 16 * 60, {Ben:"10h",Luke:"6h"});
+assert(split.ok, "valid actual split should save");
+assert(split.assignmentMinutes.Ben === 600 && split.assignmentMinutes.Luke === 360, "edited split minutes should be preserved");
+split = context.buildTaskSplitForSave(["Ben","Luke"], 16 * 60, {Ben:"16h",Luke:"0h"});
+assert(split.ok && split.assigned.length === 1 && split.assigned[0] === "Ben", "0h should remove that employee from the task");
+assert(!("Luke" in split.assignmentMinutes), "0h employee should be removed from assignmentMinutes");
+split = context.buildTaskSplitForSave(["Ben","Luke"], 16 * 60, {Ben:"10h",Luke:"5h"});
+assert(!split.ok, "split total must equal the task duration");
+split = context.buildTaskSplitForSave(["Ben"], 7 * 60, {Ben:"1h"});
+assert(split.ok && split.assignmentMinutes.Ben === 420, "single employee should always receive the full task duration");
 
 context.calendarEvents = [{
   id: "closure",

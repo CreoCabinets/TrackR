@@ -64,6 +64,13 @@ class FrontendStaticTests(unittest.TestCase):
         self.assertIn('if (!isAdmin) {openTaskDetailsPanel(id); return;}', JS)
         self.assertIn('item.dataset.taskType === "admin" && isAdmin', JS)
 
+    def test_actual_split_editor_is_wired(self):
+        self.assertIn('data-input-action="handleTaskHoursChanged"', INDEX)
+        self.assertIn("function buildTaskSplitForSave(selected,duration,rawValues)", JS)
+        self.assertIn('data-input-action="updateTaskSplitDraft"', JS)
+        self.assertIn("Enter 0h to remove an employee", JS)
+        self.assertIn(".allocation-split-row", CSS)
+
     def test_workflow_uses_production_day_helper(self):
         self.assertIn("function isWorkingProductionDay(dateObj)", JS)
         self.assertIn("calendarEventBlocksProduction(globalCalendarEventForDate(dateObj))", JS)
