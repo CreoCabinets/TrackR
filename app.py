@@ -344,6 +344,16 @@ def valid_iso_date(value: object) -> bool:
         return False
 
 
+def valid_iso_datetime(value: object) -> bool:
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return True
+    except ValueError:
+        return False
+
+
 def clean_text(value: object, field: str, *, max_length: int = TEXT_MAX, required: bool = False) -> str:
     if value is None:
         value = ""
@@ -525,6 +535,26 @@ def validate_state(payload: object) -> dict:
             raise ValueError(f"Invalid date for {task_id}.")
         if task.get("endDate") and not valid_iso_date(task.get("endDate")):
             raise ValueError(f"Invalid end date for {task_id}.")
+        delivery_ready = task.get("deliveryReady")
+        is_delivery_task = bool(re.search(r"(^|[^a-z])delivery([^a-z]|$)", task_name.casefold()))
+        if delivery_ready is not None:
+            if not isinstance(delivery_ready, dict):
+                raise ValueError(f"Delivery readiness for {task_id} is invalid.")
+            delivery_date = delivery_ready.get("deliveryDate")
+            # A Ready confirmation belongs to one specific Delivery task/date.
+            # Moving/renaming the Delivery clears stale confirmation automatically.
+            if not is_delivery_task or not task.get("date") or delivery_date != task.get("date"):
+                task.pop("deliveryReady", None)
+            else:
+                confirmed_at = clean_text(delivery_ready.get("confirmedAt"), f"Delivery confirmation time for {task_id}", max_length=64, required=True)
+                confirmed_by = clean_text(delivery_ready.get("confirmedBy"), f"Delivery confirmation user for {task_id}", max_length=64, required=True)
+                if not valid_iso_datetime(confirmed_at):
+                    raise ValueError(f"Delivery confirmation time for {task_id} is invalid.")
+                task["deliveryReady"] = {
+                    "deliveryDate": delivery_date,
+                    "confirmedAt": confirmed_at,
+                    "confirmedBy": confirmed_by,
+                }
         assigned = task.get("assigned", [])
         if not isinstance(assigned, list) or len(assigned) > MAX_PEOPLE:
             raise ValueError(f"Invalid employee assignments for {task_id}.")
@@ -1453,6 +1483,7 @@ def filtered_state_for_user(state: dict) -> dict:
     ]
     for task in filtered.get("tasks", []):
         task.pop("notes", None)
+        task.pop("deliveryReady", None)
     return filtered
 
 

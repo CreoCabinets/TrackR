@@ -10,6 +10,7 @@ const jsFiles = [
   "calendar.js",
   "schedule.js",
   "tasks.js",
+  "beta.js",
   "settings.js",
   "init.js",
 ];
@@ -44,6 +45,9 @@ function extractFunction(name) {
 const names = [
   "parseHours",
   "fmt",
+  "normaliseSearch",
+  "isDeliveryTask",
+  "isInstallTask",
   "buildTaskSplitForSave",
   "toIsoDate",
   "globalCalendarEventForDate",
@@ -58,6 +62,10 @@ const names = [
   "taskDate",
   "taskDateForPerson",
   "materialiseAssignmentMinutes",
+  "deliveryReadyCurrent",
+  "deliveryRequiredReadyDate",
+  "deliveryProductionTasks",
+  "deliveryReadinessStatus",
   "scheduleOrderFor",
   "compareScheduleTaskPriority",
   "calculate",
@@ -110,6 +118,31 @@ context.calendarEvents = [{
   endDate: "2026-09-09",
 }];
 assert(context.isWorkingProductionDay(new Date(2026, 8, 9)) === false, "Company Event should preserve existing blocking behaviour");
+
+// BETA Delivery Readiness: previous working day, task completion and manual Ready confirmation.
+context.calendarEvents = [{
+  id: "friday-closure",
+  name: "Factory closed",
+  type: "Factory Closure",
+  startDate: "2026-09-11",
+  endDate: "2026-09-11",
+}];
+const deliveryTask = {id:"D1",job:"J1",name:"Delivery",type:"capacity",date:"2026-09-14",status:"Planned"};
+assert(context.toIsoDate(context.deliveryRequiredReadyDate(deliveryTask)) === "2026-09-10", "Monday delivery should roll ready-by back past a Friday closure");
+context.tasks = [
+  deliveryTask,
+  {id:"A1",job:"J1",name:"Assembly",type:"capacity",date:"2026-09-09",status:"Complete"},
+  {id:"L1",job:"J1",name:"Loading",type:"capacity",date:"2026-09-10",status:"In Progress"},
+  {id:"I1",job:"J1",name:"Install",type:"capacity",date:"2026-09-15",status:"Planned"},
+];
+let readiness = context.deliveryReadinessStatus(deliveryTask, new Date(2026, 8, 10));
+assert(readiness.key === "due" && readiness.incomplete.length === 1 && readiness.incomplete[0].id === "L1", "ready-by day should warn while pre-delivery work is incomplete");
+deliveryTask.deliveryReady = {deliveryDate:"2026-09-14",confirmedAt:"2026-09-10T01:00:00.000Z",confirmedBy:"admin"};
+assert(context.deliveryReadyCurrent(deliveryTask), "manual Ready confirmation should apply to the matching delivery date");
+readiness = context.deliveryReadinessStatus(deliveryTask, new Date(2026, 8, 10));
+assert(readiness.key === "ready", "manual Ready confirmation should suppress warnings");
+deliveryTask.date = "2026-09-15";
+assert(!context.deliveryReadyCurrent(deliveryTask), "changing the delivery date should invalidate the old Ready confirmation");
 
 // Scheduling regression: capacity is a hard daily limit and lower-priority work spills forward.
 context.scheduleStartDate = new Date(2026, 8, 7);

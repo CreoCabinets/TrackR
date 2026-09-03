@@ -131,6 +131,48 @@ class TrackRAppTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing job"):
             trackr.validate_state(state)
 
+    def test_delivery_ready_confirmation_is_bound_to_delivery_date(self):
+        state = copy.deepcopy(trackr.DEFAULT_STATE)
+        state["jobs"] = [{
+            "id": "J123",
+            "address": "1 Test Street",
+            "builder": "Builder",
+            "notes": "",
+            "status": "Active",
+            "labourHours": {},
+            "excludedStages": [],
+        }]
+        delivery = {
+            "id": "J123-delivery",
+            "job": "J123",
+            "name": "Delivery",
+            "type": "capacity",
+            "department": "Cabinet Making",
+            "date": "2026-09-14",
+            "duration": 0,
+            "assigned": [],
+            "assignmentMinutes": {},
+            "assignmentDates": {},
+            "scheduleOrder": {},
+            "status": "Planned",
+            "custom": False,
+            "showOnCalendar": True,
+            "deliveryReady": {
+                "deliveryDate": "2026-09-14",
+                "confirmedAt": "2026-09-10T01:02:03+00:00",
+                "confirmedBy": "admin",
+            },
+        }
+        state["tasks"] = [delivery]
+        validated = trackr.validate_state(state)
+        self.assertEqual(validated["tasks"][0]["deliveryReady"]["deliveryDate"], "2026-09-14")
+        self.assertEqual(validated["tasks"][0]["deliveryReady"]["confirmedBy"], "admin")
+
+        stale = copy.deepcopy(state)
+        stale["tasks"][0]["date"] = "2026-09-15"
+        validated = trackr.validate_state(stale)
+        self.assertNotIn("deliveryReady", validated["tasks"][0])
+
     def test_revision_conflict_returns_409(self):
         csrf = self.login_admin()
         state = self.client.get("/api/state").get_json()

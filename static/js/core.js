@@ -80,6 +80,10 @@ function taskPayloadForSave(source){
   task.scheduleOrder = filterAssignedMap(task.scheduleOrder);
   task.assignmentMinutes = filterAssignedMap(task.assignmentMinutes);
   task.assignmentDates = filterAssignedMap(task.assignmentDates);
+  if (task.deliveryReady) {
+    const currentDeliveryDate = toIsoDate(taskDate(task));
+    if (!isDeliveryTask(task) || task.deliveryReady.deliveryDate !== currentDeliveryDate) delete task.deliveryReady;
+  }
   return task;
 }
 function workspaceSnapshot(){
@@ -439,6 +443,14 @@ function weeklyCapacity(person){
   return Object.values(person.week || {}).reduce((sum, mins) => sum + (mins || 0), 0);
 }
 function taskLabel(task){return `${task.job} · ${task.name}`}
+function isDeliveryTask(task){
+  const name = normaliseSearch(task?.name);
+  return /(^|[^a-z])delivery([^a-z]|$)/.test(name);
+}
+function isInstallTask(task){
+  const name = normaliseSearch(task?.name);
+  return /(^|[^a-z])install(?:ation)?([^a-z]|$)/.test(name);
+}
 function typeColour(task){
   const name = String(task.name || "").toLowerCase();
   if (task.custom) return "stage-custom";
@@ -664,17 +676,18 @@ function setScheduleOrderRelative(task,targetTask,rowName,before=true){
 }
 
 function showView(view){
-  const allowedViews = isAdmin ? ["home","jobs","addJob","calendar","schedule","settings"] : ["home","calendar","schedule"];
+  const allowedViews = isAdmin ? ["home","jobs","addJob","calendar","schedule","beta","settings"] : ["home","calendar","schedule"];
   if (!allowedViews.includes(view)) view = "home";
-  ["home","jobs","addJob","calendar","schedule","settings"].forEach(name => {
+  ["home","jobs","addJob","calendar","schedule","beta","settings"].forEach(name => {
     const section = document.getElementById(name + "View");
     if (section) section.classList.toggle("active", view === name);
   });
-  ["home","jobs","calendar","schedule","settings"].forEach(name => {
+  ["home","jobs","calendar","schedule","beta","settings"].forEach(name => {
     const tab = document.getElementById("tab" + name[0].toUpperCase() + name.slice(1));
     if (tab) tab.classList.toggle("active", view === name || (name === "jobs" && view === "addJob"));
   });
   if (view === "settings" && isAdmin) showSettingsSection(activeSettingsSection);
+  if (view === "beta" && isAdmin) renderBeta();
   if (view === "schedule") setTimeout(() => {updateScheduleDayWidth(); renderSchedule();}, 0);
   setTimeout(syncFloatingScrollWidth, 0);
 }
@@ -684,6 +697,7 @@ function renderAll(){
   renderCalendar();
   renderSchedule();
   if (isAdmin) {
+    renderBeta();
     renderSettings();
   }
 }

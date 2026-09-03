@@ -17,6 +17,7 @@
       {% if current_user.role == 'admin' %}<button id="tabJobs" data-click-action="showView" data-click-args="[&quot;jobs&quot;]">Jobs</button>{% endif %}
       <button id="tabCalendar" data-click-action="showView" data-click-args="[&quot;calendar&quot;]">Calendar</button>
       <button id="tabSchedule" data-click-action="showView" data-click-args="[&quot;schedule&quot;]">Schedule</button>
+      {% if current_user.role == 'admin' %}<button id="tabBeta" data-click-action="showView" data-click-args="[&quot;beta&quot;]">BETA</button>{% endif %}
       {% if current_user.role == 'admin' %}<button id="tabSettings" data-click-action="showView" data-click-args="[&quot;settings&quot;]">Settings</button>{% endif %}
     </div>
     <div class="account-tools">
@@ -152,6 +153,33 @@
     </div>
     <section class="planner" id="planner"><div class="timeline"><div id="rows"></div></div></section>
   </section>
+
+
+  {% if current_user.role == 'admin' %}
+  <section id="betaView" class="view">
+    <div class="header beta-header">
+      <div><div class="beta-kicker">Experimental tools</div><h1>BETA</h1><p class="sub">Delivery readiness for jobs appearing on the TrakR Calendar.</p></div>
+      <div class="header-actions beta-toolbar">
+        <button data-click-action="changeBetaWeek" data-click-args="[-1]">Previous</button>
+        <button data-click-action="goBetaCurrentWeek">This week</button>
+        <button data-click-action="changeBetaWeek" data-click-args="[1]">Next</button>
+        <button class="primary" data-click-action="printBetaDeliveryReport">Print / PDF</button>
+      </div>
+    </div>
+    <div id="betaPrintMeta" class="beta-print-meta"></div>
+    <section class="panel beta-summary-panel">
+      <div class="panel-head"><div><h2>Delivery readiness</h2><p id="betaWeekLabel">This week</p></div></div>
+      <div class="beta-summary-grid">
+        <div class="beta-summary-card"><span>Deliveries</span><strong id="betaDeliveryCount">0</strong></div>
+        <div class="beta-summary-card beta-summary-ready"><span>Confirmed ready</span><strong id="betaReadyCount">0</strong></div>
+        <div class="beta-summary-card beta-summary-action"><span>Need confirmation</span><strong id="betaActionCount">0</strong></div>
+        <div class="beta-summary-card beta-summary-urgent"><span>Due / overdue</span><strong id="betaUrgentCount">0</strong></div>
+      </div>
+      <div class="beta-explainer">TrakR reads Calendar Delivery tasks for the selected week. Each job should be ready by the previous working production day. Confirming Ready suppresses the warning for that specific delivery date.</div>
+    </section>
+    <section class="beta-delivery-list" id="betaDeliveryRows"></section>
+  </section>
+  {% endif %}
 
 
   <section id="settingsView" class="view">
@@ -391,6 +419,7 @@
 <script src="{{ url_for('static', filename='js/calendar.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/schedule.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/tasks.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/beta.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/settings.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/init.js') }}" defer></script>
 </body>

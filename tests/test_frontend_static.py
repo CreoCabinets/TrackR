@@ -18,6 +18,7 @@ JS_FILES = [
     "calendar.js",
     "schedule.js",
     "tasks.js",
+    "beta.js",
     "settings.js",
     "init.js",
 ]
@@ -70,6 +71,17 @@ class FrontendStaticTests(unittest.TestCase):
         self.assertIn('data-input-action="updateTaskSplitDraft"', JS)
         self.assertIn("Enter 0h to remove an employee", JS)
         self.assertIn(".allocation-split-row", CSS)
+
+
+    def test_beta_delivery_readiness_is_wired(self):
+        self.assertIn('id="tabBeta"', INDEX)
+        self.assertIn('id="betaView"', INDEX)
+        self.assertIn('data-click-action="printBetaDeliveryReport"', INDEX)
+        self.assertIn("function deliveryRequiredReadyDate(task)", JS)
+        self.assertIn("function confirmDeliveryReady(taskId)", JS)
+        self.assertIn("function undoDeliveryReady(taskId)", JS)
+        self.assertIn("deliveryReady", APP)
+        self.assertIn("@media print", CSS)
 
     def test_workflow_uses_production_day_helper(self):
         self.assertIn("function isWorkingProductionDay(dateObj)", JS)
