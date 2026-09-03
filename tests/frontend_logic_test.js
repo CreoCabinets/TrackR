@@ -60,11 +60,13 @@ const names = [
   "calendarDayDifference",
   "scheduleIndexForDate",
   "taskDate",
+  "scheduledTaskDate",
   "taskDateForPerson",
   "materialiseAssignmentMinutes",
   "deliveryReadyCurrent",
   "deliveryRequiredReadyDate",
   "deliveryProductionTasks",
+  "deliveryTasksForWeek",
   "deliveryReadinessStatus",
   "betaProductionProgress",
   "scheduleOrderFor",
@@ -146,12 +148,15 @@ productionLabel = context.betaProductionProgress(readiness);
 assert(productionLabel.text === "Completed", "BETA production summary should say Completed once production work is complete");
 context.tasks[2].status = "In Progress";
 readiness = context.deliveryReadinessStatus(deliveryTask, new Date(2026, 8, 10));
-deliveryTask.deliveryReady = {deliveryDate:"2026-09-14",confirmedAt:"2026-09-10T01:00:00.000Z",confirmedBy:"admin"};
-assert(context.deliveryReadyCurrent(deliveryTask), "manual Ready confirmation should apply to the matching delivery date");
+deliveryTask.parts = [{person:"Ben",date:"2026-09-15",minutes:60}];
+assert(context.toIsoDate(context.scheduledTaskDate(deliveryTask)) === "2026-09-15", "BETA should prefer the calculated Schedule date over the planned task date");
+assert(context.toIsoDate(context.deliveryRequiredReadyDate(deliveryTask)) === "2026-09-14", "ready-by should be based on the calculated Schedule delivery date");
+deliveryTask.deliveryReady = {deliveryDate:"2026-09-15",confirmedAt:"2026-09-10T01:00:00.000Z",confirmedBy:"admin"};
+assert(context.deliveryReadyCurrent(deliveryTask), "manual Ready confirmation should apply to the matching calculated Schedule date");
 readiness = context.deliveryReadinessStatus(deliveryTask, new Date(2026, 8, 10));
 assert(readiness.key === "ready", "manual Ready confirmation should suppress warnings");
-deliveryTask.date = "2026-09-15";
-assert(!context.deliveryReadyCurrent(deliveryTask), "changing the delivery date should invalidate the old Ready confirmation");
+deliveryTask.parts = [{person:"Ben",date:"2026-09-16",minutes:60}];
+assert(!context.deliveryReadyCurrent(deliveryTask), "moving the Delivery in Schedule should invalidate the old Ready confirmation");
 
 // Scheduling regression: capacity is a hard daily limit and lower-priority work spills forward.
 context.scheduleStartDate = new Date(2026, 8, 7);
@@ -166,5 +171,20 @@ assert(schedule.used.Ben[0] === 480, "first day must stop at 480 minutes");
 assert(schedule.used.Ben[1] === 180, "remaining work should spill to the next day");
 assert(context.tasks[1].parts[0].minutes === 60 && context.tasks[1].parts[0].date === "2026-09-07", "higher-priority task should run first");
 assert(context.tasks[0].parts.reduce((sum, part) => sum + part.minutes, 0) === 600, "all lower-priority work should still be allocated");
+
+// BETA must follow the calculated Schedule date when capacity pushes Delivery forward.
+context.calendarEvents = [];
+context.scheduleStartDate = new Date(2026, 8, 14);
+context.days = Array.from({length: 7}, (_, index) => ({iso: context.toIsoDate(new Date(2026, 8, 14 + index))}));
+context.people = [{name: "Ben", role: "Cabinet Making", countsCapacity: true}];
+const pushedDelivery = {id:"DEL",job:"J3",name:"Delivery",type:"capacity",date:"2026-09-14",duration:60,assigned:["Ben"],assignmentMinutes:{Ben:60},assignmentDates:{Ben:"2026-09-14"},scheduleOrder:{Ben:2},status:"Planned"};
+context.tasks = [
+  {id:"BLOCK",job:"J2",name:"Assembly",type:"capacity",date:"2026-09-14",duration:480,assigned:["Ben"],assignmentMinutes:{Ben:480},assignmentDates:{Ben:"2026-09-14"},scheduleOrder:{Ben:1},status:"Planned"},
+  pushedDelivery,
+];
+context.calculate();
+assert(context.toIsoDate(context.scheduledTaskDate(pushedDelivery)) === "2026-09-15", "capacity spillover should move the effective BETA delivery date to Tuesday");
+const scheduledWeekDeliveries = context.deliveryTasksForWeek(new Date(2026, 8, 14));
+assert(scheduledWeekDeliveries.length === 1 && scheduledWeekDeliveries[0].id === "DEL", "BETA week scan should read Delivery tasks from the calculated Schedule");
 
 console.log("frontend logic tests passed");

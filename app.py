@@ -540,12 +540,15 @@ def validate_state(payload: object) -> dict:
         if delivery_ready is not None:
             if not isinstance(delivery_ready, dict):
                 raise ValueError(f"Delivery readiness for {task_id} is invalid.")
-            delivery_date = delivery_ready.get("deliveryDate")
-            # A Ready confirmation belongs to one specific Delivery task/date.
-            # Moving/renaming the Delivery clears stale confirmation automatically.
-            if not is_delivery_task or not task.get("date") or delivery_date != task.get("date"):
+            delivery_date = clean_text(delivery_ready.get("deliveryDate"), f"Delivery confirmation date for {task_id}", max_length=10, required=True)
+            # Delivery Ready is keyed to the calculated Schedule date, which can
+            # legitimately differ from task.date after capacity spillover. The
+            # browser recalculates the Schedule and drops stale confirmations.
+            if not is_delivery_task:
                 task.pop("deliveryReady", None)
             else:
+                if not valid_iso_date(delivery_date):
+                    raise ValueError(f"Delivery confirmation date for {task_id} is invalid.")
                 confirmed_at = clean_text(delivery_ready.get("confirmedAt"), f"Delivery confirmation time for {task_id}", max_length=64, required=True)
                 confirmed_by = clean_text(delivery_ready.get("confirmedBy"), f"Delivery confirmation user for {task_id}", max_length=64, required=True)
                 if not valid_iso_datetime(confirmed_at):

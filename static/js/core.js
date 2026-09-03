@@ -81,12 +81,15 @@ function taskPayloadForSave(source){
   task.assignmentMinutes = filterAssignedMap(task.assignmentMinutes);
   task.assignmentDates = filterAssignedMap(task.assignmentDates);
   if (task.deliveryReady) {
-    const currentDeliveryDate = toIsoDate(taskDate(task));
+    const currentDeliveryDate = toIsoDate(scheduledTaskDate(task));
     if (!isDeliveryTask(task) || task.deliveryReady.deliveryDate !== currentDeliveryDate) delete task.deliveryReady;
   }
   return task;
 }
 function workspaceSnapshot(){
+  // Keep transient Schedule parts current before serialising so Delivery Ready
+  // confirmations can be invalidated against the date the Schedule actually uses.
+  calculate();
   return JSON.parse(JSON.stringify({
     version: 9,
     people,
@@ -303,6 +306,13 @@ function legacyDateForDayIndex(dayIndex){ return addCalendarDays(legacyBaseDate,
 function legacyIndexForDate(dateObj){ return calendarDayDifference(legacyBaseDate, dateObj); }
 function dateForDayIndex(dayIndex){ return addCalendarDays(scheduleStartDate, Number(dayIndex || 0)); }
 function taskDate(task){ return parseIsoDate(task && task.date) || legacyDateForDayIndex(Number(task && task.start || 0)); }
+function scheduledTaskDate(task){
+  const scheduledDates = (task?.parts || [])
+    .map(part => parseIsoDate(part?.date))
+    .filter(Boolean)
+    .sort((a,b) => a-b);
+  return scheduledDates[0] || taskDate(task);
+}
 function taskDateForPerson(task,personName){
   const override = task && task.assignmentDates && personName ? parseIsoDate(task.assignmentDates[personName]) : null;
   return override || taskDate(task);

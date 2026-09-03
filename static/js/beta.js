@@ -2,11 +2,11 @@ let betaWeekStartDate = startOfWeek(new Date());
 
 function deliveryReadyCurrent(task){
   if(!task?.deliveryReady || !isDeliveryTask(task)) return false;
-  const deliveryDate=toIsoDate(taskDate(task));
+  const deliveryDate=toIsoDate(scheduledTaskDate(task));
   return task.deliveryReady.deliveryDate === deliveryDate && !!task.deliveryReady.confirmedAt;
 }
 function deliveryRequiredReadyDate(task){
-  const deliveryDate=taskDate(task);
+  const deliveryDate=scheduledTaskDate(task);
   return deliveryDate ? addBusinessDays(deliveryDate,-1) : null;
 }
 function deliveryProductionTasks(deliveryTask){
@@ -20,15 +20,18 @@ function deliveryProductionTasks(deliveryTask){
   );
 }
 function deliveryTasksForWeek(weekStart=betaWeekStartDate){
+  // BETA follows the Schedule, not the Calendar/planned task date. calculate()
+  // materialises each capacity task into task.parts after capacity/spillover.
+  calculate();
   const startIso=toIsoDate(weekStart);
   const endIso=toIsoDate(addCalendarDays(weekStart,6));
   return tasks
     .filter(task => {
-      if(!calendarTaskVisible(task) || !isDeliveryTask(task)) return false;
-      const iso=toIsoDate(taskDate(task));
+      if(task.type !== "capacity" || !isDeliveryTask(task)) return false;
+      const iso=toIsoDate(scheduledTaskDate(task));
       return iso >= startIso && iso <= endIso;
     })
-    .sort((a,b) => toIsoDate(taskDate(a)).localeCompare(toIsoDate(taskDate(b))) || String(a.job).localeCompare(String(b.job)));
+    .sort((a,b) => toIsoDate(scheduledTaskDate(a)).localeCompare(toIsoDate(scheduledTaskDate(b))) || String(a.job).localeCompare(String(b.job)));
 }
 function deliveryReadinessStatus(task,today=new Date()){
   const production=deliveryProductionTasks(task);
@@ -96,7 +99,7 @@ function renderBeta(){
       : `<button class="primary" data-click-action="confirmDeliveryReady" data-click-args='${escapeHtml(JSON.stringify([task.id]))}'>${status.incomplete.length ? "Confirm Ready Anyway" : "Confirm Ready"}</button>`;
     return `<article class="beta-delivery-card beta-status-${status.key}">
       <div class="beta-delivery-main">
-        <div class="beta-delivery-date"><span>Delivery</span><strong>${escapeHtml(betaDateLabel(taskDate(task)))}</strong></div>
+        <div class="beta-delivery-date"><span>Delivery</span><strong>${escapeHtml(betaDateLabel(scheduledTaskDate(task)))}</strong></div>
         <div class="beta-delivery-job"><div class="beta-job-title">${escapeHtml(task.job)}</div><div class="beta-job-address">${escapeHtml(job?.address || "No address")}</div>${job?.builder ? `<div class="beta-job-builder">${escapeHtml(job.builder)}</div>` : ""}</div>
         <div class="beta-ready-by"><span>Must be ready</span><strong>${escapeHtml(betaDateLabel(status.readyBy))}</strong></div>
         <div class="beta-production"><span>Production</span><strong>${escapeHtml(progress.text)}</strong></div>
@@ -116,6 +119,7 @@ function goBetaCurrentWeek(){
 }
 async function confirmDeliveryReady(taskId){
   if(!isAdmin) return;
+  calculate();
   const task=tasks.find(item=>item.id===taskId);
   if(!task || !isDeliveryTask(task)) return;
   const status=deliveryReadinessStatus(task);
@@ -125,7 +129,7 @@ async function confirmDeliveryReady(taskId){
     if(!window.confirm(`${status.incomplete.length} production task${status.incomplete.length===1?" is":"s are"} still marked incomplete (${names}${extra}). Confirm this delivery is ready anyway?`)) return;
   }
   task.deliveryReady={
-    deliveryDate:toIsoDate(taskDate(task)),
+    deliveryDate:toIsoDate(scheduledTaskDate(task)),
     confirmedAt:new Date().toISOString(),
     confirmedBy:String(currentUser.username || "Admin")
   };

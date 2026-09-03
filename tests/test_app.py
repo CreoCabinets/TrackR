@@ -131,7 +131,7 @@ class TrackRAppTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing job"):
             trackr.validate_state(state)
 
-    def test_delivery_ready_confirmation_is_bound_to_delivery_date(self):
+    def test_delivery_ready_confirmation_accepts_calculated_schedule_date(self):
         state = copy.deepcopy(trackr.DEFAULT_STATE)
         state["jobs"] = [{
             "id": "J123",
@@ -158,19 +158,19 @@ class TrackRAppTests(unittest.TestCase):
             "custom": False,
             "showOnCalendar": True,
             "deliveryReady": {
-                "deliveryDate": "2026-09-14",
+                "deliveryDate": "2026-09-15",
                 "confirmedAt": "2026-09-10T01:02:03+00:00",
                 "confirmedBy": "admin",
             },
         }
         state["tasks"] = [delivery]
         validated = trackr.validate_state(state)
-        self.assertEqual(validated["tasks"][0]["deliveryReady"]["deliveryDate"], "2026-09-14")
+        self.assertEqual(validated["tasks"][0]["deliveryReady"]["deliveryDate"], "2026-09-15")
         self.assertEqual(validated["tasks"][0]["deliveryReady"]["confirmedBy"], "admin")
 
-        stale = copy.deepcopy(state)
-        stale["tasks"][0]["date"] = "2026-09-15"
-        validated = trackr.validate_state(stale)
+        renamed = copy.deepcopy(state)
+        renamed["tasks"][0]["name"] = "Loading"
+        validated = trackr.validate_state(renamed)
         self.assertNotIn("deliveryReady", validated["tasks"][0])
 
     def test_revision_conflict_returns_409(self):
