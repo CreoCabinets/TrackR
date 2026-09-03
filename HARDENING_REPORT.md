@@ -58,6 +58,8 @@ node tests/frontend_logic_test.js
 
 A Railway smoke test is still required after deploy because local automated tests cannot reproduce the hosted proxy/volume/runtime exactly.
 
-## Deferred cleanup
+## Frontend modularisation
 
-The main UI remains a single large `templates/index.html` file with inline JavaScript/CSS. It works, but a later dedicated refactor should split the frontend into static modules and then tighten the Content Security Policy so `unsafe-inline` can be removed. That refactor is deliberately deferred from this behaviour/reliability pass to reduce regression risk.
+The main UI has now been split into a small structural `templates/index.html`, `static/css/trackr.css`, and focused classic JavaScript files for core state, Home, Jobs, Calendar, Schedule, task/day panels, Settings and startup/event wiring. Inline HTML event handlers were replaced with delegated `data-*` actions so executable JavaScript no longer needs an inline-script CSP exception.
+
+The Content Security Policy now uses `script-src 'self'` with no `unsafe-inline`. `style-src` still permits `unsafe-inline` because TrackR deliberately uses runtime element styles for schedule geometry/progress and a small number of presentation-only inline styles. The existing two-pass visual CSS cascade was moved intact into `trackr.css` rather than aggressively rewritten, so this refactor changes structure/security without intentionally changing the approved UI. A later purely visual CSS consolidation can be done separately if desired.

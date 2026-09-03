@@ -62,7 +62,9 @@ Admins can run the deliberate deep SQLite check at `GET /api/database-integrity`
 ## Important files
 
 - `app.py` — Flask application, API, validation, SQLite handling and PDF import
-- `templates/index.html` — main TrackR interface and scheduling logic
+- `templates/index.html` — main TrackR page structure
+- `static/css/trackr.css` — main TrackR styles
+- `static/js/` — frontend state, jobs, calendar, schedule, task, settings and startup modules
 - `templates/login.html` — login page
 - `templates/change_password.html` — forced/manual password-change page
 - `railway.toml` — production start command and healthcheck

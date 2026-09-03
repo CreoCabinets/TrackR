@@ -3,10 +3,17 @@ const path = require("path");
 const vm = require("vm");
 
 const root = path.resolve(__dirname, "..");
-const html = fs.readFileSync(path.join(root, "templates", "index.html"), "utf8");
-const scriptMatch = html.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-if (!scriptMatch) throw new Error("No script block found in index.html");
-const source = scriptMatch[1];
+const jsFiles = [
+  "core.js",
+  "home.js",
+  "jobs.js",
+  "calendar.js",
+  "schedule.js",
+  "tasks.js",
+  "settings.js",
+  "init.js",
+];
+const source = jsFiles.map(name => fs.readFileSync(path.join(root, "static", "js", name), "utf8")).join("\n");
 
 function extractFunction(name) {
   const marker = `function ${name}(`;
