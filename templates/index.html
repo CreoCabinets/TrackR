@@ -158,24 +158,28 @@
   {% if current_user.role == 'admin' %}
   <section id="betaView" class="view">
     <div class="header beta-header">
-      <div><div class="beta-kicker">Experimental tools</div><h1>BETA</h1><p class="sub">Delivery readiness for jobs appearing on the TrakR Calendar.</p></div>
+      <div><div class="beta-kicker">Experimental tools</div><h1>BETA</h1><p class="sub">Delivery readiness based on the live TrakR Schedule.</p></div>
       <div class="header-actions beta-toolbar">
         <button data-click-action="changeBetaWeek" data-click-args="[-1]">Previous</button>
-        <button data-click-action="goBetaCurrentWeek">This week</button>
+        <button id="betaThisWeekBtn" data-click-action="goBetaCurrentWeek">This week</button>
         <button data-click-action="changeBetaWeek" data-click-args="[1]">Next</button>
         <button class="primary" data-click-action="printBetaDeliveryReport">Print / PDF</button>
       </div>
     </div>
-    <div id="betaPrintMeta" class="beta-print-meta"></div>
     <section class="panel beta-summary-panel">
-      <div class="panel-head"><div><h2>Delivery readiness</h2><p id="betaWeekLabel">This week</p></div></div>
+      <div class="panel-head"><div><h2>Delivery readiness</h2></div></div>
+      <div class="beta-week-banner" aria-live="polite">
+        <span>Viewing</span>
+        <strong id="betaWeekContext">THIS WEEK</strong>
+        <b id="betaWeekLabel">Current week</b>
+      </div>
       <div class="beta-summary-grid">
         <div class="beta-summary-card"><span>Deliveries</span><strong id="betaDeliveryCount">0</strong></div>
         <div class="beta-summary-card beta-summary-ready"><span>Confirmed ready</span><strong id="betaReadyCount">0</strong></div>
         <div class="beta-summary-card beta-summary-action"><span>Need confirmation</span><strong id="betaActionCount">0</strong></div>
         <div class="beta-summary-card beta-summary-urgent"><span>Due / overdue</span><strong id="betaUrgentCount">0</strong></div>
       </div>
-      <div class="beta-explainer">TrakR reads Calendar Delivery tasks for the selected week. Each job should be ready by the previous working production day. Confirming Ready suppresses the warning for that specific delivery date.</div>
+      <div class="beta-explainer">TrakR reads each Delivery from the calculated Schedule for the selected week. Each job should be ready by the previous working production day. Confirming Ready suppresses the warning for that specific scheduled delivery date.</div>
     </section>
     <section class="beta-delivery-list" id="betaDeliveryRows"></section>
   </section>

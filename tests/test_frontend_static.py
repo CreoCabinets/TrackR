@@ -86,7 +86,13 @@ class FrontendStaticTests(unittest.TestCase):
         self.assertIn("deliveryReady", APP)
         self.assertIn('"Completed" : "Not completed"', JS)
         self.assertNotIn('progress.detail', JS)
-        self.assertIn("@media print", CSS)
+        self.assertIn('id="betaWeekContext"', INDEX)
+        self.assertIn('id="betaThisWeekBtn"', INDEX)
+        self.assertIn("function betaWeekContextLabel(", JS)
+        self.assertIn("function buildBetaPrintReportHtml()", JS)
+        self.assertIn('class="delivery-table"', JS)
+        self.assertIn("reportWindow.print()", JS)
+        self.assertNotIn("@media print", CSS)
 
     def test_workflow_uses_production_day_helper(self):
         self.assertIn("function isWorkingProductionDay(dateObj)", JS)

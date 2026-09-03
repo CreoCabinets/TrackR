@@ -57,6 +57,7 @@ const names = [
   "ensureBusinessDay",
   "parseIsoDate",
   "addCalendarDays",
+  "startOfWeek",
   "calendarDayDifference",
   "scheduleIndexForDate",
   "taskDate",
@@ -68,6 +69,7 @@ const names = [
   "deliveryProductionTasks",
   "deliveryTasksForWeek",
   "deliveryReadinessStatus",
+  "betaWeekContextLabel",
   "betaProductionProgress",
   "scheduleOrderFor",
   "compareScheduleTaskPriority",
@@ -121,6 +123,11 @@ context.calendarEvents = [{
   endDate: "2026-09-09",
 }];
 assert(context.isWorkingProductionDay(new Date(2026, 8, 9)) === false, "Company Event should preserve existing blocking behaviour");
+
+assert(context.betaWeekContextLabel(new Date(2026, 8, 14), new Date(2026, 8, 16)) === "THIS WEEK", "current BETA week should be labelled clearly");
+assert(context.betaWeekContextLabel(new Date(2026, 8, 21), new Date(2026, 8, 16)) === "NEXT WEEK", "next BETA week should be labelled clearly");
+assert(context.betaWeekContextLabel(new Date(2026, 8, 7), new Date(2026, 8, 16)) === "LAST WEEK", "previous BETA week should be labelled clearly");
+assert(context.betaWeekContextLabel(new Date(2026, 8, 28), new Date(2026, 8, 16)) === "2 WEEKS AHEAD", "future BETA weeks should show their relative position");
 
 // BETA Delivery Readiness: previous working day, task completion and manual Ready confirmation.
 context.calendarEvents = [{
