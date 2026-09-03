@@ -212,7 +212,7 @@ h2{margin:0 0 6px;font-size:23px;letter-spacing:-.05em}
 .side-panel{position:fixed;top:0;right:0;bottom:0;width:min(520px,94vw);background:#fff;z-index:270;box-shadow:-24px 0 60px rgba(23,32,51,.18);transform:translateX(105%);transition:.22s ease;display:flex;flex-direction:column}.side-panel.open{transform:translateX(0)}
 .side-head{padding:20px 20px 14px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.panel-title{font-size:20px;font-weight:950;letter-spacing:-.04em}.panel-sub{font-size:13px;color:#64748b;font-weight:800;margin-top:4px}.close-btn{border:1px solid var(--line);background:#fff;border-radius:999px;width:36px;height:36px;padding:0}
 .side-body{padding:18px 20px;display:grid;gap:14px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0;overscroll-behavior:contain;align-content:start;grid-auto-rows:max-content}.detail-card{border:1px solid var(--line);border-radius:16px;padding:14px;background:#fffaf2}.detail-card h3{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.07em;color:#64748b}
-.form-grid{display:grid;gap:10px}.form-row{display:grid;gap:5px}.form-row label{font-size:11px;font-weight:950;color:#64748b;text-transform:uppercase;letter-spacing:.05em}.form-row input,.form-row select{border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-weight:850;color:#172033;background:#fff;width:100%}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-grid{display:grid;gap:10px}.form-row{display:grid;gap:5px}.form-row label{font-size:11px;font-weight:950;color:#64748b;text-transform:uppercase;letter-spacing:.05em}.form-row input,.form-row select{border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-weight:850;color:#172033;background:#fff;width:100%}.readonly-field-value{border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-weight:850;color:#172033;background:#f8fafc;min-height:39px}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .employee-list{display:grid;gap:8px}.employee-choice{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);border-radius:14px;padding:10px 12px;background:#fff}.employee-choice label{display:flex;align-items:center;gap:10px;font-weight:900;cursor:pointer}.employee-choice input{width:18px;height:18px}.employee-choice span{color:#64748b;font-size:12px;font-weight:850}
 .overtime-day-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px}.overtime-day-option{position:relative;display:block;cursor:pointer}.overtime-day-option input{position:absolute;opacity:0;pointer-events:none}.overtime-day-chip{display:flex;align-items:center;justify-content:center;min-height:42px;border:1px solid var(--line);border-radius:12px;background:#fff;color:#536579;font-size:12px;font-weight:950;transition:.14s ease}.overtime-day-option input:checked + .overtime-day-chip{background:#e6f5f1;border-color:#74b8aa;color:#0f6f61;box-shadow:inset 0 0 0 1px rgba(15,111,97,.08)}.overtime-day-option input:focus-visible + .overtime-day-chip{outline:3px solid rgba(15,118,110,.14);outline-offset:2px}.overtime-week-note{font-size:12px;color:#64748b;font-weight:800;margin-top:2px}.overtime-amount-row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end}.overtime-amount-row .form-row{min-width:0}.overtime-unit{padding:10px 0 11px;font-size:12px;color:#64748b;font-weight:900}.overtime-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 #taskPanel #panelSub{display:none}
@@ -648,8 +648,8 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
           <section class="panel">
             <div class="panel-head"><div><h2>User Admin</h2><p>Create admins or read-only users, reset passwords and remove accounts.</p></div><a class="button-link" href="/api/backup">Download backup</a></div>
             <div class="user-admin-form">
-              <div class="form-row"><label>Username</label><input id="newUsername" autocomplete="off" placeholder="e.g. factory2"></div>
-              <div class="form-row"><label>Temporary password</label><input id="newUserPassword" type="password" autocomplete="new-password" placeholder="Minimum 12 characters"></div>
+              <div class="form-row"><label>Username</label><input id="newUsername" minlength="3" maxlength="32" autocapitalize="none" spellcheck="false" autocomplete="off" placeholder="e.g. factory2"></div>
+              <div class="form-row"><label>Temporary password</label><input id="newUserPassword" type="password" minlength="12" maxlength="200" autocomplete="new-password" placeholder="12–200 characters"></div>
               <div class="form-row"><label>Access</label><select id="newUserRole"><option value="user">Read-only user</option><option value="admin">Admin</option></select></div>
               <button class="primary" onclick="addFlowUser()">Add user</button>
             </div>
@@ -744,6 +744,14 @@ h2{font-size:21px;font-weight:830;letter-spacing:-.035em;color:var(--brand-stron
       <div class="action-row"><button class="danger" onclick="deleteTask()">Delete</button><button class="primary" onclick="savePanelTask()">Save task</button></div>
     </div>
   </div>
+</aside>
+
+<aside class="side-panel" id="taskDetailsPanel">
+  <div class="side-head">
+    <div><div class="panel-title" id="taskDetailsTitle">Task details</div><div class="panel-sub" id="taskDetailsSub">Read-only</div></div>
+    <button class="close-btn" onclick="closeTaskDetailsPanel()">×</button>
+  </div>
+  <div class="side-body" id="taskDetailsBody"></div>
 </aside>
 
 <aside class="side-panel" id="dayPanel">
@@ -919,8 +927,12 @@ let addJobImportDetails = null;
 let editingJobId = null;
 let addJobSaveInProgress = false;
 let lastStateSaveError = "";
+let lastStateSaveConflict = false;
 let pendingStateSaves = 0;
 let scheduleMoveSaving = false;
+let lastPersistedWorkspace = null;
+let stateDirty = false;
+let stateEpoch = 0;
 let scheduleSaveStatusTimer = null;
 let calendarEvents = [];
 let activeSettingsSection = "employees";
@@ -939,16 +951,48 @@ function taskPayloadForSave(source){
   task.assignmentDates = filterAssignedMap(task.assignmentDates);
   return task;
 }
-function statePayload(){
-  return {
-    _revision: stateRevision,
+function workspaceSnapshot(){
+  return JSON.parse(JSON.stringify({
     version: 9,
     people,
     jobs,
     tasks: tasks.map(taskPayloadForSave),
     dayStatuses,
     calendarEvents
-  };
+  }));
+}
+function statePayload(){
+  return {_revision: stateRevision, ...workspaceSnapshot()};
+}
+function applyWorkspaceSnapshot(snapshot){
+  const state = JSON.parse(JSON.stringify(snapshot || {}));
+  people = Array.isArray(state.people) ? state.people : [];
+  people.forEach(person => {
+    if (typeof person.countsCapacity !== "boolean") person.countsCapacity = person.role !== "Admin";
+    if (person.role === "Admin") person.countsCapacity = false;
+    if (!person.capacityOverrides || typeof person.capacityOverrides !== "object" || Array.isArray(person.capacityOverrides)) person.capacityOverrides = {};
+  });
+  jobs = Array.isArray(state.jobs) ? state.jobs : [];
+  tasks = Array.isArray(state.tasks) ? state.tasks : [];
+  tasks.forEach(task => {
+    if (!task.date && Number.isFinite(Number(task.start))) task.date = toIsoDate(legacyDateForDayIndex(Number(task.start)));
+    if (typeof task.showOnCalendar !== "boolean") task.showOnCalendar = false;
+    if (typeof task.stoneMason !== "string") task.stoneMason = "";
+  });
+  dayStatuses = Array.isArray(state.dayStatuses) ? state.dayStatuses : [];
+  calendarEvents = Array.isArray(state.calendarEvents) ? state.calendarEvents : [];
+  dayStatuses.forEach(status => {
+    if (!status.startDate && Number.isFinite(Number(status.start))) status.startDate = toIsoDate(legacyDateForDayIndex(Number(status.start)));
+    if (!status.endDate && Number.isFinite(Number(status.end))) status.endDate = toIsoDate(legacyDateForDayIndex(Number(status.end)));
+  });
+}
+function restoreLastPersistedWorkspace(){
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  stateEpoch += 1;
+  if (lastPersistedWorkspace) applyWorkspaceSnapshot(lastPersistedWorkspace);
+  stateDirty = false;
+  renderAll();
 }
 function setScheduleSaveStatus(message="",kind=""){
   const el=document.getElementById("scheduleSaveStatus");
@@ -959,71 +1003,82 @@ function setScheduleSaveStatus(message="",kind=""){
   if(kind === "saved") scheduleSaveStatusTimer=setTimeout(()=>{if(pendingStateSaves===0 && !scheduleMoveSaving){el.textContent="";el.className="schedule-save-status";}},1800);
 }
 window.addEventListener("beforeunload",event=>{
-  if(pendingStateSaves>0 || scheduleMoveSaving){
+  if(stateDirty || pendingStateSaves>0 || scheduleMoveSaving){
     event.preventDefault();
     event.returnValue="";
   }
 });
 
-async function loadSavedState(){
+async function loadSavedState({quiet=false}={}){
   try{
     const response = await apiFetch("/api/state");
-    if (response.status === 401) {window.location.href = "/login"; return;}
+    if (response.status === 401) {window.location.href = "/login"; return false;}
+    if (!response.ok) {
+      let payload={}; try{payload=await response.json();}catch(_){}
+      throw new Error(payload.error || `Load failed (${response.status})`);
+    }
     const state = await response.json();
     stateRevision = Number(state._revision || 0);
-    people = Array.isArray(state.people) ? state.people : [];
-    people.forEach(person => {
-      if (typeof person.countsCapacity !== "boolean") person.countsCapacity = person.role !== "Admin";
-      if (person.role === "Admin") person.countsCapacity = false;
-      if (!person.capacityOverrides || typeof person.capacityOverrides !== "object" || Array.isArray(person.capacityOverrides)) person.capacityOverrides = {};
-    });
-    jobs = Array.isArray(state.jobs) ? state.jobs : [];
-    tasks = Array.isArray(state.tasks) ? state.tasks : [];
-    tasks.forEach(task => {
-      if (!task.date && Number.isFinite(Number(task.start))) task.date = toIsoDate(legacyDateForDayIndex(Number(task.start)));
-      if (typeof task.showOnCalendar !== "boolean") task.showOnCalendar = false;
-      if (typeof task.stoneMason !== "string") task.stoneMason = "";
-    });
-    dayStatuses = Array.isArray(state.dayStatuses) ? state.dayStatuses : [];
-    calendarEvents = Array.isArray(state.calendarEvents) ? state.calendarEvents : [];
-    dayStatuses.forEach(status => {
-      if (!status.startDate && Number.isFinite(Number(status.start))) status.startDate = toIsoDate(legacyDateForDayIndex(Number(status.start)));
-      if (!status.endDate && Number.isFinite(Number(status.end))) status.endDate = toIsoDate(legacyDateForDayIndex(Number(status.end)));
-    });
+    applyWorkspaceSnapshot(state);
     initialiseScheduleWindow();
     stateLoaded = true;
+    stateDirty = false;
+    stateEpoch += 1;
+    lastPersistedWorkspace = workspaceSnapshot();
     renderAll();
     if (isAdmin) loadUsers();
-    showToast("TrackR data loaded");
+    if(!quiet) showToast("TrackR data loaded");
+    return true;
   }catch(error){
     console.error(error);
-    showToast("Could not load saved TrackR data");
+    stateLoaded = false;
+    if(!quiet) showToast(error?.message || "Could not load saved TrackR data");
+    return false;
   }
 }
 
-async function persistState(message="Saved"){
-  if(!stateLoaded || !isAdmin) return false;
+async function persistState(message="Saved", queuedEpoch=stateEpoch){
+  if(!stateLoaded || !isAdmin || queuedEpoch !== stateEpoch) return false;
   clearTimeout(saveTimer);
+  saveTimer = null;
   lastStateSaveError = "";
+  lastStateSaveConflict = false;
   pendingStateSaves += 1;
   setScheduleSaveStatus("Saving…","saving");
   let successful=false;
+  const payload = statePayload();
+  const sentSnapshot = JSON.parse(JSON.stringify({
+    version: payload.version,
+    people: payload.people,
+    jobs: payload.jobs,
+    tasks: payload.tasks,
+    dayStatuses: payload.dayStatuses,
+    calendarEvents: payload.calendarEvents
+  }));
   try{
     const response = await apiFetch("/api/state", {
       method: "POST",
       headers: {"Content-Type":"application/json"},
-      body: JSON.stringify(statePayload())
+      body: JSON.stringify(payload)
     });
-    let payload = {}; try {payload = await response.json();} catch (_) {}
+    let result = {}; try {result = await response.json();} catch (_) {}
     if (response.status === 409) {
-      lastStateSaveError = payload.error || "TrackR changed elsewhere. Refresh TrackR and try again.";
+      lastStateSaveConflict = true;
+      lastStateSaveError = result.error || "TrackR changed elsewhere. Your change was not saved.";
+      clearTimeout(saveTimer);
+      saveTimer = null;
       stateLoaded = false;
+      stateDirty = false;
+      stateEpoch += 1;
       setScheduleSaveStatus("Not saved","error");
-      showToast(lastStateSaveError);
+      const reloaded = await loadSavedState({quiet:true});
+      showToast(reloaded ? `${lastStateSaveError} Latest data reloaded.` : `${lastStateSaveError} Refresh TrackR.`);
       return false;
     }
-    if(!response.ok) throw new Error(payload.error || `Save failed (${response.status})`);
-    stateRevision = Number(payload.revision || stateRevision + 1);
+    if(!response.ok) throw new Error(result.error || `Save failed (${response.status})`);
+    stateRevision = Number(result.revision || stateRevision + 1);
+    lastPersistedWorkspace = sentSnapshot;
+    stateDirty = JSON.stringify(workspaceSnapshot()) !== JSON.stringify(sentSnapshot);
     successful=true;
     showToast(message);
     return true;
@@ -1031,7 +1086,8 @@ async function persistState(message="Saved"){
     console.error(error);
     lastStateSaveError = error?.message || "Save failed";
     setScheduleSaveStatus("Not saved","error");
-    showToast(lastStateSaveError);
+    restoreLastPersistedWorkspace();
+    showToast(`${lastStateSaveError} Unsaved changes were rolled back.`);
     return false;
   }finally{
     pendingStateSaves=Math.max(0,pendingStateSaves-1);
@@ -1040,18 +1096,27 @@ async function persistState(message="Saved"){
 }
 
 function queueStateSave(message="Saved"){
+  if(!stateLoaded || !isAdmin) return Promise.resolve(false);
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  stateDirty = true;
+  const queuedEpoch = stateEpoch;
   saveChain = saveChain.then(
-    () => persistState(message),
-    () => persistState(message)
+    () => persistState(message, queuedEpoch),
+    () => persistState(message, queuedEpoch)
   );
   return saveChain;
 }
 function saveState(message="Saved"){
   if(!stateLoaded || !isAdmin) return;
+  stateDirty = true;
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => queueStateSave(message), 180);
+  const queuedEpoch = stateEpoch;
+  saveTimer = setTimeout(() => {
+    if (queuedEpoch !== stateEpoch) return;
+    queueStateSave(message);
+  }, 180);
 }
-
 
 function fmt(minutes){
   minutes = Math.round(minutes || 0);
@@ -1065,13 +1130,20 @@ function parseHours(value){
   const txt = String(value || "").trim().toLowerCase();
   if (!txt || txt === "0" || txt === "0h") return 0;
   const compact = txt.match(/^(\d+)\s*h\s*(\d+)$/);
-  if (compact) return Number(compact[1]) * 60 + Number(compact[2]);
-  const h = txt.match(/(\d+(?:\.\d+)?)\s*h/);
-  const m = txt.match(/(\d+)\s*m/);
-  if (h || m) return Math.round((h ? Number(h[1]) * 60 : 0) + (m ? Number(m[1]) : 0));
+  if (compact) {
+    const extraMinutes = Number(compact[2]);
+    return extraMinutes < 60 ? Number(compact[1]) * 60 + extraMinutes : Number.NaN;
+  }
+  const h = txt.match(/^(\d+(?:\.\d+)?)\s*h(?:\s*(\d+)\s*m?)?$/);
+  if (h) {
+    const extraMinutes = Number(h[2] || 0);
+    return extraMinutes < 60 ? Math.round(Number(h[1]) * 60 + extraMinutes) : Number.NaN;
+  }
+  const minutes = txt.match(/^(\d+)\s*m$/);
+  if (minutes) return Number(minutes[1]);
   const decimal = Number(txt);
-  if (Number.isFinite(decimal)) return Math.round(decimal * 60);
-  return 0;
+  if (Number.isFinite(decimal) && decimal >= 0) return Math.round(decimal * 60);
+  return Number.NaN;
 }
 function jobById(id){return jobs.find(job => job.id === id)}
 function dayNameForIndex(i){return days[i] ? days[i].name : ""}
@@ -1131,19 +1203,28 @@ function toIsoDate(dateObj){
   if (!dateObj || Number.isNaN(dateObj.getTime())) return "";
   return `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,"0")}-${String(dateObj.getDate()).padStart(2,"0")}`;
 }
+function calendarEventBlocksProduction(event){
+  // Preserve TrackR's existing capacity rule: Factory Closure, Public Holiday
+  // and Company Event are all company-wide non-production days.
+  return !!event;
+}
+function isWorkingProductionDay(dateObj){
+  if (!dateObj || dateObj.getDay() === 0 || dateObj.getDay() === 6) return false;
+  return !calendarEventBlocksProduction(globalCalendarEventForDate(dateObj));
+}
 function addBusinessDays(dateObj, amount){
   const result = new Date(dateObj);
   const direction = amount >= 0 ? 1 : -1;
   let remaining = Math.abs(Number(amount) || 0);
   while (remaining > 0) {
     result.setDate(result.getDate() + direction);
-    if (result.getDay() !== 0 && result.getDay() !== 6) remaining--;
+    if (isWorkingProductionDay(result)) remaining--;
   }
   return result;
 }
 function ensureBusinessDay(dateObj){
   const result = new Date(dateObj);
-  while (result.getDay() === 0 || result.getDay() === 6) result.setDate(result.getDate() + 1);
+  while (!isWorkingProductionDay(result)) result.setDate(result.getDate() + 1);
   return result;
 }
 function calendarDayDifference(fromDate, toDate){
@@ -1206,8 +1287,7 @@ function capacityOverrideForDate(person,dateObj){
   return Number.isFinite(value) ? Math.max(0,value) : null;
 }
 function normalCapacityForDate(person,dateObj){
-  if (!employeeCountsCapacity(person) || !dateObj) return 0;
-  if (globalCalendarEventForDate(dateObj)) return 0;
+  if (!employeeCountsCapacity(person) || !dateObj || !isWorkingProductionDay(dateObj)) return 0;
   return rosteredCapacityForDate(person,dateObj);
 }
 function capacityForDate(person,dateObj){
@@ -2132,8 +2212,6 @@ async function saveAddJob(){
 
   const isEditing = !!editingJobId;
   const originalId = editingJobId;
-  const previousJobs = JSON.parse(JSON.stringify(jobs));
-  const previousTasks = JSON.parse(JSON.stringify(tasks));
   const job = {
     id:jobNumber,
     name:address,
@@ -2294,11 +2372,8 @@ async function saveAddJob(){
     setAddJobSaving(false,isEditing);
   }
   if (!saved) {
-    jobs = previousJobs;
-    tasks = previousTasks;
-    renderAll();
     const detail = lastStateSaveError ? ` ${lastStateSaveError}` : "";
-    showAddJobMessage(`The job could not be saved. Your previous data has been restored.${detail}`,true);
+    showAddJobMessage(lastStateSaveConflict ? `The job was not saved because TrackR changed elsewhere. The latest saved data has been reloaded.${detail}` : `The job could not be saved. Unsaved workspace changes were rolled back.${detail}`,true);
     return;
   }
 
@@ -2317,8 +2392,6 @@ async function deleteEditingJob(){
   const confirmed = confirm(`Delete ${job.id}? This will also delete ${linkedTaskCount} linked Calendar and Schedule item${linkedTaskCount === 1 ? "" : "s"}. This cannot be undone.`);
   if (!confirmed) return;
 
-  const previousJobs = JSON.parse(JSON.stringify(jobs));
-  const previousTasks = JSON.parse(JSON.stringify(tasks));
   jobs = jobs.filter(item => String(item.id) !== String(editingJobId));
   tasks = tasks.filter(task => String(task.job) !== String(editingJobId));
   tasks.forEach(task => { task.parts = []; });
@@ -2327,10 +2400,7 @@ async function deleteEditingJob(){
   const deletedId = editingJobId;
   const saved = await queueStateSave(`${deletedId} deleted`);
   if (!saved) {
-    jobs = previousJobs;
-    tasks = previousTasks;
-    renderAll();
-    showAddJobMessage("The job could not be deleted. Your previous data has been restored.",true);
+    showAddJobMessage(lastStateSaveConflict ? "The job was not deleted because TrackR changed elsewhere. The latest saved data has been reloaded." : "The job could not be deleted. Unsaved workspace changes were rolled back.",true);
     return;
   }
 
@@ -2468,7 +2538,7 @@ function renderCalendar(){
   grid.querySelectorAll(".month-item[data-task-id]").forEach(item => item.addEventListener("click", event => {
     event.stopPropagation();
     if (calendarDragSuppressClick) return;
-    if (item.dataset.taskType === "admin") openEditJob(decodeURIComponent(item.dataset.jobId));
+    if (item.dataset.taskType === "admin" && isAdmin) openEditJob(decodeURIComponent(item.dataset.jobId));
     else openTaskPanel(item.dataset.taskId);
   }));
   if (isAdmin) {
@@ -2857,12 +2927,11 @@ async function moveTaskToCell(task,cell,sourcePerson=currentDragPerson,reorderTa
   if(scheduleMoveSaving){showToast("Wait for the current Schedule move to finish saving.");return;}
   scheduleMoveSaving=true;
   setScheduleSaveStatus("Saving move…","saving");
-  const previousTasks=JSON.parse(JSON.stringify(tasks));
   try{
     const independentShare=(task.assigned || []).length > 1 && sourcePerson && (task.assigned || []).includes(sourcePerson);
     const priorityOnly=!!reorderTarget && sourcePerson === newPerson && sourceDay != null && Number(sourceDay) === newDay;
     if(!priorityOnly){
-      if(independentShare){const moved=reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);if(!moved){tasks=previousTasks;renderAll();return;}}
+      if(independentShare){const moved=reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);if(!moved){renderAll();return;}}
       else{setTaskDate(task,newDate);reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);}
     }
     if(reorderTarget && newPerson !== "Unassigned" && reorderTarget.id !== task.id){
@@ -2872,10 +2941,8 @@ async function moveTaskToCell(task,cell,sourcePerson=currentDragPerson,reorderTa
     const action=priorityOnly ? "Task priority updated" : reorderTarget ? "Task moved and reprioritised" : (independentShare ? "Employee share moved" : "Task moved");
     const saved=await queueStateSave(action);
     if(!saved){
-      tasks=previousTasks;
-      renderAll();
       setScheduleSaveStatus("Move not saved","error");
-      showToast("Move failed. The task was returned to its previous position.");
+      showToast(lastStateSaveConflict ? "Move not saved. Latest TrackR data has been reloaded." : "Move failed. Unsaved workspace changes were rolled back.");
       return;
     }
     setScheduleSaveStatus("Saved","saved");
@@ -2946,7 +3013,32 @@ function updateTaskJobMeta(task=null){
   input.value=job.builder || "";
   label.textContent=job.jobType === "private" ? "Client" : job.jobType === "builder" ? "Builder" : "Builder / Client";
 }
+function openTaskDetailsPanel(id){
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  const job = jobById(task.job);
+  const assigned = (task.assigned || []).join(", ") || "Unassigned";
+  const dateObj = taskDate(task);
+  const rows = [
+    ["Job", task.job || "—"],
+    ["Task", task.name || "—"],
+    ["Type", task.type === "capacity" ? "Capacity task" : task.type === "admin" ? "Admin calendar task" : "Calendar milestone"],
+    ["Date", dateObj ? dateObj.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"}) : "—"],
+    ["Hours", task.type === "milestone" ? "Calendar only" : fmt(task.duration)],
+    ["Department", task.department || "—"],
+    ["Status", task.status || "Planned"],
+    ["Assigned", assigned]
+  ];
+  if (job?.builder) rows.splice(1,0,[job.jobType === "private" ? "Client" : job.jobType === "builder" ? "Builder" : "Builder / Client",job.builder]);
+  if (task.stoneMason) rows.push(["Stone mason",task.stoneMason]);
+  if (task.type === "capacity") rows.push(["Calendar",task.showOnCalendar ? "Shown on Calendar" : "Schedule only"]);
+  document.getElementById("taskDetailsTitle").textContent = task.name || "Task details";
+  document.getElementById("taskDetailsSub").textContent = "Read-only details";
+  document.getElementById("taskDetailsBody").innerHTML = `<div class="detail-card"><h3>Task details</h3><div class="form-grid">${rows.map(([label,value])=>`<div class="form-row"><label>${escapeHtml(label)}</label><div class="readonly-field-value">${escapeHtml(value)}</div></div>`).join("")}</div></div>`;
+  openPanel("taskDetailsPanel");
+}
 function openTaskPanel(id){
+  if (!isAdmin) {openTaskDetailsPanel(id); return;}
   taskPanelOrigin="edit";
   const task = tasks.find(t => t.id === id);
   if (!task) return;
@@ -3028,23 +3120,28 @@ function savePanelTask(){
   const selected = [...document.querySelectorAll("#employeeChoices input:checked")].map(input => input.value);
   const jobText = document.getElementById("taskJob").value.trim();
   if (!jobText) {showToast("Enter a job number or description."); document.getElementById("taskJob").focus(); return;}
-  const task = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) : {id:`custom-${Date.now()}`, custom:true};
+  const selectedDate = parseIsoDate(document.getElementById("taskDate").value);
+  if (!selectedDate) {showToast("Choose a valid task date."); document.getElementById("taskDate").focus(); return;}
+  const parsedDuration = type === "milestone" ? 0 : parseHours(document.getElementById("taskHours").value);
+  if (!Number.isFinite(parsedDuration)) {showToast("Enter task hours such as 2h, 1h30 or 2.5."); document.getElementById("taskHours").focus(); return;}
+  const existingIndex = selectedTaskId ? tasks.findIndex(t => t.id === selectedTaskId) : -1;
+  const task = existingIndex >= 0 ? JSON.parse(JSON.stringify(tasks[existingIndex])) : {id:`custom-${Date.now()}`, custom:true};
   task.job = jobText;
   task.type = type;
   task.name = enteredName || (type === "milestone" ? "Milestone" : "Custom Task");
-  const selectedDate = parseIsoDate(document.getElementById("taskDate").value) || new Date();
   task.start = legacyIndexForDate(selectedDate);
   task.monthDay = selectedDate.getDate();
   task.date = toIsoDate(selectedDate);
   task.department = type === "milestone" ? "Milestone" : document.getElementById("taskDepartment").value;
-  task.duration = type === "milestone" ? 0 : parseHours(document.getElementById("taskHours").value);
+  task.duration = parsedDuration;
   task.assigned = selected;
   task.assignmentMinutes = {};
   task.assignmentDates = Object.fromEntries(selected.map(name => [name,toIsoDate(selectedDate)]));
   task.showOnCalendar = type === "capacity" && (taskPanelOrigin === "calendar" || document.getElementById("taskShowOnCalendar").checked);
   task.stoneMason = isStoneTaskName(task.name) ? document.getElementById("taskStoneMason").value.trim() : "";
   task.status = document.getElementById("taskStatus").value;
-  if (!selectedTaskId) tasks.push(task);
+  if (existingIndex >= 0) tasks[existingIndex] = task;
+  else tasks.push(task);
   calculate();
   updateAllocationSummary(task);
   renderAll();
@@ -3262,7 +3359,7 @@ function renderUserAdmin(){
   rows.innerHTML = appUsers.length ? appUsers.map(user => `<div class="user-row">
     <div class="user-identity"><strong>${escapeHtml(user.username)}${user.is_current ? `<span class="user-role-pill">You</span>` : ""}${user.must_change_password ? `<span class="user-role-pill">Password change required</span>` : ""}</strong><span>${user.role === "admin" ? "Full admin access" : "Home, Calendar and Schedule only"}</span></div>
     <div class="form-row"><label>Access</label><select id="userRole-${user.id}" ${user.is_current ? "disabled" : ""}><option value="user" ${user.role === "user" ? "selected" : ""}>Read-only user</option><option value="admin" ${user.role === "admin" ? "selected" : ""}>Admin</option></select></div>
-    <div class="form-row"><label>New password</label><input id="userPassword-${user.id}" type="password" autocomplete="new-password" placeholder="Leave blank to keep current"></div>
+    <div class="form-row"><label>New password</label><input id="userPassword-${user.id}" type="password" maxlength="200" autocomplete="new-password" placeholder="Leave blank to keep current"></div>
     <div class="user-actions"><button onclick="saveFlowUser(${user.id})">Save</button>${user.is_current ? "" : `<button class="danger" onclick="deleteFlowUser(${user.id}, '${encodeURIComponent(user.username)}')">Delete</button>`}</div>
   </div>`).join("") : `<div class="note">No users found.</div>`;
 }
@@ -3567,9 +3664,9 @@ function saveEmployee(){
     return;
   }
 
+  const isNewEmployee = !p;
   if (!p) {
     p = {name:"", role:"Cabinet Making", countsCapacity:true, workPattern:"Standard", week:{Mon:460,Tue:460,Wed:460,Thu:460,Fri:340}};
-    people.push(p);
   }
 
   const oldName = p.name;
@@ -3585,17 +3682,26 @@ function saveEmployee(){
     const linked = tasks.filter(task => task.type === "milestone" && (task.assigned || []).includes(oldName)).length;
     if (linked) {showToast(`Remove this employee from ${linked} calendar-only task${linked === 1 ? "" : "s"} before making them capacity.`); return;}
   }
+  const standardWeek = getStandardWeekFromInputs();
+  const customWeek1 = getCustomWeekInputs("w1");
+  const customWeek2 = getCustomWeekInputs("w2");
+  const rosterValues = [...Object.values(standardWeek),...Object.values(customWeek1),...Object.values(customWeek2)];
+  if (rosterValues.some(value => !Number.isFinite(value) || value < 0 || value > 24*60)) {
+    showToast("Enter roster hours as values such as 7h40, 8h or 7.5.");
+    return;
+  }
   p.name = newName;
   p.role = newRole;
   p.countsCapacity = newCountsCapacity;
   p.workPattern = currentEmployeePattern();
-  p.week = getStandardWeekFromInputs();
-  p.week1 = getCustomWeekInputs("w1");
-  p.week2 = getCustomWeekInputs("w2");
+  p.week = standardWeek;
+  p.week1 = customWeek1;
+  p.week2 = customWeek2;
   p.customStart = document.getElementById("customStartInput").value || "2026-06-08";
 
   if (oldName && oldName !== p.name) renameEmployeeReferences(oldName,p.name);
   if (oldName) convertEmployeeAssignmentsForRole(p.name,oldRole,newRole,newCountsCapacity);
+  if (isNewEmployee) people.push(p);
 
   selectedEmployeeName = p.name;
   closeEmployeePanel();
@@ -3653,7 +3759,7 @@ function applyCapacityOverrides(){
   if(!dayIndexes.length){showToast("Select at least one day.");return;}
   const amountText=String(document.getElementById("capacityOverrideAmount")?.value || "").trim().toLowerCase();
   const minutes=parseHours(amountText);
-  if(!amountText || minutes <= 0 || minutes > 12*60){showToast("Enter overtime such as 1h, 1h30 or 2h.");return;}
+  if(!amountText || !Number.isFinite(minutes) || minutes <= 0 || minutes > 12*60){showToast("Enter overtime such as 1h, 1h30 or 2h.");return;}
   names.forEach(name=>{
     const person=people.find(item=>item.name===name);if(!person) return;
     if(!person.capacityOverrides || typeof person.capacityOverrides !== "object") person.capacityOverrides={};
@@ -3684,11 +3790,13 @@ function openPanel(panelId){
   document.getElementById(panelId).classList.add("open");
 }
 function closeTaskPanel(closeBackdrop=true){document.getElementById("taskPanel").classList.remove("open"); if(closeBackdrop) document.getElementById("panelBackdrop").classList.remove("open")}
+function closeTaskDetailsPanel(closeBackdrop=true){document.getElementById("taskDetailsPanel").classList.remove("open"); if(closeBackdrop) document.getElementById("panelBackdrop").classList.remove("open")}
 function closeDayPanel(closeBackdrop=true){document.getElementById("dayPanel").classList.remove("open"); if(closeBackdrop) document.getElementById("panelBackdrop").classList.remove("open")}
 function closeEmployeePanel(closeBackdrop=true){document.getElementById("employeePanel").classList.remove("open"); if(closeBackdrop) document.getElementById("panelBackdrop").classList.remove("open")}
 function closeCapacityOverridePanel(closeBackdrop=true){document.getElementById("capacityOverridePanel").classList.remove("open"); if(closeBackdrop) document.getElementById("panelBackdrop").classList.remove("open")}
 function closeAllPanels(closeBackdrop=true){
   document.getElementById("taskPanel").classList.remove("open");
+  document.getElementById("taskDetailsPanel").classList.remove("open");
   document.getElementById("dayPanel").classList.remove("open");
   document.getElementById("statusPanel").classList.remove("open");
   document.getElementById("employeePanel").classList.remove("open");

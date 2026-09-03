@@ -1,129 +1,63 @@
-# TrackR pre-Railway hardening report
+# TrackR current hardening and reliability report
 
-## Status
+## Scope
 
-TrackR has been converted from the audited local development build into a hardened pre-Railway build. It has **not** been deployed to Railway yet.
+This report supersedes the old pre-Railway status report for the current codebase. The historical report is preserved separately as `HARDENING_REPORT_2026_PRE_RAILWAY.md`.
 
-The packaged seed database preserves the uploaded TrackR data:
+## Current architecture
 
-- 10 employees
-- 2 login accounts (`admin` and `factory`)
-- 0 jobs
-- 0 production tasks
-- 0 day-status entries
-- 0 calendar events
+TrackR remains a Flask + SQLite internal production-planning application. The supported production topology is:
 
-Both account passwords have been replaced with random temporary passwords. Both accounts must change their password after first sign-in. The credentials are supplied in a separate file and are not included in the deployment ZIP.
+- one TrackR service
+- one Railway replica
+- one Gunicorn worker (threads are allowed)
+- one persistent Railway volume
 
-## Audit blockers fixed
+Do not horizontally scale the current SQLite/whole-workspace-JSON architecture.
 
-### Production startup
+## Reliability changes in this pass
 
-- Added a Railway configuration file and a Gunicorn production start command.
-- Disabled Flask debug mode by default.
-- Added a `/health` endpoint that checks SQLite integrity.
-- Pinned Python and application dependencies.
-- Added deployment documentation and a checklist.
+- Railway's mounted volume now takes priority over `TRACKR_DB_PATH`; a stale local DB override cannot move the Railway live database onto ephemeral application storage.
+- The old Git/bundled `flow.sqlite3` seed-copy deployment path has been removed. A genuinely new database is initialized by the application and bootstrap accounts come from environment variables.
+- Startup schema maintenance is committed before recovery backups are attempted.
+- Corrupt or semantically invalid stored workspace state is backed up and startup fails clearly rather than silently replacing operational data with the default workspace.
+- `/health` is now a lightweight availability/database read. Deep SQLite integrity checking moved to the admin-only `/api/database-integrity` endpoint.
+- Frontend workspace saves keep a last-known persisted snapshot. Failed saves roll unsaved workspace mutations back; revision conflicts reload the latest saved server state instead of leaving the browser showing changes that were never committed.
+- Browser unload protection now covers dirty/debounced state as well as active requests.
 
-### Persistent database handling
+## Validation and scheduling changes
 
-- Added `TRACKR_DB_PATH` support.
-- Added Railway volume support through `RAILWAY_VOLUME_MOUNT_PATH`.
-- On a new empty Railway volume, TrackR copies the bundled `flow.sqlite3` seed database to `<mount>/trackr.sqlite3`.
-- Enabled SQLite WAL mode, foreign keys, a busy timeout and transactional writes.
-- Added rolling automatic SQLite backups and an admin backup-download endpoint.
+- Validated text values are normalized back into persisted state instead of being checked and then discarded.
+- Non-custom generated/job-linked tasks must reference an existing job.
+- `custom:true` standalone tasks remain valid and can keep a quick-fix description in the Job field without requiring a matching job record.
+- Malformed free-text hour entries no longer silently become zero when saving tasks, employee rosters or overtime.
+- Generated workflow business-day calculations now skip company-wide Calendar Events as well as weekends.
+- Existing semantics are preserved: Factory Closure, Public Holiday and Company Event all block production capacity.
 
-### Login and session security
+## Authentication and read-only changes
 
-- Removed hardcoded default passwords.
-- Replaced both existing passwords with random temporary passwords.
-- Added forced password changes for temporary credentials.
-- Added session-version revocation when passwords or roles change.
-- Added login rate limiting.
-- Added CSRF protection to all state-changing requests.
-- Added secure production cookie settings, proxy handling and security headers.
-- Production startup now requires a `TRACKR_SECRET_KEY` of at least 32 characters.
+- Login throttling now uses Flask's proxy-resolved `request.remote_addr` rather than reading raw `X-Forwarded-For` itself.
+- Throttling applies both per account and per IP, with bounded/expired in-memory buckets. The Railway deployment still intentionally uses one Gunicorn process; counters reset on restart/deploy and are therefore a pragmatic internal-app control rather than a distributed security service.
+- Login/password fields now reflect backend length limits and auth errors are announced with `role="alert"`.
+- Password-change wording now accurately says the new password must differ from the current password; TrackR does not maintain password-history records.
+- Read-only users opening Calendar/Schedule tasks now receive a dedicated read-only details panel rather than an edit form that could never persist changes.
 
-### Authorization
+## Backup model
 
-- Retained role-based UI restrictions.
-- Enforced read-only Factory-user permissions on the backend, not only in the interface.
-- Restricted user administration, backups, PDF import and workspace writes to admins.
+TrackR keeps up to 10 rolling SQLite backups beside the live database and admins can download a consistent backup. Same-volume backups protect against bad saves/migrations but not complete Railway volume loss. Keep downloaded backups outside Railway and periodically test restoration/integrity.
 
-### Data integrity and concurrency
+## Test expectations
 
-- Added state-schema migration and semantic validation.
-- Added input length and collection-size limits.
-- Rejected unsafe angle-bracket content before it can be stored.
-- Added optimistic revision locking; a stale browser receives a conflict instead of silently overwriting newer work.
-- Serialized browser saves to prevent overlapping requests.
-- Added database and state recovery safeguards.
+The current repository includes backend regression tests plus frontend logic/static checks. Before deployment, run:
 
-### Scheduling consistency
+```text
+python -m py_compile app.py
+python -m unittest discover -s tests -p "test_*.py"
+node tests/frontend_logic_test.js
+```
 
-- Unassigned capacity work can no longer be saved invisibly.
-- Split-task allocation minutes must match the task duration.
-- Admin employees cannot be assigned as production capacity.
-- Admin calendar-only assignments are retained.
-- Employee rename and deletion handling now accounts for split minutes, individual dates and admin references.
-- Capacity tasks stay off Calendar; milestone and non-capacity items remain visible there.
+A Railway smoke test is still required after deploy because local automated tests cannot reproduce the hosted proxy/volume/runtime exactly.
 
-### Frontend correctness
+## Deferred cleanup
 
-- Corrected the Home weekly calculations.
-- Corrected current-month and current-date Calendar behaviour.
-- Escaped dynamic job, employee, address and task values before inserting them into HTML.
-- Removed deprecated reset/demo, old Sick/Away-page, unused status-list and obsolete toolbar code.
-- Added safer state payload preparation so transient display properties are not persisted.
-
-## Checks completed
-
-### Static checks
-
-- `app.py` compiles successfully.
-- Extracted inline JavaScript passes `node --check`.
-- The main HTML template contains no duplicate element IDs.
-- No original default passwords, demo-reset endpoint or forced debug-mode pattern remains.
-
-### Automated behaviour checks
-
-Five automated test groups passed, covering:
-
-1. Health endpoint, security headers, admin login and forced password change.
-2. CSRF enforcement, stale-state conflict handling and state saves.
-3. Stored-script payload rejection, unassigned-task rejection and split-allocation validation.
-4. SQLite backup creation, account creation and exclusion of password hashes from API responses.
-5. Factory read-only enforcement, password-reset session revocation and SQLite integrity.
-
-The behaviour tests used the compatible Flask and pypdf versions already available in the isolated test environment. Railway will install the exact pinned versions from `requirements.txt`, so a final post-build Railway smoke test is still required.
-
-### Production-environment simulation
-
-- Production startup without `TRACKR_SECRET_KEY` fails as intended.
-- A secret shorter than 32 characters is rejected.
-- An empty mounted volume receives a copy of the seed database.
-- `/health` returns success against the volume database.
-- Secure cookies, HSTS and the Content Security Policy are enabled in production mode.
-
-## Deployment constraints that remain
-
-TrackR still stores its workspace as one JSON record inside SQLite. That is suitable for this small internal deployment only when Railway runs:
-
-- one TrackR service,
-- one replica,
-- one Gunicorn worker,
-- one persistent volume.
-
-Do not horizontally scale this build. If TrackR later needs multiple simultaneous sites, replicas, high write concurrency or detailed database reporting, migrate the workspace to normalized relational tables in PostgreSQL.
-
-The current Content Security Policy permits inline scripts and styles because the interface is still a single-file application. This is safer than having no policy, but moving the JavaScript and CSS into static files would allow a stricter policy in a future cleanup.
-
-## Before making the Railway domain public
-
-1. Attach a persistent volume at `/data`.
-2. Set a long random `TRACKR_SECRET_KEY`.
-3. Confirm one replica and the packaged one-worker start command.
-4. Deploy and confirm `/health` passes.
-5. Sign in with the separate temporary credentials and change both passwords.
-6. Create one test job, redeploy once and confirm it persists.
-7. Download a database backup from User Admin and store it safely.
+The main UI remains a single large `templates/index.html` file with inline JavaScript/CSS. It works, but a later dedicated refactor should split the frontend into static modules and then tighten the Content Security Policy so `unsafe-inline` can be removed. That refactor is deliberately deferred from this behaviour/reliability pass to reduce regression risk.

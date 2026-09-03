@@ -32,11 +32,11 @@
 <body>
   <section class="login-shell">
     <div class="brand"><span class="logo">TR</span><div><div class="eyebrow">Production planning</div><h1>TrackR</h1><p>Sign in to access your workspace.</p></div></div>
-    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    {% if error %}<div class="error" role="alert">{{ error }}</div>{% endif %}
     <form method="post" autocomplete="on">
       <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-      <label>Username<input name="username" value="{{ username }}" autocomplete="username" autofocus required></label>
-      <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+      <label>Username<input name="username" value="{{ username }}" minlength="3" maxlength="32" autocapitalize="none" spellcheck="false" autocomplete="username" autofocus required></label>
+      <label>Password<input name="password" type="password" maxlength="200" autocomplete="current-password" required></label>
       <button type="submit">Sign in</button>
     </form>
     <div class="help">Administrators can manage jobs, employees and settings. Standard users have read-only access to Home, Calendar and Schedule.</div>

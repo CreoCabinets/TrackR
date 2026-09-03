@@ -6,7 +6,6 @@ import json
 import os
 import re
 import secrets
-import shutil
 import sqlite3
 import tempfile
 import threading
@@ -35,17 +34,19 @@ IS_PRODUCTION = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("TR
 
 
 def resolve_db_path() -> Path:
-    explicit = os.environ.get("TRACKR_DB_PATH")
-    if explicit:
-        return Path(explicit).expanduser().resolve()
+    # Railway's mounted volume is authoritative in production. This prevents a
+    # stale/local TRACKR_DB_PATH value from accidentally moving the live SQLite
+    # database onto Railway's ephemeral application filesystem.
     volume_path = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH")
     if volume_path:
         return (Path(volume_path) / "trackr.sqlite3").resolve()
+    explicit = os.environ.get("TRACKR_DB_PATH")
+    if explicit:
+        return Path(explicit).expanduser().resolve()
     return APP_DIR / "flow.sqlite3"
 
 
 DB_PATH = resolve_db_path()
-SEED_DB_PATH = APP_DIR / "flow.sqlite3"
 DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 secret_key = os.environ.get("TRACKR_SECRET_KEY")
@@ -86,7 +87,9 @@ MAX_CALENDAR_EVENTS = 5000
 _login_attempts: dict[str, deque[float]] = defaultdict(deque)
 _login_attempts_lock = threading.Lock()
 LOGIN_WINDOW_SECONDS = 15 * 60
-LOGIN_MAX_FAILURES = 8
+LOGIN_ACCOUNT_MAX_FAILURES = 8
+LOGIN_IP_MAX_FAILURES = 24
+LOGIN_MAX_BUCKETS = 5000
 DUMMY_PASSWORD_HASH = generate_password_hash(secrets.token_urlsafe(24))
 
 DEFAULT_STATE = {
@@ -369,12 +372,13 @@ def require_number(value: object, field: str, minimum: float = 0, maximum: float
     return number
 
 
-def validate_week(value: object, field: str) -> None:
+def validate_week(value: object, field: str) -> dict[str, int]:
     if not isinstance(value, dict):
         raise ValueError(f"{field} must be an object.")
-    for day_name in WEEK_DAYS:
-        minutes = value.get(day_name, 0)
-        require_number(minutes, f"{field}.{day_name}", 0, 24 * 60)
+    return {
+        day_name: int(round(require_number(value.get(day_name, 0), f"{field}.{day_name}", 0, 24 * 60)))
+        for day_name in WEEK_DAYS
+    }
 
 
 def validate_state(payload: object) -> dict:
@@ -406,6 +410,7 @@ def validate_state(payload: object) -> dict:
         if key in people_names:
             raise ValueError(f"Duplicate employee name: {name}.")
         people_names.add(key)
+        person["name"] = name
         role = person.get("role")
         if role not in ALLOWED_EMPLOYEE_ROLES:
             raise ValueError(f"Invalid department for {name}.")
@@ -420,10 +425,11 @@ def validate_state(payload: object) -> dict:
         pattern = person.get("workPattern", "Standard")
         if pattern not in {"Standard", "Custom"}:
             raise ValueError(f"Invalid work pattern for {name}.")
-        validate_week(person.get("week", {}), f"{name} standard week")
+        person["workPattern"] = pattern
+        person["week"] = validate_week(person.get("week", {}), f"{name} standard week")
         if pattern == "Custom":
-            validate_week(person.get("week1", person.get("week", {})), f"{name} week 1")
-            validate_week(person.get("week2", person.get("week", {})), f"{name} week 2")
+            person["week1"] = validate_week(person.get("week1", person.get("week", {})), f"{name} week 1")
+            person["week2"] = validate_week(person.get("week2", person.get("week", {})), f"{name} week 2")
             if person.get("customStart") and not valid_iso_date(person.get("customStart")):
                 raise ValueError(f"Invalid custom roster start date for {name}.")
         capacity_overrides = person.get("capacityOverrides", {}) or {}
@@ -446,9 +452,10 @@ def validate_state(payload: object) -> dict:
         if job_id.casefold() in job_ids:
             raise ValueError(f"Duplicate job number: {job_id}.")
         job_ids.add(job_id.casefold())
-        clean_text(job.get("address"), f"Address for {job_id}", max_length=300, required=True)
-        clean_text(job.get("builder", ""), f"Builder for {job_id}", max_length=160)
-        clean_text(job.get("notes", ""), f"Notes for {job_id}", max_length=3000)
+        job["id"] = job_id
+        job["address"] = clean_text(job.get("address"), f"Address for {job_id}", max_length=300, required=True)
+        job["builder"] = clean_text(job.get("builder", ""), f"Builder for {job_id}", max_length=160)
+        job["notes"] = clean_text(job.get("notes", ""), f"Notes for {job_id}", max_length=3000)
         labour_hours = job.get("labourHours", {})
         if not isinstance(labour_hours, dict):
             raise ValueError(f"Invalid labour hours for {job_id}.")
@@ -473,6 +480,7 @@ def validate_state(payload: object) -> dict:
         job_status = clean_text(job.get("status", "Active"), f"Status for {job_id}", max_length=40)
         if job_status not in ALLOWED_JOB_STATUSES:
             raise ValueError(f"Invalid status for {job_id}.")
+        job["status"] = job_status
         if job.get("installDate") and not valid_iso_date(job.get("installDate")):
             raise ValueError(f"Invalid install date for {job_id}.")
 
@@ -487,24 +495,32 @@ def validate_state(payload: object) -> dict:
         if task_id in task_ids:
             raise ValueError(f"Duplicate task ID: {task_id}.")
         task_ids.add(task_id)
+        task["id"] = task_id
         task.pop("parts", None)
         task.pop("unscheduledMinutes", None)
         task_type = task.get("type")
         if task_type not in ALLOWED_TASK_TYPES:
             raise ValueError(f"Invalid task type for {task_id}.")
-        clean_text(task.get("job"), f"Job for {task_id}", max_length=160, required=True)
-        clean_text(task.get("name"), f"Name for {task_id}", max_length=140, required=True)
+        task_job = clean_text(task.get("job"), f"Job for {task_id}", max_length=160, required=True)
+        task_name = clean_text(task.get("name"), f"Name for {task_id}", max_length=140, required=True)
+        task["job"] = task_job
+        task["name"] = task_name
+        is_custom_task = task.get("custom", False) is True or task_id.startswith("custom-")
+        task["custom"] = is_custom_task
+        if not is_custom_task and task_job.casefold() not in job_ids:
+            raise ValueError(f"Task {task_id} refers to missing job {task_job}.")
         show_on_calendar = task.get("showOnCalendar", False)
         if not isinstance(show_on_calendar, bool):
             raise ValueError(f"Calendar setting for {task_id} must be yes or no.")
         task["showOnCalendar"] = show_on_calendar if task_type == "capacity" else False
-        clean_text(task.get("department", ""), f"Department for {task_id}", max_length=80)
+        task["department"] = clean_text(task.get("department", ""), f"Department for {task_id}", max_length=80)
         task_status = clean_text(task.get("status", "Planned"), f"Status for {task_id}", max_length=40)
         if task_status not in ALLOWED_TASK_STATUSES:
             raise ValueError(f"Invalid status for {task_id}.")
-        clean_text(task.get("notes", ""), f"Notes for {task_id}", max_length=2000)
+        task["status"] = task_status
+        task["notes"] = clean_text(task.get("notes", ""), f"Notes for {task_id}", max_length=2000)
         task["stoneMason"] = clean_text(task.get("stoneMason", ""), f"Stone mason for {task_id}", max_length=160)
-        require_number(task.get("duration", 0), f"Duration for {task_id}", 0, 5_000_000)
+        task["duration"] = require_number(task.get("duration", 0), f"Duration for {task_id}", 0, 5_000_000)
         if task.get("date") and not valid_iso_date(task.get("date")):
             raise ValueError(f"Invalid date for {task_id}.")
         if task.get("endDate") and not valid_iso_date(task.get("endDate")):
@@ -561,6 +577,7 @@ def validate_state(payload: object) -> dict:
         if not isinstance(status, dict):
             raise ValueError(f"Blocked day {index + 1} is invalid.")
         person = clean_text(status.get("person"), "Blocked-day employee", max_length=80, required=True)
+        status["person"] = person
         if person not in exact_people_names:
             raise ValueError(f"Blocked day refers to missing employee {person}.")
         if status.get("type") not in ALLOWED_DAY_STATUS_TYPES:
@@ -569,6 +586,8 @@ def validate_state(payload: object) -> dict:
         end_date = status.get("endDate") or start_date
         if not valid_iso_date(start_date) or not valid_iso_date(end_date) or end_date < start_date:
             raise ValueError(f"Invalid blocked date range for {person}.")
+        status["startDate"] = start_date
+        status["endDate"] = end_date
 
     event_ids: set[str] = set()
     for index, event in enumerate(state["calendarEvents"]):
@@ -578,13 +597,16 @@ def validate_state(payload: object) -> dict:
         if not re.fullmatch(r"[A-Za-z0-9._:/-]{1,140}", event_id) or event_id in event_ids:
             raise ValueError("Calendar event IDs must be unique and use supported characters.")
         event_ids.add(event_id)
-        clean_text(event.get("name"), "Calendar event name", max_length=160, required=True)
+        event["id"] = event_id
+        event["name"] = clean_text(event.get("name"), "Calendar event name", max_length=160, required=True)
         if event.get("type") not in ALLOWED_EVENT_TYPES:
             raise ValueError(f"Invalid calendar event type for {event_id}.")
         start_date = event.get("startDate")
         end_date = event.get("endDate") or start_date
         if not valid_iso_date(start_date) or not valid_iso_date(end_date) or end_date < start_date:
             raise ValueError(f"Invalid calendar event dates for {event_id}.")
+        event["startDate"] = start_date
+        event["endDate"] = end_date
 
     state["version"] = STATE_VERSION
     return state
@@ -867,13 +889,6 @@ def get_db() -> sqlite3.Connection:
     return conn
 
 
-def ensure_database_file() -> None:
-    if DB_PATH.exists():
-        return
-    if DB_PATH != SEED_DB_PATH and SEED_DB_PATH.exists():
-        shutil.copy2(SEED_DB_PATH, DB_PATH)
-
-
 def add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, definition: str) -> None:
     columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
     if column not in columns:
@@ -885,7 +900,6 @@ def generate_bootstrap_password() -> str:
 
 
 def init_db() -> None:
-    ensure_database_file()
     conn = get_db()
     try:
         conn.execute("PRAGMA journal_mode = WAL")
@@ -919,9 +933,14 @@ def init_db() -> None:
         add_column_if_missing(conn, "users", "session_version", "INTEGER NOT NULL DEFAULT 1")
         add_column_if_missing(conn, "users", "must_change_password", "INTEGER NOT NULL DEFAULT 0")
 
+        # Commit schema maintenance before any recovery backup. SQLite's backup
+        # API must not run from a connection holding an uncommitted write
+        # transaction.
+        conn.commit()
+
         existing = conn.execute("SELECT state_json FROM app_state WHERE id = 1").fetchone()
         if not existing:
-            state = copy.deepcopy(DEFAULT_STATE)
+            state = validate_state(copy.deepcopy(DEFAULT_STATE))
             conn.execute(
                 "INSERT INTO app_state (id, state_json, revision, updated_at) VALUES (1, ?, 1, ?)",
                 (json.dumps(state, separators=(",", ":")), utc_now_iso()),
@@ -929,10 +948,12 @@ def init_db() -> None:
         else:
             try:
                 stored_state = json.loads(existing["state_json"])
-            except (json.JSONDecodeError, TypeError):
-                backup_database(conn=conn, label="corrupt-state")
-                stored_state = copy.deepcopy(DEFAULT_STATE)
-                changed = True
+            except (json.JSONDecodeError, TypeError) as exc:
+                backup_path = backup_database(label="corrupt-state", force=True)
+                raise RuntimeError(
+                    f"Stored TrackR state is corrupt. A recovery backup was created at {backup_path}. "
+                    "Restore a known-good backup instead of replacing production data."
+                ) from exc
             else:
                 try:
                     stored_version = int(stored_state.get("version", 0) or 0) if isinstance(stored_state, dict) else 0
@@ -946,8 +967,10 @@ def init_db() -> None:
             try:
                 validated_state = validate_state(stored_state)
             except ValueError as exc:
-                backup_database(conn=conn, label="invalid-state", force=True)
-                raise RuntimeError(f"Stored TrackR state failed validation: {exc}") from exc
+                backup_path = backup_database(label="invalid-state", force=True)
+                raise RuntimeError(
+                    f"Stored TrackR state failed validation: {exc}. Recovery backup: {backup_path}"
+                ) from exc
             if validated_state != stored_state:
                 stored_state = validated_state
                 changed = True
@@ -959,7 +982,10 @@ def init_db() -> None:
 
         user_count = conn.execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"]
         if user_count == 0:
-            username = validate_username(os.environ.get("TRACKR_BOOTSTRAP_ADMIN_USERNAME", "admin")) or "admin"
+            raw_username = str(os.environ.get("TRACKR_BOOTSTRAP_ADMIN_USERNAME", "admin") or "admin").strip()
+            username = validate_username(raw_username)
+            if not username:
+                raise RuntimeError("TRACKR_BOOTSTRAP_ADMIN_USERNAME must be 3-32 characters using letters, numbers, dots, dashes or underscores.")
             password = os.environ.get("TRACKR_BOOTSTRAP_ADMIN_PASSWORD")
             if not password:
                 if IS_PRODUCTION:
@@ -967,16 +993,21 @@ def init_db() -> None:
                 password = generate_bootstrap_password()
                 app.logger.warning("New local TrackR admin created: username=%s temporary_password=%s", username, password)
             if not validate_password(password):
-                raise RuntimeError("TRACKR_BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters.")
+                raise RuntimeError("TRACKR_BOOTSTRAP_ADMIN_PASSWORD must be between 12 and 200 characters.")
             conn.execute(
                 "INSERT INTO users (username, password_hash, role, must_change_password) VALUES (?, ?, 'admin', 1)",
                 (username, generate_password_hash(password)),
             )
-            factory_username = validate_username(os.environ.get("TRACKR_BOOTSTRAP_FACTORY_USERNAME", ""))
+            raw_factory_username = str(os.environ.get("TRACKR_BOOTSTRAP_FACTORY_USERNAME", "") or "").strip()
             factory_password = os.environ.get("TRACKR_BOOTSTRAP_FACTORY_PASSWORD")
-            if factory_username and factory_password:
+            if bool(raw_factory_username) != bool(factory_password):
+                raise RuntimeError("Set both TRACKR_BOOTSTRAP_FACTORY_USERNAME and TRACKR_BOOTSTRAP_FACTORY_PASSWORD, or leave both unset.")
+            if raw_factory_username and factory_password:
+                factory_username = validate_username(raw_factory_username)
+                if not factory_username:
+                    raise RuntimeError("TRACKR_BOOTSTRAP_FACTORY_USERNAME must be 3-32 characters using letters, numbers, dots, dashes or underscores.")
                 if not validate_password(factory_password):
-                    raise RuntimeError("TRACKR_BOOTSTRAP_FACTORY_PASSWORD must be at least 12 characters.")
+                    raise RuntimeError("TRACKR_BOOTSTRAP_FACTORY_PASSWORD must be between 12 and 200 characters.")
                 conn.execute(
                     "INSERT INTO users (username, password_hash, role, must_change_password) VALUES (?, ?, 'user', 1)",
                     (factory_username, generate_password_hash(factory_password)),
@@ -986,7 +1017,7 @@ def init_db() -> None:
         conn.close()
 
 
-def backup_database(*, conn: sqlite3.Connection | None = None, label: str = "auto", force: bool = False) -> Path | None:
+def backup_database(*, label: str = "auto", force: bool = False) -> Path | None:
     backup_dir = DB_PATH.parent / "backups"
     backup_dir.mkdir(parents=True, exist_ok=True)
     existing = sorted(backup_dir.glob("trackr-*.sqlite3"), key=lambda path: path.stat().st_mtime, reverse=True)
@@ -995,15 +1026,13 @@ def backup_database(*, conn: sqlite3.Connection | None = None, label: str = "aut
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     safe_label = re.sub(r"[^A-Za-z0-9_-]+", "-", label)[:30]
     target = backup_dir / f"trackr-{timestamp}-{safe_label}.sqlite3"
-    source = conn or get_db()
-    owns_source = conn is None
+    source = get_db()
     destination = sqlite3.connect(target)
     try:
         source.backup(destination)
     finally:
         destination.close()
-        if owns_source:
-            source.close()
+        source.close()
     for old_backup in sorted(backup_dir.glob("trackr-*.sqlite3"), key=lambda path: path.stat().st_mtime, reverse=True)[10:]:
         old_backup.unlink(missing_ok=True)
     return target
@@ -1112,29 +1141,56 @@ def validate_password(value: object) -> str | None:
     return password
 
 
-def login_key(username: str) -> str:
-    forwarded = request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
-    remote = forwarded or request.remote_addr or "unknown"
-    return f"{remote}|{username.casefold()}"
+def login_keys(username: str) -> tuple[str, str]:
+    # ProxyFix already resolves the single trusted Railway proxy hop, so use
+    # request.remote_addr rather than reading X-Forwarded-For directly.
+    remote = str(request.remote_addr or "unknown").strip()[:128]
+    account = str(username or "").strip().casefold()[:64]
+    return f"ip:{remote}", f"account:{account}"
 
 
-def is_login_limited(key: str) -> bool:
-    cutoff = time.time() - LOGIN_WINDOW_SECONDS
-    with _login_attempts_lock:
-        attempts = _login_attempts[key]
+def _prune_login_attempts(now: float) -> None:
+    cutoff = now - LOGIN_WINDOW_SECONDS
+    empty_keys: list[str] = []
+    for key, attempts in _login_attempts.items():
         while attempts and attempts[0] < cutoff:
             attempts.popleft()
-        return len(attempts) >= LOGIN_MAX_FAILURES
-
-
-def record_login_failure(key: str) -> None:
-    with _login_attempts_lock:
-        _login_attempts[key].append(time.time())
-
-
-def clear_login_failures(key: str) -> None:
-    with _login_attempts_lock:
+        if not attempts:
+            empty_keys.append(key)
+    for key in empty_keys:
         _login_attempts.pop(key, None)
+    if len(_login_attempts) > LOGIN_MAX_BUCKETS:
+        oldest = sorted(_login_attempts, key=lambda key: _login_attempts[key][-1] if _login_attempts[key] else 0)
+        for key in oldest[: len(_login_attempts) - LOGIN_MAX_BUCKETS]:
+            _login_attempts.pop(key, None)
+
+
+def _login_limit_for_key(key: str) -> int:
+    return LOGIN_IP_MAX_FAILURES if key.startswith("ip:") else LOGIN_ACCOUNT_MAX_FAILURES
+
+
+def is_login_limited(keys: tuple[str, str]) -> bool:
+    now = time.time()
+    with _login_attempts_lock:
+        _prune_login_attempts(now)
+        return any(len(_login_attempts.get(key, ())) >= _login_limit_for_key(key) for key in keys)
+
+
+def record_login_failure(keys: tuple[str, str]) -> None:
+    now = time.time()
+    with _login_attempts_lock:
+        _prune_login_attempts(now)
+        for key in keys:
+            _login_attempts[key].append(now)
+
+
+def clear_login_failures(keys: tuple[str, str]) -> None:
+    # A successful login clears the account bucket. The broader IP bucket is
+    # deliberately retained so cycling usernames cannot bypass throttling.
+    with _login_attempts_lock:
+        for key in keys:
+            if key.startswith("account:"):
+                _login_attempts.pop(key, None)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -1146,26 +1202,31 @@ def login():
     if request.method == "POST":
         username = str(request.form.get("username", "")).strip()
         password = str(request.form.get("password", ""))
-        key = login_key(username)
-        if is_login_limited(key):
+        keys = login_keys(username)
+        if is_login_limited(keys):
             error = "Too many failed attempts. Wait 15 minutes and try again."
         else:
-            conn = get_db()
-            row = conn.execute(
-                "SELECT id, username, password_hash, role, session_version, must_change_password FROM users WHERE username = ? COLLATE NOCASE",
-                (username,),
-            ).fetchone()
-            conn.close()
-            password_ok = check_password_hash(row["password_hash"] if row else DUMMY_PASSWORD_HASH, password)
+            row = None
+            valid_username = validate_username(username)
+            valid_password_length = 1 <= len(password) <= 200
+            if valid_username and valid_password_length:
+                conn = get_db()
+                row = conn.execute(
+                    "SELECT id, username, password_hash, role, session_version, must_change_password FROM users WHERE username = ? COLLATE NOCASE",
+                    (valid_username,),
+                ).fetchone()
+                conn.close()
+            candidate_password = password if valid_password_length else password[:200] + "\0"
+            password_ok = check_password_hash(row["password_hash"] if row else DUMMY_PASSWORD_HASH, candidate_password)
             if row and password_ok:
-                clear_login_failures(key)
+                clear_login_failures(keys)
                 session.clear()
                 session.permanent = True
                 session["user_id"] = row["id"]
                 session["session_version"] = row["session_version"]
                 csrf_token()
                 return redirect(url_for("change_password" if row["must_change_password"] else "index"))
-            record_login_failure(key)
+            record_login_failure(keys)
             error = "Incorrect username or password."
     return render_template("login.html", error=error, username=username, csrf_token=csrf_token())
 
@@ -1184,11 +1245,11 @@ def change_password():
         if not row or not check_password_hash(row["password_hash"], current_password):
             error = "Current password is incorrect."
         elif not new_password:
-            error = "New password must be at least 12 characters."
+            error = "New password must be between 12 and 200 characters."
         elif new_password != confirm_password:
             error = "New passwords do not match."
         elif check_password_hash(row["password_hash"], new_password):
-            error = "Choose a password you have not already used."
+            error = "Choose a password different from your current password."
         else:
             new_version = row["session_version"] + 1
             conn.execute(
@@ -1211,16 +1272,35 @@ def logout():
 
 @app.get("/health")
 def health():
+    conn = None
     try:
         conn = get_db()
-        result = conn.execute("PRAGMA quick_check").fetchone()[0]
-        conn.close()
-        if result != "ok":
-            raise RuntimeError(result)
+        row = conn.execute("SELECT revision FROM app_state WHERE id = 1").fetchone()
+        if not row:
+            raise RuntimeError("workspace state missing")
         return jsonify({"ok": True, "service": "TrackR"})
     except Exception:
         app.logger.exception("Health check failed")
         return jsonify({"ok": False}), 503
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+@app.get("/api/database-integrity")
+@admin_required
+def database_integrity():
+    conn = None
+    try:
+        conn = get_db()
+        result = conn.execute("PRAGMA quick_check").fetchone()[0]
+        return jsonify({"ok": result == "ok", "result": result}), (200 if result == "ok" else 500)
+    except Exception:
+        app.logger.exception("Database integrity check failed")
+        return jsonify({"ok": False, "error": "Database integrity check failed."}), 500
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 @app.route("/")
@@ -1270,7 +1350,7 @@ def create_user():
     if not username:
         return jsonify({"ok": False, "error": "Username must be 3-32 characters using letters, numbers, dots, dashes or underscores."}), 400
     if not password:
-        return jsonify({"ok": False, "error": "Temporary password must be at least 12 characters."}), 400
+        return jsonify({"ok": False, "error": "Temporary password must be between 12 and 200 characters."}), 400
     if role not in ALLOWED_USER_ROLES:
         return jsonify({"ok": False, "error": "Invalid role."}), 400
     conn = get_db()
@@ -1307,7 +1387,7 @@ def update_user(user_id: int):
         password = validate_password(payload.get("password"))
         if not password:
             conn.close()
-            return jsonify({"ok": False, "error": "Password must be at least 12 characters."}), 400
+            return jsonify({"ok": False, "error": "Password must be between 12 and 200 characters."}), 400
         updates.extend(["password_hash = ?", "must_change_password = ?"])
         values.extend([generate_password_hash(password), 0 if current_user["id"] == user_id else 1])
         revoke_sessions = True
@@ -1496,5 +1576,5 @@ init_db()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "5050"))
-    debug = os.environ.get("TRACKR_DEBUG") == "1"
+    debug = not IS_PRODUCTION and os.environ.get("TRACKR_DEBUG") == "1"
     app.run(host="0.0.0.0", port=port, debug=debug)
