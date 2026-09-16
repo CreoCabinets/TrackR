@@ -321,8 +321,47 @@ function updateAllocationSummary(task){
 
 
 /* Day panel */
+let absenceOverrideSaving = false;
+let selectedDayPanel = null;
+async function setDayAbsenceOverride(personName,iso,working){
+  if (!isAdmin || !stateLoaded || absenceOverrideSaving || typeof working !== "boolean") return false;
+  const dateObj = parseIsoDate(iso);
+  const person = people.find(item => item.name === personName);
+  if (!dateObj || toIsoDate(dateObj) !== iso || !employeeCountsCapacity(person)) return false;
+  const statuses = absenceStatusesForDate(personName,dateObj);
+  const rosterDayOff = rosterDayOffForDate(person,dateObj);
+  if ((!statuses.length && !rosterDayOff) || statuses.some(status => !["RDO","Away","Holiday","Sick"].includes(status.type))) return false;
+  if (working && globalCalendarEventForDate(dateObj)) return false;
+  if (rosterDayOff) {
+    if (working) {
+      person.capacityOverrides = {...(person.capacityOverrides || {}),[iso]:workingDayCapacityForDate(person,dateObj)};
+    } else if (person.capacityOverrides) delete person.capacityOverrides[iso];
+  } else {
+    absenceOverrides = validAbsenceOverrides().filter(item => item.person !== personName || item.date !== iso);
+    if (working) absenceOverrides.push({person:personName,date:iso,statuses:statuses.map(status => ({
+      type:status.type,startDate:status.startDate,endDate:status.endDate || status.startDate
+    }))});
+  }
+  absenceOverrideSaving = true;
+  try {
+    renderAll();
+    openDayPanel(personName,scheduleIndexForDate(dateObj));
+    return await queueStateSave(working ? "Working day saved" : rosterDayOff ? "RDO restored" : "Absence restored");
+  } finally {
+    absenceOverrideSaving = false;
+    // Refresh after save failure/conflict as well, without reopening a closed drawer.
+    if (selectedDayPanel?.personName === personName && selectedDayPanel.iso === iso &&
+        document.getElementById("dayPanel").classList.contains("open")) {
+      const dayIndex = scheduleIndexForDate(dateObj);
+      if (days[dayIndex] && people.some(item => item.name === personName)) openDayPanel(personName,dayIndex);
+      else closeDayPanel();
+    }
+  }
+}
 function openDayPanel(personName, dayIndex){
   const day = days[dayIndex];
+  if (!day) return;
+  selectedDayPanel = {personName,iso:toIsoDate(dateForDayIndex(dayIndex))};
   const result = calculate();
   const person = people.find(p => p.name === personName);
   const title = personName === "Milestones" ? `${day.name} ${day.date}` : `${personName} · ${day.name} ${day.date}`;
@@ -341,14 +380,28 @@ function openDayPanel(personName, dayIndex){
     const booked = (result.used[personName] && result.used[personName][dayIndex]) || 0;
     const cap = capacityFor(person, dayIndex);
     const items = (result.allocation[personName] && result.allocation[personName][dayIndex]) || [];
-    const blocked=blockedStatusForDate(personName,dateForDayIndex(dayIndex));
+    const dateObj=dateForDayIndex(dayIndex),iso=toIsoDate(dateObj);
+    const blocked=blockedStatusForDate(personName,dateObj);
+    const statuses=absenceStatusesForDate(personName,dateObj);
+    const rosterDayOff=rosterDayOffForDate(person,dateObj);
+    const activeOverride=absenceOverrideForDate(personName,dateObj) || rosterWorkOverrideForDate(person,dateObj);
+    const closure=globalCalendarEventForDate(dateObj);
+    const statusLabel=rosterDayOff ? "RDO" : [...new Set(statuses.map(status=>status.type))].join(" / ");
+    const absenceDetails=statuses.length || rosterDayOff ? `<div class="detail-card"><h3>Day status · ${escapeHtml(iso)}</h3>
+      ${rosterDayOff ? `<div class="note">RDO / day off · Normal roster: 0h</div>` : ""}
+      ${statuses.map(status=>`<div class="note">${escapeHtml(status.type)} · ${escapeHtml(status.startDate)} to ${escapeHtml(status.endDate || status.startDate)}</div>`).join("")}
+      ${activeOverride ? `<div class="note" role="status">${closure ? "Override active" : "Working"} · ${escapeHtml(statusLabel)} overridden for this date only.</div>` : ""}
+      ${closure ? `<div class="note">${escapeHtml(closure.name)} · ${escapeHtml(closure.type)} still blocks capacity.</div>` : rosterDayOff ? `<div class="note">${activeOverride ? `${fmt(cap)} available for this date only.` : `Work this day makes ${fmt(workingDayCapacityForDate(person,dateObj))} available for this date only.`} The roster stays unchanged.</div>` : normalCapacityForDate(person,dateObj) === 0 ? `<div class="note">No normal rostered hours on this date. Working this day adds no capacity.</div>` : ""}
+      ${isAdmin ? `<button class="${activeOverride ? "" : "primary"}" style="margin-top:10px;width:100%" data-day-action="work-status" ${absenceOverrideSaving || (closure && !activeOverride) ? "disabled" : ""}>${activeOverride ? `Restore ${escapeHtml(statusLabel)}` : "Work this day"}</button>` : ""}</div>` : "";
     const over=Math.max(0,booked-cap);
     body.innerHTML = `
-      <div class="detail-card"><h3>Capacity</h3><div class="note">${blocked && !booked ? `${blocked.type} · capacity blocked` : `${fmt(booked)} booked / ${fmt(cap)} available${over ? ` · Over by ${fmt(over)}` : ""}`}</div>${blocked ? `<button class="danger" style="margin-top:10px;width:100%" data-day-action="remove-status">Remove ${blocked.type} from this day</button>` : ""}</div>
+      ${absenceDetails}
+      <div class="detail-card"><h3>Capacity</h3><div class="note">${blocked && !booked ? `${escapeHtml(blocked.type)} · capacity blocked` : `${fmt(booked)} booked / ${fmt(cap)} available${over ? ` · Over by ${fmt(over)}` : ""}`}</div>${blocked && isAdmin ? `<button class="danger" style="margin-top:10px;width:100%" data-day-action="remove-status">Remove ${escapeHtml(blocked.type)} from this day</button>` : ""}</div>
       <div class="detail-card"><h3>Tasks</h3>${items.map(item => `<div class="mini-detail"><span>${escapeHtml(taskLabel(item.task))}</span><strong>${fmt(item.minutes)}</strong></div>`).join("") || `<div class="note">No work allocated.</div>`}</div>
-      <div class="detail-card"><h3>Add to this day</h3><div class="action-row"><button class="primary" data-day-action="task">Add custom task</button><button data-day-action="status">Sick / Away</button></div></div>`;
-    body.querySelector('[data-day-action="task"]').addEventListener("click", () => openScheduleTaskPanel(personName, dayIndex));
-    body.querySelector('[data-day-action="status"]').addEventListener("click", () => openScheduleStatusPanel(personName, dayIndex));
+      ${isAdmin ? `<div class="detail-card"><h3>Add to this day</h3><div class="action-row"><button class="primary" data-day-action="task">Add custom task</button><button data-day-action="status">Sick / Away</button></div></div>` : ""}`;
+    body.querySelector('[data-day-action="task"]')?.addEventListener("click", () => openScheduleTaskPanel(personName, dayIndex));
+    body.querySelector('[data-day-action="status"]')?.addEventListener("click", () => openScheduleStatusPanel(personName, dayIndex));
+    body.querySelector('[data-day-action="work-status"]')?.addEventListener("click", () => setDayAbsenceOverride(personName,iso,!activeOverride));
     const removeStatusButton = body.querySelector('[data-day-action="remove-status"]');
     if (removeStatusButton) removeStatusButton.addEventListener("click", () => removeBlockedDay(personName, dayIndex));
   }
@@ -415,6 +468,8 @@ function closeStatusPanel(closeBackdrop=true){
   if(closeBackdrop) document.getElementById("panelBackdrop").classList.remove("open");
 }
 function saveStatusRange(){
+  if (!isAdmin) return;
+  absenceOverrides = validAbsenceOverrides();
   const startDate = document.getElementById("statusStart").value;
   let endDate = document.getElementById("statusEnd").value;
   if (endDate < startDate) endDate = startDate;
@@ -426,16 +481,22 @@ function saveStatusRange(){
     start:legacyIndexForDate(parseIsoDate(startDate)),
     end:legacyIndexForDate(parseIsoDate(endDate))
   });
+  absenceOverrides = validAbsenceOverrides();
   closeStatusPanel();
   renderAll();
   saveState("Blocked range saved");
 }
 function removeStatusRange(index){
+  if (!isAdmin) return;
+  absenceOverrides = validAbsenceOverrides();
   dayStatuses.splice(index,1);
+  absenceOverrides = validAbsenceOverrides();
   renderAll();
   saveState("Blocked range removed");
 }
 function removeBlockedDay(personName, dayIndex){
+  if (!isAdmin) return;
+  absenceOverrides = validAbsenceOverrides();
   const targetDate = dateForDayIndex(dayIndex);
   const targetIso = toIsoDate(targetDate);
   const statusIndex = dayStatuses.findIndex(status => {
@@ -475,6 +536,7 @@ function removeBlockedDay(personName, dayIndex){
     dayStatuses.splice(statusIndex + 1,0,afterStatus);
   }
 
+  absenceOverrides = validAbsenceOverrides();
   closeDayPanel();
   renderAll();
   saveState(`${status.type} removed from ${targetIso}`);

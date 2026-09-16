@@ -185,6 +185,146 @@ class TrackRAppTests(unittest.TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertTrue(response.get_json()["conflict"])
 
+    def absence_state(self, kind="Holiday"):
+        state = copy.deepcopy(trackr.DEFAULT_STATE)
+        status = {"person": "Lewis", "type": kind, "startDate": "2026-09-14", "endDate": "2026-09-18"}
+        state["dayStatuses"] = [status]
+        state["absenceOverrides"] = [{"person": "Lewis", "date": "2026-09-16", "statuses": [
+            {key: status[key] for key in ("type", "startDate", "endDate")}
+        ]}]
+        return state
+
+    def test_absence_override_save_reload_restart_and_restore(self):
+        csrf = self.login_admin()
+        for kind in sorted(trackr.ALLOWED_DAY_STATUS_TYPES):
+            with self.subTest(kind=kind):
+                state = self.absence_state(kind)
+                state["_revision"] = self.client.get("/api/state").get_json()["_revision"]
+                response = self.client.post("/api/state", json=state, headers={"X-CSRF-Token": csrf})
+                self.assertEqual(response.status_code, 200)
+                trackr.init_db()  # Same validation/load path used on process restart.
+                loaded = self.client.get("/api/state").get_json()
+                self.assertEqual(loaded["dayStatuses"], state["dayStatuses"])
+                self.assertEqual(loaded["absenceOverrides"], state["absenceOverrides"])
+                loaded["absenceOverrides"] = []
+                response = self.client.post("/api/state", json=loaded, headers={"X-CSRF-Token": csrf})
+                self.assertEqual(response.status_code, 200)
+                restored = self.client.get("/api/state").get_json()
+                self.assertEqual(restored["absenceOverrides"], [])
+                self.assertEqual(restored["dayStatuses"], state["dayStatuses"])
+
+    def test_absence_override_stale_sources_are_pruned(self):
+        for change in ("remove", "type", "range", "employee", "overlap"):
+            with self.subTest(change=change):
+                state = self.absence_state()
+                if change == "remove":
+                    state["dayStatuses"] = []
+                elif change == "type":
+                    state["dayStatuses"][0]["type"] = "Sick"
+                elif change == "range":
+                    state["dayStatuses"][0]["endDate"] = "2026-09-17"
+                elif change == "employee":
+                    state["absenceOverrides"][0]["person"] = "Missing"
+                else:
+                    state["dayStatuses"].append({**state["dayStatuses"][0], "type": "Away"})
+                self.assertEqual(trackr.validate_state(state)["absenceOverrides"], [])
+
+    def test_roster_rdo_capacity_override_save_reload_restart_restore(self):
+        csrf = self.login_admin()
+        state = self.client.get("/api/state").get_json()
+        person = next(person for person in state["people"] if person["name"] == "Adrian")
+        person["customStart"] = "2026-09-07"
+        self.assertEqual(person["week1"]["Fri"], 340)
+        self.assertEqual(person["week2"]["Fri"], 0)
+        roster_keys = ("workPattern", "customStart", "week", "week1", "week2")
+        roster = {key: copy.deepcopy(person[key]) for key in roster_keys}
+        person["capacityOverrides"] = {"2026-09-18": 340}
+        response = self.client.post("/api/state", json=state, headers={"X-CSRF-Token": csrf})
+        self.assertEqual(response.status_code, 200)
+        trackr.init_db()
+        loaded = self.client.get("/api/state").get_json()
+        employee = next(person for person in loaded["people"] if person["name"] == "Adrian")
+        self.assertEqual(employee["capacityOverrides"], {"2026-09-18": 340})
+        self.assertEqual({key: employee[key] for key in roster_keys}, roster)
+        self.assertEqual(loaded["dayStatuses"], [])
+        self.assertEqual(loaded["absenceOverrides"], [])
+        del employee["capacityOverrides"]["2026-09-18"]
+        response = self.client.post("/api/state", json=loaded, headers={"X-CSRF-Token": csrf})
+        self.assertEqual(response.status_code, 200)
+        trackr.init_db()
+        restored = next(person for person in self.client.get("/api/state").get_json()["people"] if person["name"] == "Adrian")
+        self.assertEqual(restored["capacityOverrides"], {})
+        self.assertEqual({key: restored[key] for key in roster_keys}, roster)
+
+    def test_read_only_cannot_add_or_remove_roster_rdo_capacity_override(self):
+        csrf = self.login_admin()
+        state = self.client.get("/api/state").get_json()
+        state["people"][4]["capacityOverrides"] = {"2026-09-18": 340}
+        self.assertEqual(self.client.post("/api/state", json=state, headers={"X-CSRF-Token": csrf}).status_code, 200)
+        conn = trackr.get_db()
+        cursor = conn.execute("INSERT INTO users (username, password_hash, role, must_change_password) VALUES ('reader', 'unused', 'user', 0)")
+        user_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        reader = trackr.app.test_client()
+        with reader.session_transaction() as sess:
+            sess.update(user_id=user_id, session_version=1, csrf_token="reader-csrf")
+        saved = reader.get("/api/state").get_json()
+        self.assertEqual(saved["people"][4]["capacityOverrides"], {"2026-09-18": 340})
+        for overrides in ({}, {"2026-09-18": 340, "2026-10-02": 340}):
+            changed = copy.deepcopy(saved)
+            changed["people"][4]["capacityOverrides"] = overrides
+            response = reader.post("/api/state", json=changed, headers={"X-CSRF-Token": "reader-csrf"})
+            self.assertEqual(response.status_code, 403)
+        self.assertEqual(reader.get("/api/state").get_json(), saved)
+
+    def test_absence_override_invalid_payloads_rejected_without_saving(self):
+        csrf = self.login_admin()
+        original = self.client.get("/api/state").get_json()
+        valid = self.absence_state()["absenceOverrides"][0]
+        invalid_values = [None, {}, [None], [{**valid, "date": "2026-02-30"}],
+                          [{**valid, "date": "20260916"}], [{**valid, "statuses": []}],
+                          [{**valid, "statuses": [None]}],
+                          [{**valid, "statuses": [{"type": "Factory Closure", "startDate": "2026-09-14", "endDate": "2026-09-18"}]}],
+                          [valid] * (trackr.MAX_DAY_STATUSES + 1)]
+        for invalid in invalid_values:
+            with self.subTest(value=str(invalid)[:80]):
+                state = self.absence_state()
+                state.update(_revision=original["_revision"], absenceOverrides=invalid)
+                response = self.client.post("/api/state", json=state, headers={"X-CSRF-Token": csrf})
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(self.client.get("/api/state").get_json(), original)
+
+    def test_absence_override_legacy_state_and_duplicates(self):
+        state = self.absence_state()
+        state["absenceOverrides"] *= 2
+        self.assertEqual(len(trackr.validate_state(state)["absenceOverrides"]), 1)
+        state.pop("absenceOverrides")
+        state["version"] = 9
+        migrated, changed = trackr.migrate_state(state)
+        self.assertTrue(changed)
+        self.assertEqual(trackr.validate_state(migrated)["absenceOverrides"], [])
+
+    def test_read_only_can_see_but_cannot_add_or_restore_absence_override(self):
+        csrf = self.login_admin()
+        state = self.absence_state()
+        state["_revision"] = self.client.get("/api/state").get_json()["_revision"]
+        self.assertEqual(self.client.post("/api/state", json=state, headers={"X-CSRF-Token": csrf}).status_code, 200)
+        conn = trackr.get_db()
+        cursor = conn.execute("INSERT INTO users (username, password_hash, role, must_change_password) VALUES ('reader', 'unused', 'user', 0)")
+        user_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        reader = trackr.app.test_client()
+        with reader.session_transaction() as sess:
+            sess.update(user_id=user_id, session_version=1, csrf_token="reader-csrf")
+        loaded = reader.get("/api/state").get_json()
+        self.assertEqual(loaded["absenceOverrides"], state["absenceOverrides"])
+        for overrides in ([], [*loaded["absenceOverrides"], {**loaded["absenceOverrides"][0], "date": "2026-09-15"}]):
+            response = reader.post("/api/state", json={**loaded, "absenceOverrides": overrides}, headers={"X-CSRF-Token": "reader-csrf"})
+            self.assertEqual(response.status_code, 403)
+        self.assertEqual(reader.get("/api/state").get_json(), loaded)
+
     def test_read_only_user_cannot_write_workspace(self):
         conn = trackr.get_db()
         conn.execute(

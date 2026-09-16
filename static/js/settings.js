@@ -253,6 +253,7 @@ function renameEmployeeReferences(oldName,newName){
     });
   });
   dayStatuses.forEach(status => {if (status.person === oldName) status.person = newName;});
+  absenceOverrides.forEach(override => {if (override.person === oldName) override.person = newName;});
 }
 function convertEmployeeAssignmentsForRole(name,oldRole,newRole,newCountsCapacity=true){
   if (oldRole === newRole) return;
@@ -384,6 +385,7 @@ function removeEmployee(){
   if (!confirm(`Remove ${selectedEmployeeName}?`)) return;
   people = people.filter(p => p.name !== selectedEmployeeName);
   dayStatuses = dayStatuses.filter(status => status.person !== selectedEmployeeName);
+  absenceOverrides = absenceOverrides.filter(override => override.person !== selectedEmployeeName);
   closeEmployeePanel();
   renderAll();
   saveState("Employee removed");

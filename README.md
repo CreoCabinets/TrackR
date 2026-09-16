@@ -49,6 +49,18 @@ A new empty Railway volume creates a fresh TrackR database from the application'
 - Unassigned capacity tasks are valid and remain visible in Schedule's **Unassigned** row until an employee is selected.
 - Factory Closure, Public Holiday and Company Event entries are company-wide non-production days. Generated workflow dates skip them as well as weekends.
 
+### Single-day absence override
+
+Click an employee's RDO, Away, Holiday or Sick day in Schedule and choose **Work this day** in the existing day panel. The original absence and its full date range remain unchanged. Only the selected employee/date regains its normal rostered capacity, and tasks recalculate and spill forward as usual. The panel shows the original status/range and the active override; **Restore Holiday** (or the applicable status) removes the override. Read-only users can open the panel and see these details but cannot change them.
+
+For an absence record, the override uses the employee's standard or repeating two-week roster for that exact date. This behaviour is unchanged, including zero hours if the absence falls on a rostered day off.
+
+Roster-generated RDOs and days off without a `dayStatuses` record also offer **Work this day**. For a custom roster, TrackR first uses positive hours for the same weekday in the other roster week, then positive same-weekday hours in the standard/base week. If neither supplies hours, it uses the existing `defaultDailyCapacity(person)` rule: the largest positive daily hours across the stored weeks, or 7h40 if none exist. Thus an alternate Friday off becomes 5h40 when the employee's working Friday is 5h40, even if other weekdays are 7h40. The panel previews the hours before activation; there is no manual hours field.
+
+Roster work is stored in the employee's existing per-date `capacityOverrides` map, leaving all roster patterns unchanged. **Restore RDO** deletes that date's capacity override and returns it to zero hours. A positive per-date capacity already entered through Overtime on a rostered day off is also shown as working, and Restore RDO clears it. Company-wide Factory Closure, Public Holiday and Company Event days always block usable capacity, including when either kind of work override or overtime exists.
+
+Workspace version 10 stores absence-record overrides separately in `absenceOverrides`, including snapshots of every absence covering that employee/date. Changed, removed or newly overlapping absences invalidate the override; stale entries are ignored and pruned during save/load validation. Employee renames preserve the link, and employee removal clears it. Existing workspaces without this optional collection load with no absence-record overrides. Saves use the normal admin/CSRF/revision checks and rollback/conflict recovery. Refresh already-open browser tabs after deploying this version.
+
 ## Backups and recovery
 
 Admins can download a consistent SQLite backup from **Settings → User Admin → Download backup**. TrackR also keeps up to 10 rolling automatic backups beside the live database, with normal automatic backups throttled to avoid excessive copies.

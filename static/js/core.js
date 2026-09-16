@@ -47,6 +47,7 @@ let homeWeek = "this";
 let jobsViewMode = "current";
 const JOB_ARCHIVE_AFTER_DAYS = 60;
 let dayStatuses = [];
+let absenceOverrides = [];
 let saveTimer = null;
 let saveChain = Promise.resolve();
 let stateLoaded = false;
@@ -87,15 +88,17 @@ function taskPayloadForSave(source){
   return task;
 }
 function workspaceSnapshot(){
+  absenceOverrides = validAbsenceOverrides();
   // Keep transient Schedule parts current before serialising so Delivery Ready
   // confirmations can be invalidated against the date the Schedule actually uses.
   calculate();
   return JSON.parse(JSON.stringify({
-    version: 9,
+    version: 10,
     people,
     jobs,
     tasks: tasks.map(taskPayloadForSave),
     dayStatuses,
+    absenceOverrides,
     calendarEvents
   }));
 }
@@ -123,6 +126,8 @@ function applyWorkspaceSnapshot(snapshot){
     if (!status.startDate && Number.isFinite(Number(status.start))) status.startDate = toIsoDate(legacyDateForDayIndex(Number(status.start)));
     if (!status.endDate && Number.isFinite(Number(status.end))) status.endDate = toIsoDate(legacyDateForDayIndex(Number(status.end)));
   });
+  absenceOverrides = Array.isArray(state.absenceOverrides) ? state.absenceOverrides : [];
+  absenceOverrides = validAbsenceOverrides();
 }
 function restoreLastPersistedWorkspace(){
   clearTimeout(saveTimer);
@@ -191,6 +196,7 @@ async function persistState(message="Saved", queuedEpoch=stateEpoch){
     jobs: payload.jobs,
     tasks: payload.tasks,
     dayStatuses: payload.dayStatuses,
+    absenceOverrides: payload.absenceOverrides,
     calendarEvents: payload.calendarEvents
   }));
   try{
@@ -387,15 +393,39 @@ function weekPatternForDate(person, dateObj){
   const cycleDay = ((diffDays % 14) + 14) % 14;
   return cycleDay < 7 ? (person.week1 || person.week || {}) : (person.week2 || person.week || {});
 }
-function blockedStatusForDate(personName, dateObj){
-  if (!personName || !dateObj) return null;
+function absenceStatusesForDate(personName, dateObj){
+  if (!personName || !dateObj) return [];
   const iso = toIsoDate(dateObj);
-  return dayStatuses.find(status => {
+  return dayStatuses.filter(status => {
     if (status.person !== personName) return false;
     const start = status.startDate || toIsoDate(legacyDateForDayIndex(Number(status.start || 0)));
     const end = status.endDate || toIsoDate(legacyDateForDayIndex(Number(status.end || status.start || 0)));
     return iso >= start && iso <= end;
-  }) || null;
+  });
+}
+function absenceSignature(statuses){
+  return JSON.stringify(statuses.map(status => [status.type,status.startDate,status.endDate || status.startDate]).sort());
+}
+function absenceOverrideForDate(personName,dateObj){
+  const iso = toIsoDate(dateObj);
+  const candidates = absenceOverrides.filter(override => override && override.person === personName && override.date === iso);
+  if (!candidates.length) return null;
+  const statuses = absenceStatusesForDate(personName,dateObj);
+  if (!statuses.length || statuses.some(status => !["RDO","Away","Holiday","Sick"].includes(status.type))) return null;
+  return candidates.find(override =>
+    Array.isArray(override.statuses) && override.statuses.every(status => status && typeof status === "object") &&
+    absenceSignature(override.statuses) === absenceSignature(statuses)) || null;
+}
+function validAbsenceOverrides(){
+  return absenceOverrides.filter(override => {
+    if (!override || !people.some(person => person.name === override.person) || !/^\d{4}-\d{2}-\d{2}$/.test(override.date)) return false;
+    const dateObj = parseIsoDate(override.date);
+    return toIsoDate(dateObj) === override.date && absenceOverrideForDate(override.person,dateObj) === override;
+  });
+}
+function blockedStatusForDate(personName, dateObj){
+  if (absenceOverrideForDate(personName,dateObj)) return null;
+  return absenceStatusesForDate(personName,dateObj)[0] || null;
 }
 function globalCalendarEventForDate(dateObj){
   if (!dateObj) return null;
@@ -424,6 +454,25 @@ function defaultDailyCapacity(person){
   const values = [person?.week,person?.week1,person?.week2].flatMap(week => Object.values(week || {})).map(Number).filter(value => value > 0);
   return values.length ? Math.max(...values) : 460;
 }
+function workingDayCapacityForDate(person,dateObj){
+  if (!employeeCountsCapacity(person) || !dateObj) return 0;
+  const weekday = dateObj.toLocaleDateString("en-AU",{weekday:"short"});
+  if (person.workPattern === "Custom") {
+    // Seven days away is the same weekday in the other half of the roster.
+    const otherWeek = weekPatternForDate(person,addCalendarDays(dateObj,7));
+    const minutes = Number(otherWeek[weekday] || 0);
+    if (Number.isFinite(minutes) && minutes > 0) return minutes;
+  }
+  const baseMinutes = Number(person.week?.[weekday] || 0);
+  return Number.isFinite(baseMinutes) && baseMinutes > 0 ? baseMinutes : defaultDailyCapacity(person);
+}
+function rosterDayOffForDate(person,dateObj){
+  return employeeCountsCapacity(person) && !!dateObj && rosteredCapacityForDate(person,dateObj) === 0 &&
+    absenceStatusesForDate(person.name,dateObj).length === 0;
+}
+function rosterWorkOverrideForDate(person,dateObj){
+  return rosterDayOffForDate(person,dateObj) && capacityOverrideForDate(person,dateObj) > 0;
+}
 function capacityOverrideForDate(person,dateObj){
   if (!person || !dateObj || !person.capacityOverrides) return null;
   const iso = toIsoDate(dateObj);
@@ -437,7 +486,10 @@ function normalCapacityForDate(person,dateObj){
 }
 function capacityForDate(person,dateObj){
   if (!employeeCountsCapacity(person) || !dateObj) return 0;
+  if (calendarEventBlocksProduction(globalCalendarEventForDate(dateObj))) return 0;
   if (blockedStatusForDate(person.name,dateObj)) return 0;
+  // Working an absence restores only the actual roster, never inferred hours or OT.
+  if (absenceOverrideForDate(person.name,dateObj)) return normalCapacityForDate(person,dateObj);
   const override = capacityOverrideForDate(person,dateObj);
   if (override !== null) return override;
   return normalCapacityForDate(person,dateObj);

@@ -36,13 +36,15 @@ function renderSchedule(){
         return `<div class="cell ${day.working ? "" : "weekend"}" data-person="Unassigned" data-day="${index}" data-click-action="openDayPanel" data-click-args='["Unassigned",${index}]' ><span class="badge ${count ? "tight" : "off"}">${count ? `${count} waiting` : "None"}</span></div>`;
       }
       const dateObj=dateForDayIndex(index),blockedStatus=blockedStatusForDate(rowName,dateObj),calendarEvent=globalCalendarEventForDate(dateObj);
+      const absenceOverride=absenceOverrideForDate(rowName,dateObj);
+      const rosterWorkOverride=rosterWorkOverrideForDate(person,dateObj);
       const cap=capacityFor(person,index),booked=(result.used[rowName] && result.used[rowName][index]) || 0,over=booked > cap+1;
       const override=capacityOverrideForDate(person,dateObj),normalCap=normalCapacityForDate(person,dateObj);
-      const adjusted=override !== null,adjustmentLabel=adjusted ? (override > normalCap ? "OT" : "Adj") : "";
+      const adjusted=override !== null && !absenceOverride && !rosterWorkOverride && !calendarEvent,adjustmentLabel=adjusted ? (override > normalCap ? "OT" : "Adj") : "";
       const rosteredOff=day.working && !blockedStatus && !calendarEvent && cap === 0,isTodayCell=isSameDate(dateObj,today);
       const badgeClass=over ? "over" : calendarEvent && !adjusted ? "closure" : blockedStatus ? String(blockedStatus.type || "").toLowerCase() : rosteredOff ? "rdo" : booked >= cap-10 ? "tight" : "";
-      const badgeText=calendarEvent && !booked && !adjusted ? calendarEvent.name : blockedStatus && !booked ? blockedStatus.type : rosteredOff && !booked && !adjusted ? "RDO" : `${fmt(booked)} / ${fmt(cap)}${adjustmentLabel ? ` · ${adjustmentLabel}` : ""}${over ? ` · +${fmt(booked-cap)}` : ""}`;
-      const cellTitle=[adjusted ? `${adjustmentLabel === "OT" ? "Overtime" : "Adjusted"} availability: ${fmt(cap)}` : "",over ? `Over capacity by ${fmt(booked-cap)}` : "",calendarEvent ? calendarEvent.name : ""].filter(Boolean).join(" · ");
+      const badgeText=calendarEvent && !booked && !adjusted ? calendarEvent.name : blockedStatus && !booked ? blockedStatus.type : absenceOverride || rosterWorkOverride ? `${fmt(booked)} / ${fmt(cap)} · Working` : rosteredOff && !booked && !adjusted ? "RDO" : `${fmt(booked)} / ${fmt(cap)}${adjustmentLabel ? ` · ${adjustmentLabel}` : ""}${over ? ` · +${fmt(booked-cap)}` : ""}`;
+      const cellTitle=[rosterWorkOverride ? "Roster RDO overridden for this date only" : "",absenceOverride ? `${[...new Set(absenceOverride.statuses.map(status=>status.type))].join(" / ")} overridden for this date only` : "",adjusted ? `${adjustmentLabel === "OT" ? "Overtime" : "Adjusted"} availability: ${fmt(cap)}` : "",over ? `Over capacity by ${fmt(booked-cap)}` : "",calendarEvent ? calendarEvent.name : ""].filter(Boolean).join(" · ");
       return `<div class="cell ${day.working ? "" : "weekend"} ${calendarEvent ? "calendar-event-day" : ""} ${blockedStatus ? "blocked-day" : ""} ${rosteredOff ? "rostered-off" : ""} ${over ? "over-capacity" : ""} ${adjusted ? "capacity-adjusted" : ""} ${isTodayCell ? "today" : ""}" data-person="${escapeHtml(rowName)}" data-day="${index}" data-click-action="openDayPanel" data-click-args='${escapeHtml(JSON.stringify([rowName,index]))}'  title="${escapeHtml(cellTitle)}"><span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span></div>`;
     }).join("")}<div class="bars"></div>`;
     const bars=row.querySelector(".bars");
@@ -72,7 +74,7 @@ function renderSchedule(){
     });rows.appendChild(row);
   });
   if(!rowNames.length) rows.innerHTML=`<div class="search-empty">No employees or tasks match this search.</div>`;
-  if(!isAdmin){rows.querySelectorAll("[data-click-action]").forEach(element=>element.removeAttribute("data-click-action"));rows.querySelectorAll("[draggable]").forEach(element=>{element.draggable=false;element.removeAttribute("draggable");});}
+  if(!isAdmin){rows.querySelectorAll("[draggable]").forEach(element=>{element.draggable=false;element.removeAttribute("draggable");});}
   syncFloatingScrollWidth();
 }
 

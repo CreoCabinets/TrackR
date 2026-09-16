@@ -77,7 +77,7 @@ ALLOWED_DAY_STATUS_TYPES = {"Sick", "Away", "Holiday", "RDO"}
 ALLOWED_EVENT_TYPES = {"Factory Closure", "Public Holiday", "Company Event"}
 WEEK_DAYS = ("Mon", "Tue", "Wed", "Thu", "Fri")
 TEXT_MAX = 500
-STATE_VERSION = 9
+STATE_VERSION = 10
 MAX_PEOPLE = 250
 MAX_JOBS = 5000
 MAX_TASKS = 30000
@@ -93,7 +93,7 @@ LOGIN_MAX_BUCKETS = 5000
 DUMMY_PASSWORD_HASH = generate_password_hash(secrets.token_urlsafe(24))
 
 DEFAULT_STATE = {
-  "version": 9,
+  "version": 10,
   "people": [
     {
       "customStart": "2026-06-08",
@@ -324,6 +324,7 @@ DEFAULT_STATE = {
   "jobs": [],
   "tasks": [],
   "dayStatuses": [],
+  "absenceOverrides": [],
   "calendarEvents": []
 }
 
@@ -621,6 +622,46 @@ def validate_state(payload: object) -> dict:
             raise ValueError(f"Invalid blocked date range for {person}.")
         status["startDate"] = start_date
         status["endDate"] = end_date
+
+    # Optional for older browsers/workspaces. Never mutate the source absence.
+    overrides = state.get("absenceOverrides", [])
+    if not isinstance(overrides, list) or len(overrides) > MAX_DAY_STATUSES:
+        raise ValueError("Invalid absence overrides list.")
+    cleaned_absence_overrides = []
+    seen_absence_days = set()
+    for override in overrides:
+        if not isinstance(override, dict):
+            raise ValueError("Invalid absence override.")
+        person = clean_text(override.get("person"), "Absence override employee", max_length=80, required=True)
+        iso = override.get("date")
+        if not isinstance(iso, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", iso) or not valid_iso_date(iso):
+            raise ValueError("Invalid absence override date.")
+        sources = override.get("statuses")
+        if not isinstance(sources, list) or not sources or len(sources) > MAX_DAY_STATUSES:
+            raise ValueError("Invalid absence override statuses.")
+        signatures = []
+        for source in sources:
+            if not isinstance(source, dict) or not isinstance(source.get("type"), str) or source["type"] not in ALLOWED_DAY_STATUS_TYPES:
+                raise ValueError("Invalid absence override status.")
+            start, end = source.get("startDate"), source.get("endDate")
+            if not valid_iso_date(start) or not valid_iso_date(end) or not start <= iso <= end:
+                raise ValueError("Invalid absence override range.")
+            signatures.append((source["type"], start, end))
+        matching = sorted(
+            (status["type"], status["startDate"], status["endDate"])
+            for status in state["dayStatuses"]
+            if status["person"] == person and status["startDate"] <= iso <= status["endDate"]
+        )
+        key = (person, iso)
+        # A removed/edited absence (including a new overlapping absence) expires
+        # the override. Missing employees and duplicate entries are harmless.
+        if person not in exact_people_names or not matching or sorted(signatures) != matching or key in seen_absence_days:
+            continue
+        seen_absence_days.add(key)
+        cleaned_absence_overrides.append({"person": person, "date": iso, "statuses": [
+            {"type": kind, "startDate": start, "endDate": end} for kind, start, end in matching
+        ]})
+    state["absenceOverrides"] = cleaned_absence_overrides
 
     event_ids: set[str] = set()
     for index, event in enumerate(state["calendarEvents"]):
