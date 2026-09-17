@@ -100,7 +100,7 @@ function renderEmployees(){
     return `<div class="employee-row" draggable="true" data-employee="${escapeHtml(p.name)}">
       <div class="employee-name-cell"><span class="drag-handle" title="Drag to reorder" aria-label="Drag ${escapeHtml(p.name)} to reorder">⋮⋮</span><div><strong>${escapeHtml(p.name)}</strong><div class="job-sub">${escapeHtml(p.workPattern || "Standard")}</div></div></div>
       <div><span class="pill grey">${escapeHtml(p.role)}</span></div>
-      <div><span class="pill ${employeeCountsCapacity(p) ? "green" : "grey"}">${employeeCountsCapacity(p) ? fmt(weeklyCapacity(p)) : "Non capacity"}</span></div>
+      <div><span class="pill ${employeeCountsInHomeCapacity(p) ? "green" : "grey"}">${employeeAvailableForSchedule(p) ? fmt(weeklyCapacity(p)) : "Admin"}</span></div>
       <div><div class="days-mini">${patternHtml}</div></div>
     </div>`;
   }).join("");
@@ -214,7 +214,7 @@ function openEmployeePanel(name){
   document.getElementById("employeePanelTitle").textContent = p.name || "Add employee";
   document.getElementById("employeeNameInput").value = p.name;
   document.getElementById("employeeRoleInput").value = p.role;
-  document.getElementById("employeeCountsCapacity").checked = employeeCountsCapacity(p);
+  document.getElementById("employeeCountsCapacity").checked = employeeCountsInHomeCapacity(p);
   updateEmployeeCapacityControl();
   document.getElementById("empMon").value = fmt((p.week && p.week.Mon) || 0);
   document.getElementById("empTue").value = fmt((p.week && p.week.Tue) || 0);
@@ -236,8 +236,8 @@ function updateEmployeeCapacityControl(){
   if (isAdminRole) checkbox.checked = false;
   checkbox.disabled = isAdminRole;
   hint.textContent = isAdminRole
-    ? "Admin employees are calendar-only and cannot count toward production capacity."
-    : "Turn this off for subcontractors who should appear on Calendar without adding company capacity.";
+    ? "Admin employees are calendar-only and cannot count in Home capacity."
+    : "Include this employee in Home capacity totals. They remain available in Schedule either way.";
 }
 function renameEmployeeReferences(oldName,newName){
   tasks.forEach(task => {
@@ -340,17 +340,8 @@ function saveEmployee(){
 
   const oldName = p.name;
   const oldRole = p.role;
-  const oldCountsCapacity = employeeCountsCapacity(p);
   const newRole = document.getElementById("employeeRoleInput").value;
   const newCountsCapacity = newRole !== "Admin" && document.getElementById("employeeCountsCapacity").checked;
-  if (oldName && oldCountsCapacity && !newCountsCapacity && oldRole !== "Admin") {
-    const linked = tasks.filter(task => task.type === "capacity" && (task.assigned || []).includes(oldName)).length;
-    if (linked) {showToast(`Reassign ${linked} capacity task${linked === 1 ? "" : "s"} before making this employee non-capacity.`); return;}
-  }
-  if (oldName && !oldCountsCapacity && newCountsCapacity) {
-    const linked = tasks.filter(task => task.type === "milestone" && (task.assigned || []).includes(oldName)).length;
-    if (linked) {showToast(`Remove this employee from ${linked} calendar-only task${linked === 1 ? "" : "s"} before making them capacity.`); return;}
-  }
   const standardWeek = getStandardWeekFromInputs();
   const customWeek1 = getCustomWeekInputs("w1");
   const customWeek2 = getCustomWeekInputs("w2");
@@ -402,7 +393,7 @@ function openCapacityOverridePanel(){
   const label=document.getElementById("capacityOverrideWeekLabel");
   if(label) label.textContent=`${weekStart.toLocaleDateString("en-AU",{day:"numeric",month:"short"})} – ${weekEnd.toLocaleDateString("en-AU",{day:"numeric",month:"short",year:"numeric"})}`;
   document.getElementById("capacityOverrideAmount").value="2h";
-  const capacityPeople=people.filter(employeeCountsCapacity);
+  const capacityPeople=people.filter(employeeAvailableForSchedule);
   document.getElementById("capacityOverrideEmployees").innerHTML=capacityPeople.map(person=>`<div class="employee-choice"><label><input type="checkbox" data-capacity-override-person="${escapeHtml(person.name)}"><strong>${escapeHtml(person.name)}</strong></label><span>${escapeHtml(person.role)}</span></div>`).join("") || `<div class="note">No capacity employees available.</div>`;
   document.getElementById("capacityOverrideDays").innerHTML=weekDates.map((dateObj,index)=>{
     const checked=index < 5 ? "checked" : "";

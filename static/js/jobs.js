@@ -267,7 +267,7 @@ function refreshAddJobPlan(){
   renderAddJobStages();
 }
 function employeesForDepartment(department){
-  const capacityPeople = people.filter(employeeCountsCapacity);
+  const capacityPeople = people.filter(employeeAvailableForSchedule);
   const matching = capacityPeople.filter(person => person.role === department);
   const others = capacityPeople.filter(person => person.role !== department);
   return [...matching,...others];
@@ -353,14 +353,14 @@ function normaliseStageAssignments(stage,totalHours){
   return [{person:"",hours:totalHours,date:stage.date || ""}];
 }
 function normaliseMilestoneAssignments(stage){
-  const validNames = new Set(people.filter(person => person.role !== "Admin" && !employeeCountsCapacity(person)).map(person => person.name));
+  const validNames = new Set(people.filter(person => person.role !== "Admin").map(person => person.name));
   const raw = Array.isArray(stage.assignments) ? stage.assignments : Array.isArray(stage.assigned) ? stage.assigned.map(person => ({person})) : stage.assigned ? [{person:stage.assigned}] : [];
   const cleaned = raw.map(item => ({person:item?.person || ""})).filter((item,index,array) => !item.person || (validNames.has(item.person) && array.findIndex(other => other.person === item.person) === index));
   return cleaned.length ? cleaned : [{person:""}];
 }
 function milestoneEmployeeOptions(selected){
-  const available = people.filter(person => person.role !== "Admin" && !employeeCountsCapacity(person));
-  return `<option value="">Choose non-capacity person</option>${available.map(person => `<option value="${escapeHtml(person.name)}" ${selected===person.name?"selected":""}>${escapeHtml(person.name)} · ${escapeHtml(person.role)}</option>`).join("")}`;
+  const available = people.filter(person => person.role !== "Admin");
+  return `<option value="">Choose employee</option>${available.map(person => `<option value="${escapeHtml(person.name)}" ${selected===person.name?"selected":""}>${escapeHtml(person.name)} · ${escapeHtml(person.role)}</option>`).join("")}`;
 }
 
 function stageAssignedHours(stage){
@@ -368,7 +368,7 @@ function stageAssignedHours(stage){
 }
 function stageRemainingHours(stage){return Math.round((Number(stage.hours||0)-stageAssignedHours(stage))*100)/100}
 function stageEmployeeOptions(stage,selected){
-  const capacityPeople = people.filter(employeeCountsCapacity);
+  const capacityPeople = people.filter(employeeAvailableForSchedule);
   const matching = capacityPeople.filter(person => person.role === stage.department);
   const others = capacityPeople.filter(person => person.role !== stage.department);
   const make = list => list.map(person => `<option value="${escapeHtml(person.name)}" ${selected===person.name?"selected":""}>${escapeHtml(person.name)} · ${escapeHtml(person.role)}</option>`).join("");
@@ -545,7 +545,7 @@ function splitStageEvenly(stageIndex){
 }
 function assignAllStagesByDepartment(){
   addJobStages.filter(stage=>stage.countsCapacity).forEach(stage => {
-    const employee = people.find(person => employeeCountsCapacity(person) && person.role === stage.department);
+    const employee = people.find(person => employeeAvailableForSchedule(person) && person.role === stage.department);
     stage.assignments = [{person:employee ? employee.name : "",hours:Number(stage.hours||0),date:stage.date || ""}];
   });
   renderAddJobStages();

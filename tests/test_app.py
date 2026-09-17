@@ -131,6 +131,34 @@ class TrackRAppTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "missing job"):
             trackr.validate_state(state)
 
+    def test_home_capacity_opt_out_keeps_schedule_assignments_and_persists(self):
+        csrf = self.login_admin()
+        state = self.client.get("/api/state").get_json()
+        employee = next(person for person in state["people"] if person["name"] == "Lewis")
+        employee["countsCapacity"] = False
+        state["tasks"] = [{
+            "id": "custom-home-opt-out",
+            "job": "Schedule work",
+            "name": "Assembly",
+            "type": "capacity",
+            "department": "Cabinet Making",
+            "date": "2026-09-14",
+            "duration": 120,
+            "assigned": ["Lewis"],
+            "assignmentMinutes": {"Lewis": 120},
+            "assignmentDates": {"Lewis": "2026-09-14"},
+            "scheduleOrder": {"Lewis": 1},
+            "status": "Planned",
+            "custom": True,
+        }]
+        response = self.client.post("/api/state", json=state, headers={"X-CSRF-Token": csrf})
+        self.assertEqual(response.status_code, 200)
+        trackr.init_db()
+        loaded = self.client.get("/api/state").get_json()
+        saved_employee = next(person for person in loaded["people"] if person["name"] == "Lewis")
+        self.assertFalse(saved_employee["countsCapacity"])
+        self.assertEqual(loaded["tasks"][0]["assigned"], ["Lewis"])
+
     def test_delivery_ready_confirmation_accepts_calculated_schedule_date(self):
         state = copy.deepcopy(trackr.DEFAULT_STATE)
         state["jobs"] = [{

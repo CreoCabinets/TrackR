@@ -14,14 +14,15 @@ function departmentBooked(startIso,endIso){
   const totals = {Drafting:0,"Cabinet Making":0,Machining:0,"Installer / Site":0};
   tasks.filter(task => task.type === "capacity").forEach(task => {
     (task.parts || []).forEach(part => {
-      if (part.date >= startIso && part.date <= endIso && task.department in totals) totals[task.department] += Number(part.minutes || 0);
+      const person = people.find(item => item.name === part.person);
+      if (part.date >= startIso && part.date <= endIso && task.department in totals && employeeCountsInHomeCapacity(person)) totals[task.department] += Number(part.minutes || 0);
     });
   });
   return totals;
 }
 function departmentCapacity(startDate,endDate){
   const totals = {Drafting:0,"Cabinet Making":0,Machining:0,"Installer / Site":0};
-  people.filter(person => employeeCountsCapacity(person) && person.role in totals).forEach(person => {
+  people.filter(person => employeeCountsInHomeCapacity(person) && person.role in totals).forEach(person => {
     for (let cursor = new Date(startDate); cursor <= endDate; cursor = addCalendarDays(cursor,1)) totals[person.role] += capacityForDate(person,cursor);
   });
   return totals;

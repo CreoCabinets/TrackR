@@ -412,7 +412,7 @@ def validate_state(payload: object) -> dict:
 
     people_names: set[str] = set()
     people_roles: dict[str, str] = {}
-    people_capacity: dict[str, bool] = {}
+    people_schedule_capacity: dict[str, bool] = {}
     for index, person in enumerate(state["people"]):
         if not isinstance(person, dict):
             raise ValueError(f"Employee {index + 1} is invalid.")
@@ -432,7 +432,7 @@ def validate_state(payload: object) -> dict:
             raise ValueError(f"Admin employee {name} cannot count toward capacity.")
         person["countsCapacity"] = counts_capacity
         people_roles[name] = role
-        people_capacity[name] = counts_capacity
+        people_schedule_capacity[name] = role != "Admin"
         pattern = person.get("workPattern", "Standard")
         if pattern not in {"Standard", "Custom"}:
             raise ValueError(f"Invalid work pattern for {name}.")
@@ -570,11 +570,11 @@ def validate_state(payload: object) -> dict:
         if task_type == "capacity":
             # Unassigned capacity tasks are valid. They remain visible in the
             # Schedule's Unassigned row until an employee is chosen later.
-            if any(people_roles.get(employee) == "Admin" or not people_capacity.get(employee, False) for employee in assigned):
-                raise ValueError(f"Capacity task {task_id} can only be assigned to capacity employees.")
+            if any(not people_schedule_capacity.get(employee, False) for employee in assigned):
+                raise ValueError(f"Capacity task {task_id} can only be assigned to Schedule employees.")
         if task_type == "milestone":
-            if any(people_roles.get(employee) == "Admin" or people_capacity.get(employee, False) for employee in assigned):
-                raise ValueError(f"Calendar-only task {task_id} can only be assigned to non-capacity employees.")
+            if any(people_roles.get(employee) == "Admin" for employee in assigned):
+                raise ValueError(f"Calendar-only task {task_id} cannot be assigned to Admin employees.")
         if task_type == "admin":
             if len(assigned) != 1 or people_roles.get(assigned[0]) != "Admin":
                 raise ValueError(f"Admin calendar task {task_id} must have one Admin employee.")
@@ -773,14 +773,7 @@ def migrate_state(state: object) -> tuple[dict, bool]:
             for person in state.get("people", [])
             if isinstance(person, dict) and person.get("name")
         }
-        capacity_names = {
-            name for name, person in people_by_name.items()
-            if person.get("role") != "Admin" and person.get("countsCapacity", person.get("role") != "Admin") is not False
-        }
-        non_capacity_names = {
-            name for name, person in people_by_name.items()
-            if person.get("role") != "Admin" and person.get("countsCapacity", person.get("role") != "Admin") is False
-        }
+        schedule_names = {name for name, person in people_by_name.items() if person.get("role") != "Admin"}
         for task in state.get("tasks", []):
             if not isinstance(task, dict):
                 continue
@@ -800,7 +793,7 @@ def migrate_state(state: object) -> tuple[dict, bool]:
                 continue
 
             if stone_task and task.get("type") != "milestone":
-                kept = [name for name in task.get("assigned", []) if name in non_capacity_names]
+                kept = [name for name in task.get("assigned", []) if name in schedule_names]
                 task["type"] = "milestone"
                 task["department"] = "Milestone"
                 task["duration"] = 0
@@ -838,7 +831,7 @@ def migrate_state(state: object) -> tuple[dict, bool]:
                 continue
 
             if generated_stage and not stone_task and task.get("type") == "milestone":
-                kept = [name for name in task.get("assigned", []) if name in capacity_names]
+                kept = [name for name in task.get("assigned", []) if name in schedule_names]
                 duration = max(0, float(task.get("duration", 0) or 0))
                 estimated = max(0, float(task.get("estimatedHours", 0) or 0))
                 if duration <= 0 and estimated > 0:

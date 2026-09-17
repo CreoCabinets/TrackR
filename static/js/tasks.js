@@ -184,8 +184,8 @@ function updateAllocationSummaryForCurrentForm(){
 function renderEmployeeChoices(selected){
   const type = document.getElementById("taskType").value;
   const available = type === "capacity"
-    ? people.filter(employeeCountsCapacity)
-    : people.filter(person => person.role !== "Admin" && !employeeCountsCapacity(person));
+    ? people.filter(employeeAvailableForSchedule)
+    : people.filter(person => person.role !== "Admin");
   const choices = available.map(person => `
     <div class="employee-choice">
       <label><input type="checkbox" value="${escapeHtml(person.name)}" ${selected.includes(person.name) ? "checked" : ""} data-change-action="handleTaskEmployeeSelectionChange">${escapeHtml(person.name)}</label>
@@ -327,7 +327,7 @@ async function setDayAbsenceOverride(personName,iso,working){
   if (!isAdmin || !stateLoaded || absenceOverrideSaving || typeof working !== "boolean") return false;
   const dateObj = parseIsoDate(iso);
   const person = people.find(item => item.name === personName);
-  if (!dateObj || toIsoDate(dateObj) !== iso || !employeeCountsCapacity(person)) return false;
+  if (!dateObj || toIsoDate(dateObj) !== iso || !employeeAvailableForSchedule(person)) return false;
   const statuses = absenceStatusesForDate(personName,dateObj);
   const rosterDayOff = rosterDayOffForDate(person,dateObj);
   if ((!statuses.length && !rosterDayOff) || statuses.some(status => !["RDO","Away","Holiday","Sick"].includes(status.type))) return false;
@@ -453,7 +453,7 @@ function refreshRosterTotals(){
 
 
 function openStatusPanel(personName=null, dayIndex=null){
-  document.getElementById("statusPerson").innerHTML = people.filter(employeeCountsCapacity).map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join("");
+  document.getElementById("statusPerson").innerHTML = people.filter(employeeAvailableForSchedule).map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join("");
   const opts = days.map(d => `<option value="${d.iso}">${d.name} ${d.date}</option>`).join("");
   document.getElementById("statusStart").innerHTML = opts;
   document.getElementById("statusEnd").innerHTML = opts;

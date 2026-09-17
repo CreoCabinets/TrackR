@@ -13,7 +13,7 @@ function renderSchedule(){
     return `<div class="day-head ${day.working ? "" : "weekend"} ${isToday ? "today" : ""} ${closure ? "closed" : ""}" title="${closure ? escapeHtml(closure.name) : ""}"><span class="day-cap">${closure ? "Closed" : isToday ? "Today" : day.working ? "Work" : "Off"}</span><div class="day-name">${day.name}<span class="day-date">${day.date}</span></div></div>`;
   }).join("");
   const rows=document.getElementById("rows");rows.innerHTML="";
-  const rowNames=people.filter(employeeCountsCapacity).filter(person=>{
+  const rowNames=people.filter(employeeAvailableForSchedule).filter(person=>{
     if(!query) return true;
     return normaliseSearch(`${person.name} ${person.role}`).includes(query) || tasks.some(task=>(task.assigned || []).includes(person.name) && taskMatchesQuery(task,query));
   }).map(person=>person.name);

@@ -432,7 +432,10 @@ function globalCalendarEventForDate(dateObj){
   const iso = toIsoDate(dateObj);
   return calendarEvents.find(event => iso >= event.startDate && iso <= event.endDate) || null;
 }
-function employeeCountsCapacity(person){ return !!person && person.role !== "Admin" && person.countsCapacity !== false; }
+// Schedule eligibility and Home reporting are deliberately separate. A person
+// excluded from the Home metric still has their normal Schedule availability.
+function employeeAvailableForSchedule(person){ return !!person && person.role !== "Admin"; }
+function employeeCountsInHomeCapacity(person){ return employeeAvailableForSchedule(person) && person.countsCapacity !== false; }
 function defaultCalendarVisibilityForStage(value){
   const name=normaliseSearch(value);
   if(name.includes("stone")) return false;
@@ -446,7 +449,7 @@ function jobMissingDetailsCount(jobId){
 }
 function calendarTaskVisible(task){ return !!task && (task.type === "milestone" || task.type === "admin" || (task.type === "capacity" && task.showOnCalendar === true)); }
 function rosteredCapacityForDate(person,dateObj){
-  if (!employeeCountsCapacity(person) || !dateObj) return 0;
+  if (!employeeAvailableForSchedule(person) || !dateObj) return 0;
   const dayName = dateObj.toLocaleDateString("en-AU",{weekday:"short"});
   return Math.max(0,Number(weekPatternForDate(person,dateObj)[dayName] || 0));
 }
@@ -455,7 +458,7 @@ function defaultDailyCapacity(person){
   return values.length ? Math.max(...values) : 460;
 }
 function workingDayCapacityForDate(person,dateObj){
-  if (!employeeCountsCapacity(person) || !dateObj) return 0;
+  if (!employeeAvailableForSchedule(person) || !dateObj) return 0;
   const weekday = dateObj.toLocaleDateString("en-AU",{weekday:"short"});
   if (person.workPattern === "Custom") {
     // Seven days away is the same weekday in the other half of the roster.
@@ -467,7 +470,7 @@ function workingDayCapacityForDate(person,dateObj){
   return Number.isFinite(baseMinutes) && baseMinutes > 0 ? baseMinutes : defaultDailyCapacity(person);
 }
 function rosterDayOffForDate(person,dateObj){
-  return employeeCountsCapacity(person) && !!dateObj && rosteredCapacityForDate(person,dateObj) === 0 &&
+  return employeeAvailableForSchedule(person) && !!dateObj && rosteredCapacityForDate(person,dateObj) === 0 &&
     absenceStatusesForDate(person.name,dateObj).length === 0;
 }
 function rosterWorkOverrideForDate(person,dateObj){
@@ -481,11 +484,11 @@ function capacityOverrideForDate(person,dateObj){
   return Number.isFinite(value) ? Math.max(0,value) : null;
 }
 function normalCapacityForDate(person,dateObj){
-  if (!employeeCountsCapacity(person) || !dateObj || !isWorkingProductionDay(dateObj)) return 0;
+  if (!employeeAvailableForSchedule(person) || !dateObj || !isWorkingProductionDay(dateObj)) return 0;
   return rosteredCapacityForDate(person,dateObj);
 }
 function capacityForDate(person,dateObj){
-  if (!employeeCountsCapacity(person) || !dateObj) return 0;
+  if (!employeeAvailableForSchedule(person) || !dateObj) return 0;
   if (calendarEventBlocksProduction(globalCalendarEventForDate(dateObj))) return 0;
   if (blockedStatusForDate(person.name,dateObj)) return 0;
   // Working an absence restores only the actual roster, never inferred hours or OT.
@@ -496,7 +499,7 @@ function capacityForDate(person,dateObj){
 }
 function capacityFor(person, dayIndex){ return capacityForDate(person, dateForDayIndex(dayIndex)); }
 function weeklyCapacity(person){
-  if (!employeeCountsCapacity(person)) return 0;
+  if (!employeeAvailableForSchedule(person)) return 0;
   if ((person.workPattern || "Standard") === "Custom") {
     const week1 = Object.values(person.week1 || {}).reduce((sum, mins) => sum + (mins || 0), 0);
     const week2 = Object.values(person.week2 || {}).reduce((sum, mins) => sum + (mins || 0), 0);
@@ -577,7 +580,7 @@ function calculate(){
   // eligible work is filled top-to-bottom using the manual Schedule order.
   // Lower-priority work automatically spills forward instead of overbooking.
   const capacityTasks = tasks.filter(task => task.type === "capacity");
-  people.filter(employeeCountsCapacity).forEach(person => {
+  people.filter(employeeAvailableForSchedule).forEach(person => {
     const work = [];
     capacityTasks.forEach(task => {
       if (!(task.assigned || []).includes(person.name)) return;

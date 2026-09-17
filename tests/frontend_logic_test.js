@@ -79,7 +79,7 @@ const context = { console, calendarEvents: [] };
 vm.createContext(context);
 vm.runInContext(names.map(extractFunction).join("\n"), context);
 context.legacyDateForDayIndex = () => new Date(2026, 8, 7);
-context.employeeCountsCapacity = person => !!person && person.countsCapacity !== false && person.role !== "Admin";
+context.employeeAvailableForSchedule = person => !!person && person.role !== "Admin";
 context.capacityForDate = () => 480;
 
 function assert(condition, message) {
@@ -287,7 +287,7 @@ async function testAbsenceOverrides(){
   h.run('people[0].week2.Wed=0;');
   assert(h.run('capacityFor(people[0],2)')===0,"zero roster RDO stays zero");
   h.run('people[0].countsCapacity=false;');
-  assert(h.run('capacityFor(people[0],2)')===0,"non-capacity employee stays zero");
+  assert(h.run('capacityFor(people[0],2)')===0,"absence still blocks an employee excluded from Home capacity");
   h.run('people[0].countsCapacity=true; people[0].workPattern="Standard";');
   h.run('dayStatuses[0].endDate="2026-09-17";');
   assert(h.run('capacityFor(people[0],2)')===0,"edited source invalidates override even if date still covered");
@@ -438,4 +438,26 @@ async function testRosterDayOffOverrides(){
   assert(conflict.run('capacityFor(people[0],4)')===0 && !conflict.elements.get("dayPanelBody").innerHTML.includes("RDO overridden"),"conflict reloads saved roster capacity and panel");
   console.log("roster day-off override tests passed");
 }
-testAbsenceOverrides().then(testRosterDayOffOverrides).catch(error=>{console.error(error);process.exitCode=1;});
+async function testHomeCapacityOptOut(){
+  const h=absenceHarness();
+  h.run('tasks=[{id:"BEN",type:"capacity",department:"Cabinet Making",date:"2026-09-14",duration:120,assigned:["Ben"],assignmentMinutes:{Ben:120},assignmentDates:{Ben:"2026-09-14"}},{id:"LUKE",type:"capacity",department:"Cabinet Making",date:"2026-09-14",duration:120,assigned:["Luke"],assignmentMinutes:{Luke:120},assignmentDates:{Luke:"2026-09-14"}}]; calculate(); document.getElementById("rows").children=[]; renderSchedule();');
+  assert(h.elements.get("rows").children.length===2,"all Schedule employees render while counted in Home capacity");
+  assert(h.run('capacityFor(people[0],0)')===480 && h.run('tasks[0].parts[0].minutes')===120,"roster hours and task scheduling work normally");
+  assert(h.run('departmentCapacity(new Date(2026,8,14),new Date(2026,8,18))["Cabinet Making"]')===3900,"Home capacity includes both employees when enabled");
+  assert(h.run('departmentBooked("2026-09-14","2026-09-18")["Cabinet Making"]')===240,"Home workload includes both employees when enabled");
+  h.run('people[0].countsCapacity=false; calculate(); document.getElementById("rows").children=[]; renderSchedule();');
+  assert(h.elements.get("rows").children.length===2,"Home opt-out does not hide the employee from Schedule");
+  assert(h.run('capacityFor(people[0],0)')===480 && h.run('tasks[0].parts[0].minutes')===120,"Home opt-out keeps normal Schedule capacity and task allocation");
+  assert(h.run('departmentCapacity(new Date(2026,8,14),new Date(2026,8,18))["Cabinet Making"]')===1950,"Home capacity excludes opted-out available hours");
+  assert(h.run('departmentBooked("2026-09-14","2026-09-18")["Cabinet Making"]')===120,"Home workload excludes opted-out allocations");
+  h.run('dayStatuses=[{person:"Ben",type:"Holiday",startDate:"2026-09-16",endDate:"2026-09-16"}];');
+  assert(h.run('capacityFor(people[0],2)')===0,"absence still blocks a Home-opted-out employee");
+  await h.run('setDayAbsenceOverride("Ben","2026-09-16",true)');
+  assert(h.run('capacityFor(people[0],2)')===360,"single-day absence override still restores Schedule capacity");
+  await h.run('setDayAbsenceOverride("Ben","2026-09-16",false)');
+  assert(h.run('capacityFor(people[0],2)')===0,"restoring the absence still blocks the date");
+  h.run('dayStatuses=[]; people[0].countsCapacity=true;');
+  assert(h.run('departmentCapacity(new Date(2026,8,14),new Date(2026,8,18))["Cabinet Making"]')===3900 && h.run('departmentBooked("2026-09-14","2026-09-18")["Cabinet Making"]')===240,"re-enabling restores both Home totals");
+  console.log("Home capacity opt-out tests passed");
+}
+testAbsenceOverrides().then(testRosterDayOffOverrides).then(testHomeCapacityOptOut).catch(error=>{console.error(error);process.exitCode=1;});
