@@ -32,33 +32,38 @@
       <div><h1>Home</h1><p class="sub">A clear view of production capacity, upcoming work and team availability.</p></div>
       <div class="header-actions"><label class="view-search"><input id="homeSearch" type="search" aria-label="Search Home" placeholder="Job, builder, address or employee" data-input-action="renderHome"></label><div class="week-switch"><button id="homeThisWeek" class="active" data-click-action="setHomeWeek" data-click-args="[&quot;this&quot;]">This week</button><button id="homeNextWeek" data-click-action="setHomeWeek" data-click-args="[&quot;next&quot;]">Next week</button></div></div>
     </div>
-    <section class="panel">
-      <div class="panel-head"><div><h2>Department capacity</h2><p>Reads from employee hours and scheduled capacity work. The light gap shows unused capacity.</p></div></div>
+    <section class="panel home-capacity-panel">
+      <div class="panel-head home-section-head"><div><span class="section-kicker">Production load</span><h2>Department capacity</h2><p>Booked hours against available team capacity for the selected week.</p></div><div class="capacity-key"><span></span>Unbooked capacity</div></div>
       <div class="capacity-wrap">
-        <div class="capacity-donut" id="homeDonut"><div class="capacity-center"><strong id="homeBookedTotal">0h</strong><span id="homeCapacityTotal">of 0h capacity</span></div></div>
+        <div class="capacity-visual"><div class="capacity-visual-label">Total booked</div><div class="capacity-donut" id="homeDonut"><div class="capacity-center"><strong id="homeBookedTotal">0h</strong><span id="homeCapacityTotal">of 0h capacity</span></div></div></div>
         <div class="legend-list">
-          <div class="legend-row"><span class="legend-dot" style="background:#4a84d8"></span><div><div class="legend-title">Drafting</div><div class="legend-sub">Forward Ordering, Drafting and QC</div></div><strong id="homeDrafting">0h / 0h</strong></div>
-          <div class="legend-row"><span class="legend-dot" style="background:#3f9a63"></span><div><div class="legend-title">Cabinet Making</div><div class="legend-sub">Assembly, loading and delivery</div></div><strong id="homeCabinet">0h / 0h</strong></div>
-          <div class="legend-row"><span class="legend-dot" style="background:#9d62d3"></span><div><div class="legend-title">Machining</div><div class="legend-sub">CNC and edgebander</div></div><strong id="homeMachining">0h / 0h</strong></div>
-          <div class="legend-row"><span class="legend-dot" style="background:#e07a5f"></span><div><div class="legend-title">Installer / Site</div><div class="legend-sub">Installations and site work</div></div><strong id="homeInstaller">0h / 0h</strong></div>
+          <div class="legend-head"><span>Department</span><span>Booked / capacity</span></div>
+          <div class="legend-row"><span class="legend-dot" style="background:#4a84d8"></span><div><div class="legend-title">Drafting</div><div class="legend-sub">Forward ordering, drafting and QC</div></div><strong class="legend-value" id="homeDrafting">0h / 0h</strong></div>
+          <div class="legend-row"><span class="legend-dot" style="background:#3f9a63"></span><div><div class="legend-title">Cabinet Making</div><div class="legend-sub">Assembly, loading and delivery</div></div><strong class="legend-value" id="homeCabinet">0h / 0h</strong></div>
+          <div class="legend-row"><span class="legend-dot" style="background:#9d62d3"></span><div><div class="legend-title">Machining</div><div class="legend-sub">CNC and edgebander</div></div><strong class="legend-value" id="homeMachining">0h / 0h</strong></div>
+          <div class="legend-row"><span class="legend-dot" style="background:#e07a5f"></span><div><div class="legend-title">Installer / Site</div><div class="legend-sub">Installations and site work</div></div><strong class="legend-value" id="homeInstaller">0h / 0h</strong></div>
         </div>
       </div>
     </section>
-    <section class="panel">
-      <div class="panel-head"><div><h2 id="homeJobsTitle">This week’s jobs</h2><p>Click a job to see what is happening and who is doing it.</p></div></div>
-      <div class="home-jobs" id="homeJobs"></div>
+    <section class="panel home-production-panel">
+      <div class="panel-head home-section-head"><div><span class="section-kicker">Production summary</span><h2 id="homeJobsTitle">This week’s jobs</h2><p>Open a job to review its scheduled tasks and assigned employees.</p></div></div>
+      <div class="home-job-table">
+        <div class="home-job-columns" aria-hidden="true"><span>Job / site</span><span>Status</span><span>Scheduled</span><span></span></div>
+        <div class="home-jobs" id="homeJobs"></div>
+      </div>
     </section>
   </section>
 
   <section id="jobsView" class="view">
-    <div class="header"><div><h1>Jobs</h1></div><div class="header-actions"><label class="view-search"><input id="jobsSearch" type="search" aria-label="Search Jobs" placeholder="Job, builder, address or employee" data-input-action="renderJobs"></label><button class="primary" data-click-action="openAddJob">Add job</button></div></div>
-    <div class="jobs-compact-toolbar">
+    <div class="header"><div><h1>Jobs</h1><p class="sub">Current production work, planned capacity and key milestones.</p></div><div class="header-actions"><button class="primary" data-click-action="openAddJob">Add job</button></div></div>
+    <div class="jobs-toolbar">
       <div class="jobs-mode-switch" aria-label="Job list view"><button id="jobsCurrentBtn" class="active" data-click-action="setJobsViewMode" data-click-args="[&quot;current&quot;]">Current 0</button><button id="jobsArchiveBtn" data-click-action="setJobsViewMode" data-click-args="[&quot;archive&quot;]">Archive</button></div>
+      <label class="view-search"><input id="jobsSearch" type="search" aria-label="Search Jobs" placeholder="Job, builder, address or employee" data-input-action="renderJobs"></label>
     </div>
     <section class="panel jobs-list-panel">
-      <div class="jobs-table">
-        <div class="table-head"><div>Job</div><div>Builder / Client</div><div>Address</div><div>Install</div><div>Capacity hours</div><div>Milestones</div></div>
-        <div id="jobRows"></div>
+      <div class="jobs-table" role="table" aria-label="Jobs">
+        <div class="table-head" role="row"><div role="columnheader">Job / status</div><div role="columnheader">Builder / client</div><div role="columnheader">Site address</div><div role="columnheader">Install</div><div role="columnheader">Planned hours</div><div role="columnheader">Milestones</div></div>
+        <div id="jobRows" role="rowgroup"></div>
       </div>
     </section>
   </section>
@@ -190,14 +195,15 @@
     <div class="header"><div><h1>Settings</h1><p class="sub">Manage users, employees and company-wide calendar closures.</p></div></div>
     <div class="settings-layout">
       <aside class="settings-menu" aria-label="Settings categories">
-        <button id="settingsNavUser" data-click-action="showSettingsSection" data-click-args="[&quot;user&quot;]">User Admin</button>
-        <button id="settingsNavEmployees" class="active" data-click-action="showSettingsSection" data-click-args="[&quot;employees&quot;]">Employees</button>
-        <button id="settingsNavCalendarEvents" data-click-action="showSettingsSection" data-click-args="[&quot;calendarEvents&quot;]">Calendar Events</button>
+        <div class="settings-menu-label">Configuration</div>
+        <button id="settingsNavUser" data-click-action="showSettingsSection" data-click-args="[&quot;user&quot;]"><span>User Admin</span><small>Access and passwords</small></button>
+        <button id="settingsNavEmployees" class="active" data-click-action="showSettingsSection" data-click-args="[&quot;employees&quot;]"><span>Employees</span><small>Roster and capacity</small></button>
+        <button id="settingsNavCalendarEvents" data-click-action="showSettingsSection" data-click-args="[&quot;calendarEvents&quot;]"><span>Calendar Events</span><small>Closures and holidays</small></button>
       </aside>
       <div class="settings-content">
         <section id="settingsUserSection" class="settings-section">
-          <section class="panel">
-            <div class="panel-head"><div><h2>User Admin</h2><p>Create admins or read-only users, reset passwords and remove accounts.</p></div><a class="button-link" href="/api/backup">Download backup</a></div>
+          <section class="panel settings-surface">
+            <div class="panel-head settings-section-head"><div><span class="section-kicker">Security</span><h2>User Admin</h2><p>Create admins or read-only users, reset passwords and remove accounts.</p></div><a class="button-link" href="/api/backup">Download backup</a></div>
             <div class="user-admin-form">
               <div class="form-row"><label>Username</label><input id="newUsername" minlength="3" maxlength="32" autocapitalize="none" spellcheck="false" autocomplete="off" placeholder="e.g. factory2"></div>
               <div class="form-row"><label>Temporary password</label><input id="newUserPassword" type="password" minlength="12" maxlength="200" autocomplete="new-password" placeholder="12–200 characters"></div>
@@ -209,8 +215,8 @@
         </section>
 
         <section id="settingsEmployeesSection" class="settings-section active">
-          <section class="panel">
-            <div class="panel-head"><div><h2>Employees</h2><p>Drag employees to set their order. The same order is used on Schedule.</p></div><button class="primary" data-click-action="openEmployeePanel" data-click-args="[null]">Add employee</button></div>
+          <section class="panel settings-surface">
+            <div class="panel-head settings-section-head"><div><span class="section-kicker">Production team</span><h2>Employees</h2><p>Manage roster patterns and capacity. Drag rows to set the Schedule order.</p></div><button class="primary" data-click-action="openEmployeePanel" data-click-args="[null]">Add employee</button></div>
             <div class="employee-table">
               <div class="employee-head"><div>Employee</div><div>Department</div><div>Capacity</div><div>Working week</div></div>
               <div id="employeeRows"></div>
@@ -219,8 +225,8 @@
         </section>
 
         <section id="settingsCalendarEventsSection" class="settings-section">
-          <section class="panel">
-            <div class="panel-head"><div><h2>Calendar Events</h2><p>Block company-wide dates for public holidays, factory closures and shutdowns. These dates appear on Calendar and have zero capacity in Schedule.</p></div></div>
+          <section class="panel settings-surface">
+            <div class="panel-head settings-section-head"><div><span class="section-kicker">Production calendar</span><h2>Calendar Events</h2><p>Block company-wide dates for public holidays, factory closures and shutdowns. These dates appear on Calendar and have zero capacity in Schedule.</p></div></div>
             <div class="calendar-event-form">
               <div class="form-row full-mobile"><label>Event name</label><input id="calendarEventName" placeholder="e.g. Christmas shutdown"></div>
               <div class="form-row"><label>Type</label><select id="calendarEventType"><option>Factory Closure</option><option>Public Holiday</option><option>Company Event</option></select></div>

@@ -94,13 +94,14 @@ function renderEmployees(){
   const rows = document.getElementById("employeeRows");
   if (!rows) return;
   rows.innerHTML = people.map(p => {
+    const rosterWeek = (label,week) => `<div class="roster-week"><span class="roster-week-label">${label}</span>${["Mon","Tue","Wed","Thu","Fri"].map(d => `<span class="day-dot ${(week[d] || 0) === 0 ? "off" : ""}" title="${d}: ${(week[d] || 0) === 0 ? "RDO" : fmt(week[d])}">${d[0]}</span>`).join("")}</div>`;
     const patternHtml = (p.workPattern || "Standard") === "Custom"
-      ? ["Mon","Tue","Wed","Thu","Fri"].map(d => `<span class="day-dot ${(p.week1[d] || 0) === 0 ? "off" : ""}">${d[0]}</span>`).join("") + ["Mon","Tue","Wed","Thu","Fri"].map(d => `<span class="day-dot ${(p.week2[d] || 0) === 0 ? "off" : ""}">${d[0]}</span>`).join("")
-      : ["Mon","Tue","Wed","Thu","Fri"].map(d => `<span class="day-dot ${(p.week[d] || 0) === 0 ? "off" : ""}">${d[0]}</span>`).join("");
+      ? rosterWeek("W1",p.week1 || {}) + rosterWeek("W2",p.week2 || {})
+      : rosterWeek("Week",p.week || {});
     return `<div class="employee-row" draggable="true" data-employee="${escapeHtml(p.name)}">
       <div class="employee-name-cell"><span class="drag-handle" title="Drag to reorder" aria-label="Drag ${escapeHtml(p.name)} to reorder">⋮⋮</span><div><strong>${escapeHtml(p.name)}</strong><div class="job-sub">${escapeHtml(p.workPattern || "Standard")}</div></div></div>
-      <div><span class="pill grey">${escapeHtml(p.role)}</span></div>
-      <div><span class="pill ${employeeCountsInHomeCapacity(p) ? "green" : "grey"}">${employeeAvailableForSchedule(p) ? fmt(weeklyCapacity(p)) : "Admin"}</span></div>
+      <div class="employee-department">${escapeHtml(p.role)}</div>
+      <div class="employee-capacity ${employeeCountsInHomeCapacity(p) ? "" : "excluded"}"><strong>${employeeAvailableForSchedule(p) ? fmt(weeklyCapacity(p)) : "Admin"}</strong><span>${employeeCountsInHomeCapacity(p) ? "Home total" : "Not in Home total"}</span></div>
       <div><div class="days-mini">${patternHtml}</div></div>
     </div>`;
   }).join("");

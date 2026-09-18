@@ -839,14 +839,19 @@ function renderJobs(){
     const capMins = jobTasks.filter(task => task.type === "capacity").reduce((sum,task) => sum+Number(task.duration || 0),0);
     const milestones = calendarStageNamesForJob(job.id).join(", ") || "None";
     const missingCount = jobMissingDetailsCount(job.id);
-    return `<div class="job-row" data-job-id="${escapeHtml(encodeURIComponent(job.id))}">
-      <div><div class="job-title">${escapeHtml(job.id)}</div><div class="job-sub">${jobTasks.length} tasks · ${escapeHtml(job.status || "Active")}</div>${missingCount?`<span class="job-detail-warning">⚠ ${missingCount} task${missingCount===1?"":"s"} need details</span>`:``}</div>
-      <div><span class="job-sub">${escapeHtml(job.builder || "—")}</span></div>
-      <div><span class="job-sub">${escapeHtml(job.address)}</span></div>
-      <div><span class="pill ${job.status === "Forecast" ? "yellow" : "grey"}">${escapeHtml(job.install || "")}</span></div>
-      <div><span class="pill green">${fmt(capMins)}</span></div>
-      <div><span class="job-sub">${escapeHtml(milestones)}</span></div>
+    const statusClass = job.status === "Forecast" ? "forecast" : job.status === "On Hold" ? "hold" : job.status === "Complete" ? "complete" : "active";
+    return `<div class="job-row" role="row" tabindex="0" data-job-id="${escapeHtml(encodeURIComponent(job.id))}">
+      <div class="job-cell job-identity" role="cell"><div class="job-title">${escapeHtml(job.id)}</div><div class="job-status ${statusClass}">${escapeHtml(job.status || "Active")}</div><div class="job-sub">${jobTasks.length} task${jobTasks.length === 1 ? "" : "s"}</div>${missingCount?`<span class="job-detail-warning">⚠ ${missingCount} task${missingCount===1?"":"s"} need details</span>`:``}</div>
+      <div class="job-cell job-builder" role="cell">${escapeHtml(job.builder || "—")}</div>
+      <div class="job-cell job-address" role="cell">${escapeHtml(job.address)}</div>
+      <div class="job-cell job-install" role="cell"><strong>${escapeHtml(job.install || "—")}</strong></div>
+      <div class="job-cell job-capacity" role="cell"><strong>${fmt(capMins)}</strong><span>planned</span></div>
+      <div class="job-cell job-milestones" role="cell">${escapeHtml(milestones)}</div>
     </div>`;
   }).join("") || `<div class="search-empty">${query ? "No jobs match this search." : (jobsViewMode === "archive" ? "No jobs have moved to Archive yet." : "No current jobs to show.")}</div>`;
-  rows.querySelectorAll("[data-job-id]").forEach(row => row.addEventListener("click",()=>openEditJob(decodeURIComponent(row.dataset.jobId))));
+  rows.querySelectorAll("[data-job-id]").forEach(row => {
+    const open = () => openEditJob(decodeURIComponent(row.dataset.jobId));
+    row.addEventListener("click",open);
+    row.addEventListener("keydown",event => {if (event.key === "Enter" || event.key === " ") {event.preventDefault();open();}});
+  });
 }

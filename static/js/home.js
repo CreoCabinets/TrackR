@@ -64,10 +64,13 @@ function renderHome(){
     const jobTasks = tasks.filter(task => task.job === job.id && ((task.date >= range.startIso && task.date <= range.endIso) || (task.parts || []).some(part => part.date >= range.startIso && part.date <= range.endIso))).slice(0,6);
     return `<div class="home-job ${idx === 0 ? "open" : ""}">
       <div class="home-job-head" data-home-toggle>
-        <div><div class="home-job-title">${escapeHtml(job.id)} · ${escapeHtml(job.address)}</div><div class="home-job-sub">${escapeHtml(job.builder || "No builder/client")} · ${jobTasks.length} scheduled items · ${escapeHtml(job.status || "Active")}</div></div>
-        <span>⌃</span>
+        <div class="home-job-main"><div class="home-job-title"><span>${escapeHtml(job.id)}</span>${escapeHtml(job.address)}</div><div class="home-job-sub">${escapeHtml(job.builder || "No builder/client")}</div></div>
+        <div class="home-job-state">${escapeHtml(job.status || "Active")}</div>
+        <div class="home-job-count"><strong>${jobTasks.length}</strong><span>item${jobTasks.length === 1 ? "" : "s"}</span></div>
+        <span class="home-job-chevron" aria-hidden="true">⌄</span>
       </div>
       <div class="home-job-detail">
+        <div class="home-detail-head"><span>Scheduled task</span><span>Assigned to</span></div>
         ${jobTasks.map(task => `<div class="mini-detail"><span>${escapeHtml(task.name)}</span><strong>${(task.assigned || []).length ? (task.assigned || []).map(escapeHtml).join(", ") : "Calendar"}</strong></div>`).join("") || `<div class="note">No scheduled items in this week.</div>`}
       </div>
     </div>`;
