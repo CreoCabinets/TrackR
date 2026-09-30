@@ -7,7 +7,7 @@
 - [ ] Set a long random `TRACKR_SECRET_KEY` (minimum 32 characters).
 - [ ] Set `TRACKR_BOOTSTRAP_ADMIN_USERNAME` and a temporary `TRACKR_BOOTSTRAP_ADMIN_PASSWORD` (12–200 characters).
 - [ ] If a first read-only account is wanted, set both `TRACKR_BOOTSTRAP_FACTORY_USERNAME` and `TRACKR_BOOTSTRAP_FACTORY_PASSWORD`.
-- [ ] Confirm `TRACKR_DB_PATH` is **not** set on Railway. The live DB must resolve to `<RAILWAY_VOLUME_MOUNT_PATH>/trackr.sqlite3`.
+- [ ] Confirm `RAILWAY_VOLUME_MOUNT_PATH` is non-empty, absolute and points to the attached, existing volume directory; TrackR refuses to start otherwise. The live DB resolves to `<RAILWAY_VOLUME_MOUNT_PATH>/trackr.sqlite3`, regardless of `TRACKR_DB_PATH`. Remove `TRACKR_DB_PATH` from Railway variables when convenient to avoid confusion.
 - [ ] Confirm the service has exactly one replica.
 - [ ] Confirm `railway.toml` launches the packaged one-worker Gunicorn command.
 - [ ] Deploy and confirm the `/health` check passes.

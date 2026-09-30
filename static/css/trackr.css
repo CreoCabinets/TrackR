@@ -393,6 +393,7 @@ input:not([type="checkbox"]):not([type="radio"]),select,textarea{min-height:var(
 @media(max-width:900px){
   main{padding:16px 14px 72px}
   .topbar{height:auto;min-height:64px;margin:-16px -14px 20px;padding:10px 14px;gap:10px;flex-wrap:wrap}
+  .schedule-sticky-stack{top:113px}
   .brand{min-width:auto}.logo{width:36px;height:36px}.brand strong{font-size:20px}
   .nav{order:3;width:100%;flex-basis:100%}.nav button{padding:8px 12px}
   .account-tools{margin-left:auto}.account-pill span{display:none}

@@ -242,9 +242,11 @@ function updateEmployeeCapacityControl(){
 }
 function renameEmployeeReferences(oldName,newName){
   tasks.forEach(task => {
-    task.assigned = (task.assigned || []).map(name => name === oldName ? newName : name);
+    if (Array.isArray(task.assigned) && task.assigned.includes(oldName)) {
+      task.assigned = [...new Set(task.assigned.map(name => name === oldName ? newName : name))];
+    }
     if (task.adminEmployee === oldName) task.adminEmployee = newName;
-    ["assignmentMinutes","assignmentDates"].forEach(key => {
+    ["assignmentMinutes","assignmentDates","scheduleOrder"].forEach(key => {
       const mapping = task[key] || {};
       if (Object.prototype.hasOwnProperty.call(mapping,oldName)) {
         mapping[newName] = mapping[oldName];
@@ -274,7 +276,14 @@ function convertEmployeeAssignmentsForRole(name,oldRole,newRole,newCountsCapacit
       if (task.assignmentDates) delete task.assignmentDates[name];
       task.duration = Math.max(0,Number(task.duration || 0)-share);
       task.estimatedHours = Number(task.duration || 0)/60;
-      if (share > 0) additions.push({...task,id:`${task.id}-admin-${Date.now()}-${additions.length}`,type:"admin",department:"Admin",adminEmployee:name,duration:share,estimatedHours:share/60,assigned:[name],assignmentMinutes:{[name]:share},assignmentDates:{[name]:assignmentDate},date:assignmentDate,endDate:assignmentDate,parts:[]});
+      const adminOrder=task.scheduleOrder?.[name];
+      if(task.scheduleOrder) delete task.scheduleOrder[name];
+      if (share > 0) {
+        const adminTask={...task,id:`${task.id}-admin-${Date.now()}-${additions.length}`,type:"admin",department:"Admin",adminEmployee:name,duration:share,estimatedHours:share/60,assigned:[name],assignmentMinutes:{[name]:share},assignmentDates:{[name]:assignmentDate},scheduleOrder:adminOrder != null ? {[name]:adminOrder} : {},date:assignmentDate,endDate:assignmentDate,parts:[]};
+        delete adminTask.unassignedMinutes;
+        delete adminTask.unassignedDate;
+        additions.push(adminTask);
+      }
     });
     tasks = tasks.filter(task => !(task.type === "capacity" && Number(task.duration || 0) <= 0 && !(task.assigned || []).length));
     tasks.push(...additions);

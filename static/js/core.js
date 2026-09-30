@@ -292,18 +292,24 @@ function parseHours(value){
 function jobById(id){return jobs.find(job => job.id === id)}
 function dayNameForIndex(i){return days[i] ? days[i].name : ""}
 function parseIsoDate(value){
-  if (!value) return null;
-  const p = String(value).split("-").map(Number);
-  if (p.length !== 3 || p.some(Number.isNaN)) return null;
-  return new Date(p[0], p[1]-1, p[2]);
+  if (typeof value !== "string" || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) return null;
+  const p = value.split("-").map(Number);
+  if (p[0] === 0) return null;
+  const result = new Date(0);
+  result.setFullYear(p[0], p[1]-1, p[2]);
+  result.setHours(0, 0, 0, 0);
+  if (result.getFullYear() !== p[0] || result.getMonth() !== p[1]-1 || result.getDate() !== p[2]) return null;
+  return result;
 }
 function addCalendarDays(dateObj, amount){
-  const result = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+  const result = new Date(dateObj);
+  result.setHours(0, 0, 0, 0);
   result.setDate(result.getDate() + Number(amount || 0));
   return result;
 }
 function startOfWeek(dateObj){
-  const result = new Date(dateObj.getFullYear(), dateObj.getMonth(), dateObj.getDate());
+  const result = new Date(dateObj);
+  result.setHours(0, 0, 0, 0);
   const offset = (result.getDay() + 6) % 7;
   result.setDate(result.getDate() - offset);
   return result;
@@ -352,7 +358,7 @@ function changeScheduleWeek(direction){ scheduleStartDate = addCalendarDays(sche
 function goScheduleToday(){ scheduleStartDate = startOfWeek(new Date()); buildScheduleDays(); renderAll(); }
 function toIsoDate(dateObj){
   if (!dateObj || Number.isNaN(dateObj.getTime())) return "";
-  return `${dateObj.getFullYear()}-${String(dateObj.getMonth()+1).padStart(2,"0")}-${String(dateObj.getDate()).padStart(2,"0")}`;
+  return `${String(dateObj.getFullYear()).padStart(4,"0")}-${String(dateObj.getMonth()+1).padStart(2,"0")}-${String(dateObj.getDate()).padStart(2,"0")}`;
 }
 function calendarEventBlocksProduction(event){
   // Preserve TrackR's existing capacity rule: Factory Closure, Public Holiday
@@ -379,8 +385,10 @@ function ensureBusinessDay(dateObj){
   return result;
 }
 function calendarDayDifference(fromDate, toDate){
-  const start = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
-  const end = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
+  const start = new Date(fromDate);
+  const end = new Date(toDate);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
   return Math.round((end - start) / 86400000);
 }
 function escapeHtml(value){
@@ -442,7 +450,7 @@ function defaultCalendarVisibilityForStage(value){
   return name.includes("check measure") || name === "delivery" || name.endsWith(" delivery") || name === "install" || name.endsWith(" install");
 }
 function taskNeedsDetails(task){
-  return !!task && task.type === "capacity" && (Number(task.duration || 0) <= 0 || !(task.assigned || []).length);
+  return !!task && task.type === "capacity" && (Number(task.duration || 0) <= 0 || !(task.assigned || []).length || unassignedTaskMinutes(task)>0);
 }
 function jobMissingDetailsCount(jobId){
   return tasks.filter(task => String(task.job) === String(jobId) && taskNeedsDetails(task) && task.status !== "Complete").length;
@@ -555,6 +563,10 @@ function taskMatchesFilters(task,rowName="",query=searchValue("scheduleSearch"))
   return rowText.includes(query) || taskMatchesQuery(task,query);
 }
 
+function unassignedTaskMinutes(task){
+  if(task?.type !== "capacity") return 0;
+  return task.unassignedMinutes != null ? Math.max(0,Number(task.unassignedMinutes)||0) : !(task.assigned || []).length ? Math.max(0,Number(task.duration)||0) : 0;
+}
 function calculate(){
   tasks.forEach(task => {task.parts = []; task.unscheduledMinutes = 0;});
   const used = {};
@@ -570,9 +582,9 @@ function calculate(){
     const dateObj = taskDate(task);
     task.parts.push({person:"Milestones",day:scheduleIndexForDate(dateObj),date:toIsoDate(dateObj),minutes:0});
   });
-  tasks.filter(task => task.type === "capacity" && !(task.assigned || []).length).forEach(task => {
-    const dateObj = taskDate(task);
-    task.parts.push({person:"Unassigned",day:scheduleIndexForDate(dateObj),date:toIsoDate(dateObj),minutes:Number(task.duration || 0)});
+  tasks.filter(task => task.type === "capacity" && (unassignedTaskMinutes(task) > 0 || !(task.assigned || []).length)).forEach(task => {
+    const dateObj = parseIsoDate(task.unassignedDate) || taskDate(task);
+    task.parts.push({person:"Unassigned",day:scheduleIndexForDate(dateObj),date:toIsoDate(dateObj),minutes:unassignedTaskMinutes(task)});
   });
 
   // Priority-capacity scheduling: each employee/day is a hard capacity limit.
@@ -599,31 +611,44 @@ function calculate(){
     if (!work.length) return;
 
     let cursor = work.reduce((earliest,item) => item.startDate < earliest ? item.startDate : earliest, work[0].startDate);
-    let guard = 0;
-    while (work.some(item => item.remaining > 0) && guard < 730) {
+    let consecutiveNoProgressDays = 0;
+    while (work.some(item => item.remaining > 0)) {
+      const eligible = work
+        .filter(item => item.remaining > 0 && item.startDate <= cursor)
+        .sort((a,b) => compareScheduleTaskPriority(a.task,b.task,person.name) || a.startDate-b.startDate || String(a.task.id).localeCompare(String(b.task.id)));
+      if (!eligible.length) {
+        const futureWork = work.filter(item => item.remaining > 0 && item.startDate > cursor);
+        const nextStartDate = futureWork.reduce((earliest,item) => item.startDate < earliest ? item.startDate : earliest, futureWork[0]?.startDate || null);
+        // All remaining work should have a start date, but fail closed if a
+        // malformed date ever makes the next eligible cursor unavailable.
+        if (!nextStartDate) break;
+        cursor = new Date(nextStartDate);
+        cursor.setHours(0, 0, 0, 0);
+        consecutiveNoProgressDays = 0;
+        continue;
+      }
+
       let available = Math.max(0,Number(capacityForDate(person,cursor) || 0));
-      if (available > 0) {
-        const eligible = work
-          .filter(item => item.remaining > 0 && item.startDate <= cursor)
-          .sort((a,b) => compareScheduleTaskPriority(a.task,b.task,person.name) || a.startDate-b.startDate || String(a.task.id).localeCompare(String(b.task.id)));
-        for (const item of eligible) {
-          if (available <= 0) break;
-          const use = Math.min(item.remaining,available);
-          if (use <= 0) continue;
-          const iso = toIsoDate(cursor);
-          const visibleDay = scheduleIndexForDate(cursor);
-          item.remaining -= use;
-          available -= use;
-          usedByDate[person.name][iso] = (usedByDate[person.name][iso] || 0) + use;
-          item.task.parts.push({person:person.name,day:visibleDay,date:iso,minutes:use});
-          if (visibleDay >= 0 && visibleDay < days.length) {
-            used[person.name][visibleDay] += use;
-            allocation[person.name][visibleDay].push({task:item.task,minutes:use});
-          }
+      let allocatedToday = false;
+      for (const item of eligible) {
+        if (available <= 0) break;
+        const use = Math.min(item.remaining,available);
+        if (use <= 0) continue;
+        const iso = toIsoDate(cursor);
+        const visibleDay = scheduleIndexForDate(cursor);
+        item.remaining -= use;
+        available -= use;
+        allocatedToday = true;
+        usedByDate[person.name][iso] = (usedByDate[person.name][iso] || 0) + use;
+        item.task.parts.push({person:person.name,day:visibleDay,date:iso,minutes:use});
+        if (visibleDay >= 0 && visibleDay < days.length) {
+          used[person.name][visibleDay] += use;
+          allocation[person.name][visibleDay].push({task:item.task,minutes:use});
         }
       }
+      consecutiveNoProgressDays = allocatedToday ? 0 : consecutiveNoProgressDays + 1;
+      if (consecutiveNoProgressDays >= 730) break;
       cursor = addCalendarDays(cursor,1);
-      guard++;
     }
     work.forEach(item => {
       if (item.remaining > 0) item.task.unscheduledMinutes = Number(item.task.unscheduledMinutes || 0) + item.remaining;

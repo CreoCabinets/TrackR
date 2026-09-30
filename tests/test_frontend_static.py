@@ -24,9 +24,21 @@ JS_FILES = [
 ]
 JS = "\n".join((JS_DIR / name).read_text(encoding="utf-8") for name in JS_FILES)
 CSS = (ROOT / "static" / "css" / "trackr.css").read_text(encoding="utf-8")
+BETA = (JS_DIR / "beta.js").read_text(encoding="utf-8")
 
 
 class FrontendStaticTests(unittest.TestCase):
+    def test_trackr_branding_is_consistent_in_user_facing_beta_ui(self):
+        self.assertNotRegex(INDEX, re.compile(r"Tracka|TrakR", re.IGNORECASE))
+        self.assertNotRegex(BETA, r"TrakR")
+        self.assertIn("<title>TrackR | Production Planning</title>", INDEX)
+        self.assertIn('<strong>TrackR</strong>', INDEX)
+        self.assertIn("TrackR Schedule", INDEX)
+        self.assertIn("const title=`TrackR Delivery Readiness", BETA)
+        self.assertIn('<div class="brand">TrackR</div>', BETA)
+        self.assertIn("Ready confirmations are recorded in TrackR.", BETA)
+        self.assertIn('"trakrDeliveryReadinessReport"', BETA)
+
     def test_main_template_has_no_duplicate_ids(self):
         ids = re.findall(r'\bid="([^"]+)"', INDEX)
         duplicates = sorted(name for name, count in Counter(ids).items() if count > 1)
@@ -67,7 +79,7 @@ class FrontendStaticTests(unittest.TestCase):
 
     def test_actual_split_editor_is_wired(self):
         self.assertIn('data-input-action="handleTaskHoursChanged"', INDEX)
-        self.assertIn("function buildTaskSplitForSave(selected,duration,rawValues)", JS)
+        self.assertIn("function buildTaskSplitForSave(selected,duration,rawValues,unassigned=0)", JS)
         self.assertIn('data-input-action="updateTaskSplitDraft"', JS)
         self.assertIn("Enter 0h to remove an employee", JS)
         self.assertIn(".allocation-split-row", CSS)
@@ -105,6 +117,45 @@ class FrontendStaticTests(unittest.TestCase):
         self.assertIn('role="alert"', LOGIN)
         self.assertIn('maxlength="200"', CHANGE_PASSWORD)
         self.assertIn('role="alert"', CHANGE_PASSWORD)
+
+    def test_schedule_sticky_offsets_and_layers_are_preserved(self):
+        desktop = re.search(r"\.schedule-sticky-stack\s*\{([^}]*)\}", CSS)
+        self.assertIsNotNone(desktop)
+        self.assertRegex(desktop.group(1), r"\btop\s*:\s*68px\s*;")
+
+        responsive_blocks = []
+        for media in re.finditer(r"@media\s*\(max-width\s*:\s*900px\)\s*\{", CSS):
+            depth = 1
+            cursor = media.end()
+            content_start = cursor
+            while cursor < len(CSS) and depth:
+                if CSS[cursor] == "{":
+                    depth += 1
+                elif CSS[cursor] == "}":
+                    depth -= 1
+                cursor += 1
+            if depth == 0:
+                responsive_blocks.append(CSS[content_start:cursor - 1])
+
+        self.assertTrue(
+            any(
+                re.search(
+                    r"\.schedule-sticky-stack\s*\{\s*top\s*:\s*113px\s*;?\s*\}",
+                    block,
+                )
+                for block in responsive_blocks
+            ),
+            "Expected the 113px Schedule sticky offset in a max-width:900px block",
+        )
+
+        for selector, z_index in (("corner", "35"), ("person", "20")):
+            rule = re.search(rf"\.{selector}\s*\{{([^}}]*)\}}", CSS)
+            self.assertIsNotNone(rule)
+            self.assertRegex(rule.group(1), r"\bposition\s*:\s*sticky\s*;")
+            self.assertRegex(rule.group(1), r"\bleft\s*:\s*0\s*;")
+            self.assertRegex(rule.group(1), rf"\bz-index\s*:\s*{z_index}\s*;")
+
+        self.assertIn(".schedule-sticky-stack{position:sticky;top:68px;z-index:95;", CSS)
 
 
 if __name__ == "__main__":

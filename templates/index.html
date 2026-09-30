@@ -77,13 +77,13 @@
     <div class="aj-source-grid" id="ajSourceChoices">
       <section class="aj-source-card" id="ajPdfCard">
         <div class="aj-source-icon">PDF</div>
-        <div><div class="aj-source-title">Import estimate PDF</div><div class="aj-source-copy">Reads the quote number, site details and mapped labour hours using Tracka's existing import rules.</div></div>
+        <div><div class="aj-source-title">Import estimate PDF</div><div class="aj-source-copy">Reads the quote number, site details and mapped labour hours using TrackR's existing import rules.</div></div>
         <div class="aj-drop-hint" id="ajPdfDropHint">Drag an estimate PDF anywhere into this box</div>
         <div class="aj-upload-row"><input id="ajPdfFile" type="file" accept="application/pdf" data-change-action="handlePdfFileChosen"><button class="primary" id="ajReadPdfBtn" data-click-action="importEstimatePdf">Read PDF</button></div>
       </section>
       <section class="aj-source-card aj-manual-option active" id="ajManualCard">
         <div class="aj-source-icon">+</div>
-        <div><div class="aj-source-title">Enter job manually</div><div class="aj-source-copy">Starts with Tracka's standard hours for the selected job length. Every field and stage stays editable.</div></div>
+        <div><div class="aj-source-title">Enter job manually</div><div class="aj-source-copy">Starts with TrackR's standard hours for the selected job length. Every field and stage stays editable.</div></div>
         <button data-click-action="startManualJob">Start a blank job</button>
       </section>
     </div>
@@ -105,7 +105,7 @@
     </section>
 
     <section class="panel">
-      <div class="panel-head"><div><h2>2. Labour hours</h2><p>PDF values are prefilled when available. Manual jobs use Tracka's standard template hours.</p></div><button data-click-action="applyManualDefaultHours">Reset standard hours</button></div>
+      <div class="panel-head"><div><h2>2. Labour hours</h2><p>PDF values are prefilled when available. Manual jobs use TrackR's standard template hours.</p></div><button data-click-action="applyManualDefaultHours">Reset standard hours</button></div>
       <div class="aj-labour-grid">
         <div class="aj-labour-card"><label>Check Measure</label><input id="ajHoursCheck" type="number" min="0" step="0.25" value="0" data-input-action="refreshAddJobPlan"></div>
         <div class="aj-labour-card"><label>Drafting + QC</label><input id="ajHoursDrafting" type="number" min="0" step="0.25" value="12" data-input-action="refreshAddJobPlan"></div>
@@ -163,7 +163,7 @@
   {% if current_user.role == 'admin' %}
   <section id="betaView" class="view">
     <div class="header beta-header">
-      <div><div class="beta-kicker">Experimental tools</div><h1>BETA</h1><p class="sub">Delivery readiness based on the live TrakR Schedule.</p></div>
+      <div><div class="beta-kicker">Experimental tools</div><h1>BETA</h1><p class="sub">Delivery readiness based on the live TrackR Schedule.</p></div>
       <div class="header-actions beta-toolbar">
         <button data-click-action="changeBetaWeek" data-click-args="[-1]">Previous</button>
         <button id="betaThisWeekBtn" data-click-action="goBetaCurrentWeek">This week</button>
@@ -184,7 +184,7 @@
         <div class="beta-summary-card beta-summary-action"><span>Need confirmation</span><strong id="betaActionCount">0</strong></div>
         <div class="beta-summary-card beta-summary-urgent"><span>Due / overdue</span><strong id="betaUrgentCount">0</strong></div>
       </div>
-      <div class="beta-explainer">TrakR reads each Delivery from the calculated Schedule for the selected week. Each job should be ready by the previous working production day. Confirming Ready suppresses the warning for that specific scheduled delivery date.</div>
+      <div class="beta-explainer">TrackR reads each Delivery from the calculated Schedule for the selected week. Each job should be ready by the previous working production day. Confirming Ready suppresses the warning for that specific scheduled delivery date.</div>
     </section>
     <section class="beta-delivery-list" id="betaDeliveryRows"></section>
   </section>
@@ -298,7 +298,7 @@
     </div>
 
     <div class="detail-card">
-      <div class="action-row"><button class="danger" data-click-action="deleteTask">Delete</button><button class="primary" data-click-action="savePanelTask">Save task</button></div>
+      <div class="action-row"><button class="danger" id="taskDeleteButton" style="display:none" data-click-action="deleteTask">Delete</button><button class="primary" data-click-action="savePanelTask">Save task</button></div>
     </div>
   </div>
 </aside>

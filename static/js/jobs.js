@@ -14,6 +14,35 @@ function setAddJobSaving(saving,isEditing=!!editingJobId){
   button.disabled = saving;
   button.textContent = saving ? (isEditing ? "Saving..." : "Creating...") : (isEditing ? "Save Changes" : "Create Job");
 }
+function generatedTaskIdentityKey(task){
+  const employeeKey = task.type === "admin" ? ((task.assigned || [])[0] || task.adminEmployee || "") : "";
+  return `${task.stageGroup || task.name}|${task.stageDepartment || task.department}|${task.type}|${employeeKey}`;
+}
+function preserveGeneratedTaskMetadata(task,existingTask){
+  if (!existingTask || generatedTaskIdentityKey(task) !== generatedTaskIdentityKey(existingTask)) return task;
+  task.id = existingTask.id;
+  const assigned = new Set(task.assigned || []);
+  const previousOrder = existingTask.scheduleOrder;
+  if (previousOrder && typeof previousOrder === "object" && !Array.isArray(previousOrder)) {
+    task.scheduleOrder = Object.fromEntries(Object.entries(previousOrder).filter(([employee]) => assigned.has(employee)));
+  }
+  if (isDeliveryTask(task) && isDeliveryTask(existingTask) && existingTask.deliveryReady && typeof existingTask.deliveryReady === "object") {
+    task.deliveryReady = {...existingTask.deliveryReady};
+  }
+  return task;
+}
+function invalidateStaleDeliveryReadyConfirmations(taskList){
+  let changed = false;
+  taskList.filter(isDeliveryTask).forEach(task => {
+    if (!task.deliveryReady) return;
+    const scheduledDate = toIsoDate(scheduledTaskDate(task));
+    if (task.deliveryReady.deliveryDate !== scheduledDate) {
+      delete task.deliveryReady;
+      changed = true;
+    }
+  });
+  return changed;
+}
 function configureAddJobPage(isEditing){
   document.getElementById("addJobTitle").textContent = isEditing ? "Edit Job" : "Add Job";
   document.getElementById("addJobSubtitle").textContent = isEditing ? "Update the job details, production dates, hours and assignments." : "Import an estimate PDF or enter the job manually. Both routes create the same production plan.";
@@ -275,12 +304,14 @@ function employeesForDepartment(department){
 function assignmentsFromTask(task){
   const names = Array.isArray(task.assigned) ? task.assigned.filter(Boolean) : [];
   const fallbackDate = toIsoDate(taskDate(task));
-  if (!names.length) return [{person:"",hours:Number(task.estimatedHours ?? (Number(task.duration||0)/60))||0,date:fallbackDate}];
+  if (!names.length) return [{person:"",hours:Number(task.estimatedHours ?? (Number(task.duration||0)/60))||0,date:task.unassignedDate || fallbackDate}];
   const custom = task.assignmentMinutes || {};
   const dates = task.assignmentDates || {};
   const totalHours = Number(task.estimatedHours ?? (Number(task.duration||0)/60))||0;
   const even = totalHours / names.length;
-  return names.map(name => ({person:name,hours:custom[name] != null ? Number(custom[name])/60 : even,date:dates[name] || fallbackDate}));
+  const assignments = names.map(name => ({person:name,hours:custom[name] != null ? Number(custom[name])/60 : even,date:dates[name] || fallbackDate}));
+  if(Number(task.unassignedMinutes)>0) assignments.push({person:"",hours:Number(task.unassignedMinutes)/60,date:task.unassignedDate || fallbackDate});
+  return assignments;
 }
 function isAdminEmployee(name){
   const person = people.find(item => item.name === name);
@@ -571,7 +602,8 @@ async function saveAddJob(){
     const selected = stage.assignments.filter(item => item.person);
     if (!selected.length) return false;
     const names = selected.map(item=>item.person);
-    return new Set(names).size !== names.length || Math.abs(stageRemainingHours(stage)) > .01;
+    const representedHours=stage.assignments.reduce((sum,item)=>sum+Math.max(0,Number(item.hours)||0),0);
+    return new Set(names).size !== names.length || Math.abs(representedHours-Number(stage.hours||0)) > .01;
   });
   if (allocationProblem) {showAddJobMessage(`Assign every hour for ${allocationProblem.name}. Assigned hours must equal the stage total and each employee can only appear once.`,true); document.getElementById("ajStageRows").scrollIntoView({behavior:"smooth",block:"start"}); return;}
 
@@ -609,11 +641,10 @@ async function saveAddJob(){
   }
 
   const sourceJobId = String(originalId || jobNumber);
-  const existingStageIds = new Map();
+  const existingStageTasks = new Map();
   tasks.filter(task => String(task.job) === sourceJobId && !task.custom).forEach(task => {
-    const employeeKey = task.type === "admin" ? ((task.assigned || [])[0] || task.adminEmployee || "") : "";
-    const key = `${task.stageGroup || task.name}|${task.stageDepartment || task.department}|${task.type}|${employeeKey}`;
-    if (!existingStageIds.has(key)) existingStageIds.set(key, task.id);
+    const key = generatedTaskIdentityKey(task);
+    if (!existingStageTasks.has(key)) existingStageTasks.set(key,task);
   });
 
   // Keep manually created tasks, including their Calendar/Schedule position, and
@@ -629,9 +660,8 @@ async function saveAddJob(){
     if (!stage.countsCapacity) {
       const type = "milestone";
       const department = "Milestone";
-      const key = `${stage.name}|${department}|${type}|`;
       tasks.push({
-        id:existingStageIds.get(key) || `${jobNumber}-${Date.now()}-${index}`,
+        id:`${jobNumber}-${Date.now()}-${index}`,
         job:jobNumber,
         name:stage.name,
         type,
@@ -660,11 +690,11 @@ async function saveAddJob(){
     const adminAssignments = selectedAssignments.filter(item => isAdminEmployee(item.person));
     const capacityAssignments = selectedAssignments.filter(item => !isAdminEmployee(item.person));
     const hasAnyAssignments = selectedAssignments.length > 0;
-    const capacityHours = hasAnyAssignments ? capacityAssignments.reduce((sum,item)=>sum+Math.max(0,Number(item.hours)||0),0) : Number(stage.hours||0);
+    const unassignedHours=stage.assignments.filter(item=>!item.person).reduce((sum,item)=>sum+Math.max(0,Number(item.hours)||0),0);
+    const capacityHours = hasAnyAssignments ? capacityAssignments.reduce((sum,item)=>sum+Math.max(0,Number(item.hours)||0),0)+unassignedHours : Number(stage.hours||0);
     const department = stage.department;
-    const capacityKey = `${stage.name}|${department}|capacity|`;
     tasks.push({
-      id:existingStageIds.get(capacityKey) || `${jobNumber}-${Date.now()}-${index}-capacity`,
+      id:`${jobNumber}-${Date.now()}-${index}-capacity`,
       job:jobNumber,
       name:stage.name,
       stageGroup:stage.name,
@@ -681,6 +711,7 @@ async function saveAddJob(){
       assigned:[...new Set(capacityAssignments.map(item=>item.person))],
       assignmentMinutes:Object.fromEntries(capacityAssignments.map(item=>[item.person,Math.round(Math.max(0,Number(item.hours)||0)*60)])),
       assignmentDates:Object.fromEntries(capacityAssignments.map(item=>[item.person,item.date || stage.date])),
+      ...(unassignedHours>0 && (hasAnyAssignments || existingStageTasks.get(generatedTaskIdentityKey({job:jobNumber,name:stage.name,type:"capacity",department}))?.unassignedMinutes != null) ? {unassignedMinutes:Math.round(unassignedHours*60),unassignedDate:stage.assignments.find(item=>!item.person && item.hours>0)?.date || stage.date} : {}),
       showOnCalendar:!!stage.showOnCalendar,
       status:stage.status || "Planned",
       notes:stage.notes || "",
@@ -692,9 +723,8 @@ async function saveAddJob(){
 
     adminAssignments.forEach((assignment,adminIndex) => {
       const assignmentDate = parseIsoDate(assignment.date || stage.date) || stageDate;
-      const adminKey = `${stage.name}|${department}|admin|${assignment.person}`;
       tasks.push({
-        id:existingStageIds.get(adminKey) || `${jobNumber}-${Date.now()}-${index}-admin-${adminIndex}`,
+        id:`${jobNumber}-${Date.now()}-${index}-admin-${adminIndex}`,
         job:jobNumber,
         name:stage.name,
         stageGroup:stage.name,
@@ -723,11 +753,16 @@ async function saveAddJob(){
     });
   });
 
+  tasks.filter(task => String(task.job) === jobNumber && !task.custom).forEach(task => {
+    preserveGeneratedTaskMetadata(task,existingStageTasks.get(generatedTaskIdentityKey(task)));
+  });
+
   // Move the Calendar to the edited install month and make sure the Schedule
   // recalculates from the new dates/assignments immediately.
   visibleMonthOffset = (installDate.getFullYear()-calendarBaseDate.getFullYear())*12 + (installDate.getMonth()-calendarBaseDate.getMonth());
   tasks.forEach(task => { task.parts = []; });
   renderAll();
+  if (invalidateStaleDeliveryReadyConfirmations(tasks) && isAdmin) renderBeta();
 
   setAddJobSaving(true,isEditing);
   let saved = false;

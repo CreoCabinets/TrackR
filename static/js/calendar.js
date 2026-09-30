@@ -1,8 +1,10 @@
 /* Calendar */
 function openCalendarDayFromGrid(year,month,day){
+  if(!isAdmin) return;
   if(!calendarDragSuppressClick) openDayTaskPanel(year,month,day);
 }
 function openCalendarEventsSettings(){
+  if(!isAdmin) return;
   showSettingsSection("calendarEvents");
   showView("settings");
 }

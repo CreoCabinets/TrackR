@@ -1,16 +1,21 @@
 /* Task panel */
 let taskSplitDraft = {};
+let taskUnassignedDraft = 0;
 function fillPanelOptions(){}
 function openDayTaskPanel(year,month,day){
+  if(!isAdmin) return;
   openCustomTaskPanel("calendar");
   document.getElementById("taskDate").value = toIsoDate(new Date(year,month,day));
   document.getElementById("panelTitle").textContent = `Add task · ${day} ${new Date(year,month,day).toLocaleString("en-AU",{month:"short"})}`;
   document.getElementById("panelSub").textContent = "Calendar milestone or schedule capacity task";
 }
 function openCustomTaskPanel(origin="general"){
+  if(!isAdmin) return;
+  document.getElementById("taskDeleteButton").style.display = "none";
   taskPanelOrigin=origin;
   selectedTaskId = null;
   taskSplitDraft = {};
+  taskUnassignedDraft = 0;
   fillPanelOptions();
   document.getElementById("panelTitle").textContent = "Add task";
   document.getElementById("panelSub").textContent = "Calendar milestone or schedule capacity task";
@@ -31,6 +36,7 @@ function openCustomTaskPanel(origin="general"){
   openPanel("taskPanel");
 }
 function openScheduleTaskPanel(personName,dayIndex){
+  if(!isAdmin) return;
   openCustomTaskPanel("schedule");
   const person = people.find(item => item.name === personName);
   const dateObj = dateForDayIndex(dayIndex);
@@ -78,16 +84,20 @@ function openTaskDetailsPanel(id){
     rows.push(["Actual split",(task.assigned || []).map(name=>`${name} ${fmt(shares[name] || 0)}`).join(" · ")]);
   }
   if (task.type === "capacity") rows.push(["Calendar",task.showOnCalendar ? "Shown on Calendar" : "Schedule only"]);
+  if (unassignedTaskMinutes(task)>0) rows.push(["Unassigned hours",fmt(unassignedTaskMinutes(task))]);
   document.getElementById("taskDetailsTitle").textContent = task.name || "Task details";
   document.getElementById("taskDetailsSub").textContent = "Read-only details";
   document.getElementById("taskDetailsBody").innerHTML = `<div class="detail-card"><h3>Task details</h3><div class="form-grid">${rows.map(([label,value])=>`<div class="form-row"><label>${escapeHtml(label)}</label><div class="readonly-field-value">${escapeHtml(value)}</div></div>`).join("")}</div></div>`;
   openPanel("taskDetailsPanel");
 }
 function openTaskPanel(id){
+  const deleteButton = document.getElementById("taskDeleteButton");
+  deleteButton.style.display = "none";
   if (!isAdmin) {openTaskDetailsPanel(id); return;}
   taskPanelOrigin="edit";
   const task = tasks.find(t => t.id === id);
   if (!task) return;
+  deleteButton.style.display = task.custom === true ? "inline-flex" : "none";
   selectedTaskId = id;
   fillPanelOptions();
   document.getElementById("panelTitle").textContent = "Edit task";
@@ -104,6 +114,7 @@ function openTaskPanel(id){
   document.getElementById("taskStoneMason").value = task.stoneMason || "";
   document.getElementById("employeeCard").open = false;
   taskSplitDraft = Object.fromEntries(Object.entries(materialiseAssignmentMinutes(task)).map(([name,minutes]) => [name,fmt(minutes)]));
+  taskUnassignedDraft = Number(task.unassignedMinutes || 0);
   renderEmployeeChoices(task.assigned);
   updateTypeHint();
   updateAllocationSummary(task);
@@ -126,6 +137,7 @@ function updateTaskSplitDraft(name,value){
   renderTaskSplitStatus();
 }
 function handleTaskEmployeeSelectionChange(){
+  taskUnassignedDraft = 0;
   updateEmployeeAssignedCount();
   const selected=currentTaskAssignedSelection();
   const duration=taskPanelDurationMinutes();
@@ -146,13 +158,14 @@ function handleTaskEmployeeSelectionChange(){
 function handleTaskHoursChanged(){
   const selected=currentTaskAssignedSelection();
   const duration=taskPanelDurationMinutes();
-  if(selected.length === 1 && Number.isFinite(duration)) taskSplitDraft[selected[0]]=fmt(duration);
+  if(selected.length === 1 && Number.isFinite(duration)) taskSplitDraft[selected[0]]=fmt(Math.max(0,duration-taskUnassignedDraft));
   renderTaskSplitStatus();
 }
-function buildTaskSplitForSave(selected,duration,rawValues){
+function buildTaskSplitForSave(selected,duration,rawValues,unassigned=0){
   rawValues=rawValues || {};
   const names=[...new Set((selected || []).filter(Boolean))];
-  const target=Math.max(0,Math.round(Number(duration)||0));
+  const target=Math.max(0,Math.round(Number(duration)||0)-unassigned);
+  if(unassigned > Number(duration)) return {ok:false,error:"Unassigned hours exceed task hours."};
   if(!names.length) return {ok:true,assigned:[],assignmentMinutes:{},total:0,target};
   if(names.length === 1) return {ok:true,assigned:names,assignmentMinutes:{[names[0]]:target},total:target,target};
   const assignmentMinutes={};
@@ -228,6 +241,7 @@ function updateTypeHint(){
 }
 
 function savePanelTask(){
+  if(!isAdmin) return;
   const enteredName = document.getElementById("taskName").value.trim();
   let type = document.getElementById("taskType").value;
   if (isStoneTaskName(enteredName)) type = "milestone";
@@ -240,7 +254,7 @@ function savePanelTask(){
   if (!Number.isFinite(parsedDuration)) {showToast("Enter task hours such as 2h, 1h30 or 2.5."); document.getElementById("taskHours").focus(); return;}
   const existingIndex = selectedTaskId ? tasks.findIndex(t => t.id === selectedTaskId) : -1;
   const existingTask = existingIndex >= 0 ? tasks[existingIndex] : null;
-  const split = type === "capacity" ? buildTaskSplitForSave(selected,parsedDuration,taskSplitDraft) : {ok:true,assigned:selected,assignmentMinutes:{}};
+  const split = type === "capacity" ? buildTaskSplitForSave(selected,parsedDuration,taskSplitDraft,taskUnassignedDraft) : {ok:true,assigned:selected,assignmentMinutes:{}};
   if(!split.ok){showToast(split.error);return;}
   const finalSelected=split.assigned;
   const task = existingTask ? JSON.parse(JSON.stringify(existingTask)) : {id:`custom-${Date.now()}`, custom:true};
@@ -254,6 +268,13 @@ function savePanelTask(){
   task.duration = parsedDuration;
   task.assigned = finalSelected;
   task.assignmentMinutes = type === "capacity" ? split.assignmentMinutes : {};
+  if(type === "capacity" && existingTask?.unassignedMinutes != null){
+    task.unassignedMinutes = finalSelected.length ? taskUnassignedDraft : parsedDuration;
+    if(!task.unassignedMinutes) delete task.unassignedDate;
+  }else{
+    delete task.unassignedMinutes;
+    delete task.unassignedDate;
+  }
   const selectedIso=toIsoDate(selectedDate);
   const originalIso=existingTask ? toIsoDate(taskDate(existingTask)) : "";
   const preserveIndividualDates=!!existingTask && originalIso === selectedIso;
@@ -271,7 +292,10 @@ function savePanelTask(){
   saveState(type === "milestone" ? "Calendar task saved" : "Capacity task saved");
 }
 function deleteTask(){
-  if (!selectedTaskId) {closeTaskPanel(); return;}
+  if(!isAdmin) return;
+  const task = tasks.find(t => t.id === selectedTaskId);
+  if (!task || task.custom !== true) return;
+  if (!confirm(`Delete "${task.name || "Untitled task"}"? This cannot be undone.`)) return;
   tasks = tasks.filter(t => t.id !== selectedTaskId);
   closeTaskPanel();
   renderAll();
@@ -283,13 +307,13 @@ function renderTaskSplitStatus(){
   const selected=currentTaskAssignedSelection();
   const target=taskPanelDurationMinutes();
   if(!Number.isFinite(target)){status.textContent="Enter valid task hours first.";status.className="allocation-split-status bad";return;}
-  const split=buildTaskSplitForSave(selected,target,taskSplitDraft);
+  const split=buildTaskSplitForSave(selected,target,taskSplitDraft,taskUnassignedDraft);
   if(!split.ok){
     status.textContent=split.error;
     status.className="allocation-split-status bad";
     return;
   }
-  status.textContent=`Total ${fmt(split.total)} / ${fmt(split.target)}`;
+  status.textContent=`Total ${fmt(split.total)} / ${fmt(split.target)}${taskUnassignedDraft ? ` · ${fmt(taskUnassignedDraft)} unassigned` : ""}`;
   status.className="allocation-split-status good";
 }
 function updateAllocationSummary(task){
@@ -303,8 +327,8 @@ function updateAllocationSummary(task){
   if(!selected.length){el.textContent="Unassigned · choose an employee above to allocate this task.";return;}
   const duration=Number.isFinite(taskPanelDurationMinutes()) ? taskPanelDurationMinutes() : Math.max(0,Number(task.duration)||0);
   if(selected.length === 1){
-    taskSplitDraft[selected[0]]=fmt(duration);
-    el.innerHTML=`<div class="allocation-single"><span>${escapeHtml(selected[0])}</span><strong>${escapeHtml(fmt(duration))}</strong></div>`;
+    taskSplitDraft[selected[0]]=fmt(Math.max(0,duration-taskUnassignedDraft));
+    el.innerHTML=`<div class="allocation-single"><span>${escapeHtml(selected[0])}</span><strong>${escapeHtml(taskSplitDraft[selected[0]])}</strong></div>${taskUnassignedDraft ? `<div>${escapeHtml(fmt(taskUnassignedDraft))} unassigned</div>` : ""}`;
     return;
   }
   const fallback=materialiseAssignmentMinutes(task);
@@ -314,7 +338,7 @@ function updateAllocationSummary(task){
   el.innerHTML=`<div class="allocation-split-editor">
     ${selected.map(name=>`<div class="allocation-split-row"><label>${escapeHtml(name)}</label><input value="${escapeHtml(taskSplitDraft[name] || "0h")}" inputmode="decimal" aria-label="Actual split hours for ${escapeHtml(name)}" data-input-action="updateTaskSplitDraft" data-input-args='${escapeHtml(JSON.stringify([name]))}' data-input-pass-value="true"></div>`).join("")}
     <div id="allocationSplitStatus" class="allocation-split-status"></div>
-    <div class="allocation-split-note">The split must equal the task hours. Enter 0h to remove an employee from this task when you save.</div>
+    <div class="allocation-split-note">Assigned and unassigned hours must equal the task hours. Enter 0h to remove an employee from this task when you save.</div>
   </div>`;
   renderTaskSplitStatus();
 }
@@ -373,7 +397,7 @@ function openDayPanel(personName, dayIndex){
     body.querySelectorAll("[data-open-task]").forEach(button => button.addEventListener("click", () => openTaskPanel(decodeURIComponent(button.dataset.openTask))));
     body.querySelector("[data-add-calendar-task]")?.addEventListener("click", () => openDayTaskPanel(dateForDayIndex(dayIndex).getFullYear(),dateForDayIndex(dayIndex).getMonth(),dateForDayIndex(dayIndex).getDate()));
   } else if (personName === "Unassigned") {
-    const items = tasks.filter(t => t.type === "capacity" && !(t.assigned || []).length && scheduleIndexForDate(taskDate(t)) === dayIndex);
+    const items = tasks.filter(t => t.type === "capacity" && (unassignedTaskMinutes(t)>0 || !(t.assigned || []).length) && scheduleIndexForDate(parseIsoDate(t.unassignedDate) || taskDate(t)) === dayIndex);
     body.innerHTML = `<div class="detail-card"><h3>Unassigned tasks</h3>${items.map(t => `<div class="mini-detail"><span>${escapeHtml(taskLabel(t))}</span><button data-open-task="${escapeHtml(encodeURIComponent(t.id))}">Assign</button></div>`).join("") || `<div class="note">No unassigned tasks.</div>`}</div>`;
     body.querySelectorAll("[data-open-task]").forEach(button => button.addEventListener("click", () => openTaskPanel(decodeURIComponent(button.dataset.openTask))));
   } else {

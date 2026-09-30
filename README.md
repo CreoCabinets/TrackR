@@ -33,7 +33,7 @@ Before making the service public:
 2. Set `TRACKR_SECRET_KEY` to a long random value of at least 32 characters.
 3. Set `TRACKR_BOOTSTRAP_ADMIN_USERNAME` and `TRACKR_BOOTSTRAP_ADMIN_PASSWORD` for a brand-new database.
 4. Optionally set both `TRACKR_BOOTSTRAP_FACTORY_USERNAME` and `TRACKR_BOOTSTRAP_FACTORY_PASSWORD` to create the first read-only account.
-5. Do **not** set `TRACKR_DB_PATH` on Railway. When `RAILWAY_VOLUME_MOUNT_PATH` is present, TrackR always uses `<mount>/trackr.sqlite3`.
+5. TrackR ignores `TRACKR_DB_PATH` on Railway and always uses `<RAILWAY_VOLUME_MOUNT_PATH>/trackr.sqlite3`. Remove `TRACKR_DB_PATH` from Railway variables when convenient to avoid confusion. The volume mount path must be non-empty, absolute and point to an existing directory; TrackR refuses to start otherwise.
 6. Keep the service at exactly one replica.
 7. Deploy and confirm `/health` passes.
 8. Sign in with each bootstrap account and change its temporary password.
@@ -67,9 +67,9 @@ Admins can download a consistent SQLite backup from **Settings â†’ User Admin â†
 
 Backups beside the live database protect against bad saves/migrations but are on the same Railway volume. They are **not** sufficient protection against complete volume loss. Keep downloaded copies outside Railway.
 
-If stored workspace JSON is corrupt or fails semantic validation at startup, TrackR creates a recovery backup and refuses to replace the damaged operational state with default data. Restore a known-good backup instead.
+Before schema maintenance, startup validates the required `app_state` table, row, JSON object, and workspace contents. A readable database gets a standalone SQLite recovery backup before any schema or state migration. A missing state table or row, non-object or invalid state, or an existing empty database fails closed; TrackR will not create defaults or repair that database. Restore a known-good backup instead. If SQLite cannot read the database well enough to create a consistent backup, TrackR preserves a clearly labeled raw database copy and any available SQLite sidecars for recovery.
 
-Admins can run the deliberate deep SQLite check at `GET /api/database-integrity`. Railway's `/health` endpoint is intentionally lightweight and only checks that the workspace database is available.
+Admins can run the deliberate deep SQLite check at `GET /api/database-integrity`. Railway's `/health` endpoint checks that the workspace database and required `app_state` contents are available and valid, without running the deep integrity check.
 
 ## Important files
 

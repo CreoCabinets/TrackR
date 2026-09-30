@@ -17,8 +17,8 @@ function renderSchedule(){
     if(!query) return true;
     return normaliseSearch(`${person.name} ${person.role}`).includes(query) || tasks.some(task=>(task.assigned || []).includes(person.name) && taskMatchesQuery(task,query));
   }).map(person=>person.name);
-  const matchingUnassigned=tasks.some(task=>task.type === "capacity" && !(task.assigned || []).length && taskMatchesQuery(task,query));
-  if(matchingUnassigned) rowNames.unshift("Unassigned");
+  const matchingUnassigned=tasks.some(task=>task.type === "capacity" && (unassignedTaskMinutes(task)>0 || !(task.assigned || []).length) && taskMatchesQuery(task,query));
+  if(matchingUnassigned || (isAdmin && tasks.some(task=>task.type === "capacity" && taskMatchesQuery(task,query)))) rowNames.unshift("Unassigned");
   rowNames.forEach(rowName=>{
     const isUnassignedRow=rowName === "Unassigned";
     const person=people.find(item=>item.name === rowName);
@@ -32,7 +32,7 @@ function renderSchedule(){
     const row=document.createElement("div");row.className="row";row.dataset.person=rowName;row.style.minHeight=`${Math.max(124,56+laneCount*lanePitch+16)}px`;
     row.innerHTML=`<div class="person" data-click-action="openDayPanel" data-click-args='${escapeHtml(JSON.stringify([rowName,0]))}' ><strong>${escapeHtml(rowName)}</strong><span>${isUnassignedRow ? "Needs assignment" : escapeHtml(person.role)}</span></div>${days.map((day,index)=>{
       if(isUnassignedRow){
-        const count=tasks.filter(task=>task.type === "capacity" && !(task.assigned || []).length && scheduleIndexForDate(taskDate(task)) === index && taskMatchesQuery(task,query)).length;
+        const count=tasks.filter(task=>task.type === "capacity" && (unassignedTaskMinutes(task)>0 || !(task.assigned || []).length) && scheduleIndexForDate(parseIsoDate(task.unassignedDate) || taskDate(task)) === index && taskMatchesQuery(task,query)).length;
         return `<div class="cell ${day.working ? "" : "weekend"}" data-person="Unassigned" data-day="${index}" data-click-action="openDayPanel" data-click-args='["Unassigned",${index}]' ><span class="badge ${count ? "tight" : "off"}">${count ? `${count} waiting` : "None"}</span></div>`;
       }
       const dateObj=dateForDayIndex(index),blockedStatus=blockedStatusForDate(rowName,dateObj),calendarEvent=globalCalendarEventForDate(dateObj);
@@ -61,13 +61,13 @@ function renderSchedule(){
       if(over) metaBits.push("Over capacity");
       if(detailsRequired) metaBits.push("Details required");
       bar.innerHTML=`<span class="dot"></span><span class="bar-copy"><span class="bar-main">${escapeHtml(taskLabel(item.task))}</span><span class="bar-meta">${escapeHtml(metaBits.join(" · "))}</span></span>`;
-      bar.title=`${taskLabel(item.task)} · ${fmt(minutes)}${detailsRequired ? " · Details required" : ""}${over ? " · Over capacity" : ""} · Drag to move`;
-      bar.setAttribute("aria-label",`Edit ${taskLabel(item.task)}`);
+      bar.title=`${taskLabel(item.task)} · ${fmt(minutes)}${detailsRequired ? " · Details required" : ""}${over ? " · Over capacity" : ""} · ${isAdmin ? "Drag to move" : "View details"}`;
+      bar.setAttribute("aria-label",`${isAdmin ? "Edit" : "View details for"} ${taskLabel(item.task)}`);
       bar.dataset.taskId=item.task.id;
       bar.dataset.person=rowName;
       bar.draggable=false;
+      bar.addEventListener("click",event=>{event.stopPropagation();if(Date.now()<scheduleSuppressClickUntil) return;openTaskPanel(item.task.id);});
       if(isAdmin){
-        bar.addEventListener("click",event=>{event.stopPropagation();if(Date.now()<scheduleSuppressClickUntil) return;openTaskPanel(item.task.id);});
         bar.addEventListener("pointerdown",event=>beginSchedulePointerDrag(event,bar,item.task,rowName));
       }
       bars.appendChild(bar);
@@ -229,7 +229,7 @@ function onSchedulePointerCancel(event){
 function materialiseAssignmentMinutes(task){
   const names = [...new Set((task.assigned || []).filter(Boolean))];
   const existing = task.assignmentMinutes || {};
-  const total = Math.max(0,Number(task.duration || 0));
+  const total = Math.max(0,Number(task.duration || 0)-Number(task.unassignedMinutes || 0));
   if (!names.length) return {};
   const hasCustom = names.some(name => existing[name] != null);
   if (hasCustom) return Object.fromEntries(names.map(name => [name,Math.max(0,Number(existing[name])||0)]));
@@ -261,14 +261,42 @@ function reassignDraggedShare(task,sourcePerson,newPerson,newDate){
   const shares = materialiseAssignmentMinutes(task);
   const dates = materialiseAssignmentDates(task);
   const newIso = toIsoDate(newDate || taskDate(task));
+  const residual = Math.max(0,Number(task.unassignedMinutes ?? (assigned.length ? 0 : task.duration))||0);
+  if(sourcePerson === "Unassigned"){
+    task.unassignedMinutes = residual;
+    if(residual>0) task.unassignedDate = newIso;
+    else delete task.unassignedDate;
+    if(!newPerson) return true;
+    task.assigned = [...new Set([...assigned,newPerson])];
+    task.assignmentMinutes = {...shares,[newPerson]:(shares[newPerson] || 0)+residual};
+    task.assignmentDates = {...dates,[newPerson]:dates[newPerson] || newIso};
+    task.unassignedMinutes = 0;
+    delete task.unassignedDate;
+    return true;
+  }
   if (!newPerson) {
+    if (sourcePerson && assigned.includes(sourcePerson)) {
+      task.unassignedMinutes = residual + (shares[sourcePerson] || 0);
+      if(task.unassignedMinutes>0) task.unassignedDate = newIso;
+      else delete task.unassignedDate;
+      task.assigned = assigned.filter(name => name !== sourcePerson);
+      delete shares[sourcePerson];
+      delete dates[sourcePerson];
+      moveScheduleOrderKey(task,sourcePerson,"");
+      task.assignmentMinutes = Object.fromEntries(task.assigned.map(name => [name,Math.max(0,Number(shares[name])||0)]));
+      task.assignmentDates = Object.fromEntries(task.assigned.map(name => [name,dates[name] || newIso]));
+      return true;
+    }
     moveScheduleOrderKey(task,sourcePerson,"");
     task.assigned = [];
     task.assignmentMinutes = {};
     task.assignmentDates = {};
+    task.unassignedMinutes = Math.max(0,Number(task.duration || 0));
+    if(task.unassignedMinutes>0) task.unassignedDate = newIso;
+    else delete task.unassignedDate;
     return true;
   }
-  if (assigned.length > 1 && sourcePerson && assigned.includes(sourcePerson)) {
+  if (sourcePerson && assigned.includes(sourcePerson)) {
     if (sourcePerson !== newPerson) {
       if (assigned.includes(newPerson)) {
         showToast(`${newPerson} already has a separate share of this stage.`);
@@ -303,7 +331,7 @@ async function moveTaskToCell(task,cell,sourcePerson=currentDragPerson,reorderTa
   scheduleMoveSaving=true;
   setScheduleSaveStatus("Saving move…","saving");
   try{
-    const independentShare=(task.assigned || []).length > 1 && sourcePerson && (task.assigned || []).includes(sourcePerson);
+    const independentShare=((task.assigned || []).length > 1 || unassignedTaskMinutes(task) > 0) && sourcePerson && ((task.assigned || []).includes(sourcePerson) || sourcePerson === "Unassigned");
     const priorityOnly=!!reorderTarget && sourcePerson === newPerson && sourceDay != null && Number(sourceDay) === newDay;
     if(!priorityOnly){
       if(independentShare){const moved=reassignDraggedShare(task,sourcePerson,newPerson === "Unassigned" ? "" : newPerson,newDate);if(!moved){renderAll();return;}}

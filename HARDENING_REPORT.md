@@ -19,9 +19,9 @@ Do not horizontally scale the current SQLite/whole-workspace-JSON architecture.
 
 - Railway's mounted volume now takes priority over `TRACKR_DB_PATH`; a stale local DB override cannot move the Railway live database onto ephemeral application storage.
 - The old Git/bundled `flow.sqlite3` seed-copy deployment path has been removed. A genuinely new database is initialized by the application and bootstrap accounts come from environment variables.
-- Startup schema maintenance is committed before recovery backups are attempted.
-- Corrupt or semantically invalid stored workspace state is backed up and startup fails clearly rather than silently replacing operational data with the default workspace.
-- `/health` is now a lightweight availability/database read. Deep SQLite integrity checking moved to the admin-only `/api/database-integrity` endpoint.
+- Recovery validation and a standalone SQLite recovery backup happen before schema maintenance or state migration for readable established databases. Missing `app_state` tables or rows, non-object or invalid state, and an existing empty database fail closed rather than receiving defaults or schema repair; unreadable databases get a clearly labeled raw-copy fallback when possible.
+- Corrupt or semantically invalid stored workspace state is preserved in a recovery backup and startup fails clearly rather than silently replacing operational data with the default workspace.
+- `/health` validates the required `app_state` table, row, and workspace contents while remaining a lightweight check. Deep SQLite integrity checking is on the admin-only `/api/database-integrity` endpoint.
 - Frontend workspace saves keep a last-known persisted snapshot. Failed saves roll unsaved workspace mutations back; revision conflicts reload the latest saved server state instead of leaving the browser showing changes that were never committed.
 - Browser unload protection now covers dirty/debounced state as well as active requests.
 

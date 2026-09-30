@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import copy
-from io import BytesIO
 import json
+import math
 import os
 import re
 import secrets
+import shutil
 import sqlite3
 import tempfile
 import threading
@@ -30,16 +31,58 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
 APP_DIR = Path(__file__).resolve().parent
-IS_PRODUCTION = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("TRACKR_ENV", "").lower() == "production")
+
+# Railway's current runtime variables are documented at
+# https://docs.railway.com/variables/reference. Keep the legacy environment
+# variable too, since existing deployments may still expose it.
+RAILWAY_RUNTIME_VARIABLES = (
+    "RAILWAY_PUBLIC_DOMAIN",
+    "RAILWAY_PRIVATE_DOMAIN",
+    "RAILWAY_TCP_PROXY_DOMAIN",
+    "RAILWAY_TCP_PROXY_PORT",
+    "RAILWAY_TCP_APPLICATION_PORT",
+    "RAILWAY_PROJECT_NAME",
+    "RAILWAY_PROJECT_ID",
+    "RAILWAY_ENVIRONMENT_NAME",
+    "RAILWAY_ENVIRONMENT_ID",
+    "RAILWAY_SERVICE_NAME",
+    "RAILWAY_SERVICE_ID",
+    "RAILWAY_REPLICA_ID",
+    "RAILWAY_REPLICA_REGION",
+    "RAILWAY_DEPLOYMENT_ID",
+    "RAILWAY_SNAPSHOT_ID",
+    "RAILWAY_VOLUME_NAME",
+    "RAILWAY_VOLUME_MOUNT_PATH",
+)
+
+
+def is_railway_runtime() -> bool:
+    return any(name in os.environ for name in (*RAILWAY_RUNTIME_VARIABLES, "RAILWAY_ENVIRONMENT"))
+
+
+IS_RAILWAY = is_railway_runtime()
+IS_PRODUCTION = bool(IS_RAILWAY or os.environ.get("TRACKR_ENV", "").lower() == "production")
 
 
 def resolve_db_path() -> Path:
-    # Railway's mounted volume is authoritative in production. This prevents a
-    # stale/local TRACKR_DB_PATH value from accidentally moving the live SQLite
-    # database onto Railway's ephemeral application filesystem.
-    volume_path = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH")
-    if volume_path:
-        return (Path(volume_path) / "trackr.sqlite3").resolve()
+    if is_railway_runtime():
+        volume_path = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH", "").strip()
+        if not volume_path:
+            raise RuntimeError(
+                "Persistent Railway storage unavailable: RAILWAY_VOLUME_MOUNT_PATH is missing or empty; refusing start."
+            )
+        mount_path = Path(volume_path).expanduser()
+        if not mount_path.is_absolute():
+            raise RuntimeError(
+                "Persistent Railway storage unavailable: RAILWAY_VOLUME_MOUNT_PATH must be an absolute path; refusing start."
+            )
+        mount_path = mount_path.resolve()
+        if not mount_path.is_dir():
+            raise RuntimeError(
+                f"Persistent Railway storage unavailable: volume mount directory does not exist or is not a directory "
+                f"({mount_path}); refusing start."
+            )
+        return mount_path / "trackr.sqlite3"
     explicit = os.environ.get("TRACKR_DB_PATH")
     if explicit:
         return Path(explicit).expanduser().resolve()
@@ -47,7 +90,8 @@ def resolve_db_path() -> Path:
 
 
 DB_PATH = resolve_db_path()
-DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+if not is_railway_runtime():
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 secret_key = os.environ.get("TRACKR_SECRET_KEY")
 if IS_PRODUCTION and not secret_key:
@@ -336,7 +380,7 @@ def utc_now_iso() -> str:
 
 
 def valid_iso_date(value: object) -> bool:
-    if not isinstance(value, str) or not value:
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value):
         return False
     try:
         date.fromisoformat(value)
@@ -377,7 +421,12 @@ def clean_text(value: object, field: str, *, max_length: int = TEXT_MAX, require
 def require_number(value: object, field: str, minimum: float = 0, maximum: float = 10_000_000) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"{field} must be a number.")
-    number = float(value)
+    try:
+        number = float(value)
+    except OverflowError as exc:
+        raise ValueError(f"{field} is outside the allowed range.") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"{field} must be a finite number.")
     if number < minimum or number > maximum:
         raise ValueError(f"{field} is outside the allowed range.")
     return number
@@ -395,6 +444,21 @@ def validate_week(value: object, field: str) -> dict[str, int]:
 def validate_state(payload: object) -> dict:
     if not isinstance(payload, dict):
         raise ValueError("Invalid workspace state.")
+    def require_finite_json(value: object) -> None:
+        if isinstance(value, bool) or value is None or isinstance(value, (str, int)):
+            return
+        if isinstance(value, float):
+            if not math.isfinite(value):
+                raise ValueError("Workspace state contains a non-finite number.")
+            return
+        if isinstance(value, dict):
+            for nested in value.values():
+                require_finite_json(nested)
+            return
+        if isinstance(value, list):
+            for nested in value:
+                require_finite_json(nested)
+    require_finite_json(payload)
     state = copy.deepcopy(payload)
     state.pop("_revision", None)
 
@@ -423,7 +487,7 @@ def validate_state(payload: object) -> dict:
         people_names.add(key)
         person["name"] = name
         role = person.get("role")
-        if role not in ALLOWED_EMPLOYEE_ROLES:
+        if not isinstance(role, str) or role not in ALLOWED_EMPLOYEE_ROLES:
             raise ValueError(f"Invalid department for {name}.")
         counts_capacity = person.get("countsCapacity", role != "Admin")
         if not isinstance(counts_capacity, bool):
@@ -434,7 +498,7 @@ def validate_state(payload: object) -> dict:
         people_roles[name] = role
         people_schedule_capacity[name] = role != "Admin"
         pattern = person.get("workPattern", "Standard")
-        if pattern not in {"Standard", "Custom"}:
+        if not isinstance(pattern, str) or pattern not in {"Standard", "Custom"}:
             raise ValueError(f"Invalid work pattern for {name}.")
         person["workPattern"] = pattern
         person["week"] = validate_week(person.get("week", {}), f"{name} standard week")
@@ -510,7 +574,7 @@ def validate_state(payload: object) -> dict:
         task.pop("parts", None)
         task.pop("unscheduledMinutes", None)
         task_type = task.get("type")
-        if task_type not in ALLOWED_TASK_TYPES:
+        if not isinstance(task_type, str) or task_type not in ALLOWED_TASK_TYPES:
             raise ValueError(f"Invalid task type for {task_id}.")
         task_job = clean_text(task.get("job"), f"Job for {task_id}", max_length=160, required=True)
         task_name = clean_text(task.get("name"), f"Name for {task_id}", max_length=140, required=True)
@@ -562,6 +626,8 @@ def validate_state(payload: object) -> dict:
         assigned = task.get("assigned", [])
         if not isinstance(assigned, list) or len(assigned) > MAX_PEOPLE:
             raise ValueError(f"Invalid employee assignments for {task_id}.")
+        if any(not isinstance(employee, str) for employee in assigned):
+            raise ValueError(f"Invalid employee assignments for {task_id}.")
         if len(set(assigned)) != len(assigned):
             raise ValueError(f"Duplicate employee assignment for {task_id}.")
         for employee in assigned:
@@ -587,6 +653,16 @@ def validate_state(payload: object) -> dict:
             employee: require_number(value, f"{task_id} schedule order for {employee}", 0, 1_000_000_000)
             for employee, value in schedule_order.items()
         }
+        explicit_unassigned = "unassignedMinutes" in task
+        unassigned_minutes = 0
+        if explicit_unassigned:
+            if task_type != "capacity":
+                raise ValueError(f"Unassigned labour is only valid for capacity task {task_id}.")
+            unassigned_minutes = require_number(task["unassignedMinutes"], f"Unassigned minutes for {task_id}", 0, task["duration"])
+            task["unassignedMinutes"] = unassigned_minutes
+        if "unassignedDate" in task:
+            if not explicit_unassigned or unassigned_minutes <= 0 or not valid_iso_date(task["unassignedDate"]):
+                raise ValueError(f"Invalid unassigned date for {task_id}.")
         for map_name in ("assignmentMinutes", "assignmentDates"):
             mapping = task.get(map_name, {}) or {}
             if not isinstance(mapping, dict):
@@ -596,12 +672,12 @@ def validate_state(payload: object) -> dict:
             if map_name == "assignmentMinutes":
                 for employee, minutes in mapping.items():
                     require_number(minutes, f"{task_id} allocation for {employee}", 0, 5_000_000)
-                if mapping and task_type == "capacity":
+                if (mapping or explicit_unassigned) and task_type == "capacity":
                     if set(mapping) != set(assigned):
                         raise ValueError(f"Every assigned employee needs an hours allocation for {task_id}.")
                     allocated = sum(float(value) for value in mapping.values())
-                    if abs(allocated - float(task.get("duration", 0))) > 1:
-                        raise ValueError(f"Employee allocations must equal the task duration for {task_id}.")
+                    if abs(allocated + float(unassigned_minutes) - float(task.get("duration", 0))) > 1:
+                        raise ValueError(f"Employee allocations plus unassigned minutes must equal the task duration for {task_id}.")
             else:
                 for employee, iso_value in mapping.items():
                     if not valid_iso_date(iso_value):
@@ -614,7 +690,7 @@ def validate_state(payload: object) -> dict:
         status["person"] = person
         if person not in exact_people_names:
             raise ValueError(f"Blocked day refers to missing employee {person}.")
-        if status.get("type") not in ALLOWED_DAY_STATUS_TYPES:
+        if not isinstance(status.get("type"), str) or status.get("type") not in ALLOWED_DAY_STATUS_TYPES:
             raise ValueError(f"Invalid blocked-day type for {person}.")
         start_date = status.get("startDate")
         end_date = status.get("endDate") or start_date
@@ -673,7 +749,7 @@ def validate_state(payload: object) -> dict:
         event_ids.add(event_id)
         event["id"] = event_id
         event["name"] = clean_text(event.get("name"), "Calendar event name", max_length=160, required=True)
-        if event.get("type") not in ALLOWED_EVENT_TYPES:
+        if not isinstance(event.get("type"), str) or event.get("type") not in ALLOWED_EVENT_TYPES:
             raise ValueError(f"Invalid calendar event type for {event_id}.")
         start_date = event.get("startDate")
         end_date = event.get("endDate") or start_date
@@ -719,16 +795,18 @@ def department_for_stage(value: object, fallback: object = "Cabinet Making") -> 
 
 def migrate_state(state: object) -> tuple[dict, bool]:
     if not isinstance(state, dict):
-        return copy.deepcopy(DEFAULT_STATE), True
+        raise ValueError("Stored workspace state must be an object.")
     changed = False
     current_version = int(state.get("version", 0) or 0)
     if current_version < 4:
         state["jobs"] = [job for job in state.get("jobs", []) if job.get("id") not in DEMO_JOBS_TO_REMOVE]
         state["tasks"] = [task for task in state.get("tasks", []) if task.get("job") not in DEMO_JOBS_TO_REMOVE]
         changed = True
-    if not isinstance(state.get("calendarEvents"), list):
+    if "calendarEvents" not in state and current_version < STATE_VERSION:
         state["calendarEvents"] = []
         changed = True
+    elif not isinstance(state.get("calendarEvents"), list):
+        raise ValueError("Stored calendar events must be a list.")
     if current_version < 7:
         for person in state.get("people", []):
             if isinstance(person, dict) and not isinstance(person.get("countsCapacity"), bool):
@@ -881,13 +959,35 @@ def migrate_state(state: object) -> tuple[dict, bool]:
         changed = True
     return state, changed
 
+class EstimatePdfError(ValueError):
+    """A PDF that cannot be imported as a supported estimate."""
+
+
+class EmptyEstimatePdfTextError(EstimatePdfError):
+    pass
+
+
+class UnsupportedEstimatePdfError(EstimatePdfError):
+    pass
+
+
+class EncryptedEstimatePdfError(EstimatePdfError):
+    pass
+
+
 def read_pdf_text(file_stream) -> str:
     reader = PdfReader(file_stream, strict=False)
+    if reader.is_encrypted:
+        raise EncryptedEstimatePdfError(
+            "Password-protected PDFs are not supported. Export an unlocked copy."
+        )
     return "\n".join((page.extract_text() or "") for page in reader.pages)
 
 
 def extract_quote_no(text: str) -> str:
-    match = re.search(r"Quote\s+No:\s*([A-Za-z0-9\-]+)", text, re.IGNORECASE)
+    # The identifier belongs to the Quote No line. Do not let whitespace
+    # matching consume a following heading when the identifier is blank.
+    match = re.search(r"Quote\s+No:[ \t]*([A-Za-z0-9-]+)(?![A-Za-z0-9-])", text, re.IGNORECASE)
     return match.group(1).strip() if match else ""
 
 
@@ -904,29 +1004,79 @@ def extract_pdf_date(text: str) -> str:
     return match.group(1).strip() if match else ""
 
 
-def extract_labour_hours(text: str, label: str) -> float:
-    pattern = rf"{re.escape(label)}\s*-.*?\bhr\s+\$?[\d,]+(?:\.\d+)?\s+(\d+(?:\.\d+)?)\s+\$"
+EXPECTED_LABOUR_LABELS = (
+    "Assembly",
+    "CNC Machine",
+    "Delivery",
+    "Drafting",
+    "Edgebander",
+    "Loading",
+    "QC",
+    "Site Measure",
+    "Unloading",
+)
+
+
+def extract_labour_hours(text: str, label: str) -> float | None:
+    row_labels = "|".join(re.escape(item) for item in sorted(EXPECTED_LABOUR_LABELS, key=len, reverse=True))
+    row_start = rf"(?<![A-Za-z0-9])(?:{row_labels})(?![A-Za-z0-9])\s*-"
+    target = rf"(?<![A-Za-z0-9]){re.escape(label)}(?![A-Za-z0-9])"
+    # Descriptions may wrap across lines, but a later expected labour row
+    # always terminates the current row so it cannot supply another row's hours.
+    description = rf"(?:(?!{row_start}).)*?"
+    pattern = rf"{target}\s*-\s*{description}\bhr\s+\$?[\d,]+(?:\.\d+)?\s+(\d+(?:\.\d+)?)\s+\$"
     match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
     if match:
         return float(match.group(1))
     compact_text = " ".join(text.split())
     match = re.search(pattern, compact_text, re.IGNORECASE)
-    return float(match.group(1)) if match else 0.0
+    return float(match.group(1)) if match else None
 
 
 def parse_estimate_pdf(file_stream) -> dict:
     text = read_pdf_text(file_stream)
-    assembly_hours = extract_labour_hours(text, "Assembly")
-    cnc_hours = extract_labour_hours(text, "CNC Machine")
-    delivery_hours = extract_labour_hours(text, "Delivery")
-    drafting_hours = extract_labour_hours(text, "Drafting")
-    edgebander_hours = extract_labour_hours(text, "Edgebander")
-    loading_hours = extract_labour_hours(text, "Loading")
-    qc_hours = extract_labour_hours(text, "QC")
-    site_measure_hours = extract_labour_hours(text, "Site Measure")
-    unloading_hours = extract_labour_hours(text, "Unloading")
+    if not text or not text.strip():
+        raise EmptyEstimatePdfTextError(
+            "No readable text was found. Upload a text-based estimate PDF or an OCR-processed copy."
+        )
+
+    quote_no = extract_quote_no(text)
+    labour_rows = {
+        "assembly_hours": extract_labour_hours(text, "Assembly"),
+        "cnc_hours": extract_labour_hours(text, "CNC Machine"),
+        "delivery_hours": extract_labour_hours(text, "Delivery"),
+        "drafting_hours": extract_labour_hours(text, "Drafting"),
+        "edgebander_hours": extract_labour_hours(text, "Edgebander"),
+        "loading_hours": extract_labour_hours(text, "Loading"),
+        "qc_hours": extract_labour_hours(text, "QC"),
+        "site_measure_hours": extract_labour_hours(text, "Site Measure"),
+        "unloading_hours": extract_labour_hours(text, "Unloading"),
+    }
+    matched_rows = sum(value is not None for value in labour_rows.values())
+    has_labour_heading = re.search(r"\bLabour\s+Items\b", text, re.IGNORECASE) is not None
+    has_labour_structure = (has_labour_heading and matched_rows >= 1) or matched_rows >= 2
+    if not quote_no or not has_labour_structure:
+        raise UnsupportedEstimatePdfError(
+            "This PDF is not a supported estimate/labour-detail PDF. Check that it contains a Quote No and labour item rows."
+        )
+
+    # Missing optional rows retain None until recognition succeeds, then match
+    # the existing response contract by normalizing them to zero.
+    labour_rows = {
+        key: 0.0 if value is None else value
+        for key, value in labour_rows.items()
+    }
+    assembly_hours = labour_rows["assembly_hours"]
+    cnc_hours = labour_rows["cnc_hours"]
+    delivery_hours = labour_rows["delivery_hours"]
+    drafting_hours = labour_rows["drafting_hours"]
+    edgebander_hours = labour_rows["edgebander_hours"]
+    loading_hours = labour_rows["loading_hours"]
+    qc_hours = labour_rows["qc_hours"]
+    site_measure_hours = labour_rows["site_measure_hours"]
+    unloading_hours = labour_rows["unloading_hours"]
     return {
-        "quote_no": extract_quote_no(text),
+        "quote_no": quote_no,
         "quote_name": extract_quote_name(text),
         "estimate_date": extract_pdf_date(text),
         "assembly_hours": assembly_hours,
@@ -956,6 +1106,28 @@ def get_db() -> sqlite3.Connection:
     return conn
 
 
+def read_persisted_state(conn: sqlite3.Connection) -> tuple[dict, int]:
+    """Read and validate the required workspace row without supplying defaults."""
+    try:
+        row = conn.execute("SELECT state_json, revision FROM app_state WHERE id = 1").fetchone()
+    except sqlite3.DatabaseError as exc:
+        raise RuntimeError("Workspace state is unavailable. Restore a known-good database backup.") from exc
+    if row is None:
+        raise RuntimeError("Workspace state is missing. Restore a known-good database backup.")
+    try:
+        state = json.loads(row["state_json"])
+        if not isinstance(state, dict):
+            raise ValueError("Stored workspace state must be an object.")
+        validated = validate_state(state)
+    except Exception as exc:
+        raise RuntimeError("Workspace state is invalid. Restore a known-good database backup.") from exc
+    try:
+        revision = int(row["revision"] or 1)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise RuntimeError("Workspace revision is invalid. Restore a known-good database backup.") from exc
+    return validated, revision
+
+
 def add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, definition: str) -> None:
     columns = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
     if column not in columns:
@@ -966,7 +1138,213 @@ def generate_bootstrap_password() -> str:
     return secrets.token_urlsafe(18)
 
 
+def validated_bootstrap_users() -> tuple[str, str, str, str | None]:
+    raw_username = str(os.environ.get("TRACKR_BOOTSTRAP_ADMIN_USERNAME", "admin") or "admin").strip()
+    username = validate_username(raw_username)
+    if not username:
+        raise RuntimeError("TRACKR_BOOTSTRAP_ADMIN_USERNAME must be 3-32 characters using letters, numbers, dots, dashes or underscores.")
+    password = os.environ.get("TRACKR_BOOTSTRAP_ADMIN_PASSWORD")
+    if not password:
+        if IS_PRODUCTION:
+            raise RuntimeError("TRACKR_BOOTSTRAP_ADMIN_PASSWORD is required when creating the first production admin.")
+        password = generate_bootstrap_password()
+        app.logger.warning("New local TrackR admin created: username=%s temporary_password=%s", username, password)
+    if not validate_password(password):
+        raise RuntimeError("TRACKR_BOOTSTRAP_ADMIN_PASSWORD must be between 12 and 200 characters.")
+
+    raw_factory_username = str(os.environ.get("TRACKR_BOOTSTRAP_FACTORY_USERNAME", "") or "").strip()
+    factory_password = os.environ.get("TRACKR_BOOTSTRAP_FACTORY_PASSWORD")
+    if bool(raw_factory_username) != bool(factory_password):
+        raise RuntimeError("Set both TRACKR_BOOTSTRAP_FACTORY_USERNAME and TRACKR_BOOTSTRAP_FACTORY_PASSWORD, or leave both unset.")
+    factory_username = ""
+    if raw_factory_username and factory_password:
+        factory_username = validate_username(raw_factory_username)
+        if not factory_username:
+            raise RuntimeError("TRACKR_BOOTSTRAP_FACTORY_USERNAME must be 3-32 characters using letters, numbers, dots, dashes or underscores.")
+        if factory_username.casefold() == username.casefold():
+            raise RuntimeError("Bootstrap admin and factory usernames must be different.")
+        if not validate_password(factory_password):
+            raise RuntimeError("TRACKR_BOOTSTRAP_FACTORY_PASSWORD must be between 12 and 200 characters.")
+    return username, password, factory_username, factory_password
+
+
+def online_database_backup(source_conn: sqlite3.Connection, destination: sqlite3.Connection) -> None:
+    source_conn.backup(destination)
+
+
+def recovery_backup(
+    *,
+    label: str,
+    source_conn: sqlite3.Connection | None = None,
+    allow_raw_fallback: bool = False,
+) -> Path:
+    """Create a standalone SQLite snapshot, with an opt-in labeled raw fallback."""
+    backup_dir = DB_PATH.parent / "backups"
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
+    safe_label = re.sub(r"[^A-Za-z0-9_-]+", "-", label)[:30]
+    target = backup_dir / f"trackr-{timestamp}-{safe_label}.sqlite3"
+    backup_error = None
+    if source_conn is not None:
+        destination = None
+        try:
+            destination = sqlite3.connect(target)
+            online_database_backup(source_conn, destination)
+            destination.close()
+            return target
+        except Exception as exc:
+            if destination is not None:
+                try:
+                    destination.close()
+                except Exception:
+                    pass
+            for partial in (target, Path(f"{target}-wal"), Path(f"{target}-shm")):
+                try:
+                    partial.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            backup_error = exc
+
+    if not allow_raw_fallback:
+        raise RuntimeError("SQLite recovery backup failed; raw-copy fallback is not permitted.") from backup_error
+
+    # Raw copies are only used when SQLite cannot produce a consistent backup
+    # (or the database is empty/unreadable). The filename makes that limitation
+    # explicit, and sidecars are retained for forensic recovery.
+    target = backup_dir / f"trackr-{timestamp}-{safe_label}-raw-fallback.sqlite3"
+    shutil.copy2(DB_PATH, target)
+    for suffix in ("-wal", "-shm"):
+        sidecar = Path(f"{DB_PATH}{suffix}")
+        if sidecar.exists():
+            shutil.copy2(sidecar, Path(f"{target}{suffix}"))
+    return target
+
+
+def _recovery_error(
+    message: str,
+    label: str,
+    source_conn: sqlite3.Connection | None = None,
+    *,
+    allow_raw_fallback: bool = False,
+) -> RuntimeError:
+    try:
+        backup_path = recovery_backup(
+            label=label,
+            source_conn=source_conn,
+            allow_raw_fallback=allow_raw_fallback,
+        )
+    except Exception as exc:
+        return RuntimeError(f"{message} A recovery backup could not be created: {exc}")
+    return RuntimeError(f"{message} A recovery backup was created at {backup_path}.")
+
+
 def init_db() -> None:
+    # Capture this before sqlite3.connect: connecting to a missing path creates
+    # an empty database and must not be mistaken for an existing workspace.
+    database_existed = DB_PATH.exists()
+    if database_existed and DB_PATH.stat().st_size == 0:
+        raise _recovery_error(
+            "The existing TrackR database is empty; refusing to initialize over it.",
+            "empty-database",
+            allow_raw_fallback=True,
+        )
+
+    if database_existed:
+        # The state table is the source of truth. Check it before any CREATE or
+        # ALTER statements so an existing but incomplete DB cannot receive demo
+        # defaults or have its schema silently repaired.
+        inspect = None
+        try:
+            inspect = sqlite3.connect(DB_PATH, timeout=20)
+            tables = {
+                row[0]
+                for row in inspect.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+            }
+            if "app_state" not in tables:
+                raise _recovery_error(
+                    "The existing TrackR database has no app_state table; refusing to initialize it.",
+                    "missing-state-table",
+                    inspect,
+                )
+            columns = {row[1] for row in inspect.execute("PRAGMA table_info(app_state)")}
+            if "state_json" not in columns:
+                raise _recovery_error(
+                    "The existing TrackR database has no workspace state column; refusing to initialize it.",
+                    "invalid-state-schema",
+                    inspect,
+                )
+            row = inspect.execute("SELECT state_json FROM app_state WHERE id = 1").fetchone()
+            if row is None:
+                raise _recovery_error(
+                    "The existing TrackR database has no workspace state row; refusing to initialize it.",
+                    "missing-state-row",
+                    inspect,
+                )
+            try:
+                stored_state = json.loads(row[0])
+            except Exception as exc:
+                raise _recovery_error(
+                    "Stored TrackR state is malformed; refusing to replace it.", "corrupt-state", inspect
+                ) from exc
+            if not isinstance(stored_state, dict):
+                raise _recovery_error(
+                    "Stored TrackR state is not an object; refusing to replace it.", "invalid-state", inspect
+                )
+            try:
+                stored_version = int(stored_state.get("version", 0) or 0)
+                migrated_state, migration_changed = migrate_state(copy.deepcopy(stored_state))
+                validated_state = validate_state(migrated_state)
+            except Exception as exc:
+                raise _recovery_error(
+                    f"Stored TrackR state failed migration or validation: {exc}.", "invalid-state", inspect
+                ) from exc
+            state_changed = migration_changed
+            user_columns = set()
+            if "users" in tables:
+                user_columns = {row[1] for row in inspect.execute("PRAGMA table_info(users)")}
+            schema_needs_change = (
+                "revision" not in columns
+                or "updated_at" not in columns
+                or "users" not in tables
+                or "session_version" not in user_columns
+                or "must_change_password" not in user_columns
+            )
+            backup_created = False
+            if state_changed:
+                try:
+                    recovery_backup(
+                        label="pre-v9-workflow-conversion" if stored_version < 9 else "pre-state-migration",
+                        source_conn=inspect,
+                    )
+                    backup_created = True
+                except Exception as exc:
+                    raise RuntimeError(f"Could not create a pre-migration recovery backup: {exc}") from exc
+            if schema_needs_change and not backup_created:
+                try:
+                    recovery_backup(label="pre-schema-migration", source_conn=inspect)
+                except Exception as exc:
+                    raise RuntimeError(f"Could not create a pre-schema-migration recovery backup: {exc}") from exc
+        except RuntimeError:
+            raise
+        except sqlite3.DatabaseError as exc:
+            raise _recovery_error(
+                f"The existing TrackR database cannot be read ({exc}); refusing to initialize it.",
+                "unreadable-database",
+                inspect,
+                allow_raw_fallback=True,
+            ) from exc
+        finally:
+            if inspect is not None:
+                try:
+                    inspect.close()
+                except sqlite3.DatabaseError:
+                    pass
+
+    # A new database needs a first admin, so validate all bootstrap inputs
+    # before sqlite3.connect can create the file. Existing databases must still
+    # pass the fail-closed state inspection above before any user checks occur.
+    bootstrap_users = validated_bootstrap_users() if not database_existed else None
+
     conn = get_db()
     try:
         conn.execute("PRAGMA journal_mode = WAL")
@@ -1000,81 +1378,32 @@ def init_db() -> None:
         add_column_if_missing(conn, "users", "session_version", "INTEGER NOT NULL DEFAULT 1")
         add_column_if_missing(conn, "users", "must_change_password", "INTEGER NOT NULL DEFAULT 0")
 
-        # Commit schema maintenance before any recovery backup. SQLite's backup
-        # API must not run from a connection holding an uncommitted write
-        # transaction.
+        # Commit schema maintenance before applying a validated state migration.
         conn.commit()
 
-        existing = conn.execute("SELECT state_json FROM app_state WHERE id = 1").fetchone()
-        if not existing:
+        if not database_existed:
             state = validate_state(copy.deepcopy(DEFAULT_STATE))
             conn.execute(
                 "INSERT INTO app_state (id, state_json, revision, updated_at) VALUES (1, ?, 1, ?)",
-                (json.dumps(state, separators=(",", ":")), utc_now_iso()),
+                (json.dumps(state, separators=(",", ":"), allow_nan=False), utc_now_iso()),
             )
         else:
-            try:
-                stored_state = json.loads(existing["state_json"])
-            except (json.JSONDecodeError, TypeError) as exc:
-                backup_path = backup_database(label="corrupt-state", force=True)
-                raise RuntimeError(
-                    f"Stored TrackR state is corrupt. A recovery backup was created at {backup_path}. "
-                    "Restore a known-good backup instead of replacing production data."
-                ) from exc
-            else:
-                try:
-                    stored_version = int(stored_state.get("version", 0) or 0) if isinstance(stored_state, dict) else 0
-                except (TypeError, ValueError):
-                    stored_version = 0
-                if stored_version < STATE_VERSION:
-                    conn.commit()
-                    backup_label = "pre-v9-workflow-conversion" if stored_version < 9 else "pre-state-migration"
-                    backup_database(label=backup_label, force=True)
-                stored_state, changed = migrate_state(stored_state)
-            try:
-                validated_state = validate_state(stored_state)
-            except ValueError as exc:
-                backup_path = backup_database(label="invalid-state", force=True)
-                raise RuntimeError(
-                    f"Stored TrackR state failed validation: {exc}. Recovery backup: {backup_path}"
-                ) from exc
-            if validated_state != stored_state:
-                stored_state = validated_state
-                changed = True
-            if changed:
+            # Validation and migration completed in memory before schema writes.
+            # Persist only when migration actually changed a supported old state.
+            if migration_changed:
                 conn.execute(
                     "UPDATE app_state SET state_json = ?, revision = revision + 1, updated_at = ? WHERE id = 1",
-                    (json.dumps(stored_state, separators=(",", ":")), utc_now_iso()),
+                    (json.dumps(validated_state, separators=(",", ":"), allow_nan=False), utc_now_iso()),
                 )
 
         user_count = conn.execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"]
         if user_count == 0:
-            raw_username = str(os.environ.get("TRACKR_BOOTSTRAP_ADMIN_USERNAME", "admin") or "admin").strip()
-            username = validate_username(raw_username)
-            if not username:
-                raise RuntimeError("TRACKR_BOOTSTRAP_ADMIN_USERNAME must be 3-32 characters using letters, numbers, dots, dashes or underscores.")
-            password = os.environ.get("TRACKR_BOOTSTRAP_ADMIN_PASSWORD")
-            if not password:
-                if IS_PRODUCTION:
-                    raise RuntimeError("TRACKR_BOOTSTRAP_ADMIN_PASSWORD is required when creating the first production admin.")
-                password = generate_bootstrap_password()
-                app.logger.warning("New local TrackR admin created: username=%s temporary_password=%s", username, password)
-            if not validate_password(password):
-                raise RuntimeError("TRACKR_BOOTSTRAP_ADMIN_PASSWORD must be between 12 and 200 characters.")
+            username, password, factory_username, factory_password = bootstrap_users or validated_bootstrap_users()
             conn.execute(
                 "INSERT INTO users (username, password_hash, role, must_change_password) VALUES (?, ?, 'admin', 1)",
                 (username, generate_password_hash(password)),
             )
-            raw_factory_username = str(os.environ.get("TRACKR_BOOTSTRAP_FACTORY_USERNAME", "") or "").strip()
-            factory_password = os.environ.get("TRACKR_BOOTSTRAP_FACTORY_PASSWORD")
-            if bool(raw_factory_username) != bool(factory_password):
-                raise RuntimeError("Set both TRACKR_BOOTSTRAP_FACTORY_USERNAME and TRACKR_BOOTSTRAP_FACTORY_PASSWORD, or leave both unset.")
-            if raw_factory_username and factory_password:
-                factory_username = validate_username(raw_factory_username)
-                if not factory_username:
-                    raise RuntimeError("TRACKR_BOOTSTRAP_FACTORY_USERNAME must be 3-32 characters using letters, numbers, dots, dashes or underscores.")
-                if not validate_password(factory_password):
-                    raise RuntimeError("TRACKR_BOOTSTRAP_FACTORY_PASSWORD must be between 12 and 200 characters.")
+            if factory_username and factory_password:
                 conn.execute(
                     "INSERT INTO users (username, password_hash, role, must_change_password) VALUES (?, ?, 'user', 1)",
                     (factory_username, generate_password_hash(factory_password)),
@@ -1090,16 +1419,56 @@ def backup_database(*, label: str = "auto", force: bool = False) -> Path | None:
     existing = sorted(backup_dir.glob("trackr-*.sqlite3"), key=lambda path: path.stat().st_mtime, reverse=True)
     if not force and existing and time.time() - existing[0].stat().st_mtime < 6 * 60 * 60:
         return None
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
     safe_label = re.sub(r"[^A-Za-z0-9_-]+", "-", label)[:30]
-    target = backup_dir / f"trackr-{timestamp}-{safe_label}.sqlite3"
-    source = get_db()
-    destination = sqlite3.connect(target)
+    target = None
+    reservation = None
+    source = None
+    destination = None
+    backup_error = None
     try:
+        # Reserve an exclusive, per-attempt destination before SQLite opens it.
+        # This prevents concurrent callers and existing backups from sharing a path.
+        while True:
+            suffix = secrets.token_hex(4)
+            candidate = backup_dir / f"trackr-{timestamp}-{safe_label}-{suffix}.sqlite3"
+            try:
+                reservation = candidate.open("xb")
+            except FileExistsError:
+                continue
+            target = candidate
+            reservation.close()
+            reservation = None
+            break
+        source = get_db()
+        destination = sqlite3.connect(target)
         source.backup(destination)
+    except BaseException as exc:
+        backup_error = exc
+        raise
     finally:
-        destination.close()
-        source.close()
+        if reservation is not None:
+            try:
+                reservation.close()
+            except Exception:
+                app.logger.exception("Could not close automatic backup destination reservation")
+        for connection in (destination, source):
+            if connection is not None:
+                try:
+                    connection.close()
+                except Exception as exc:
+                    if backup_error is None:
+                        backup_error = exc
+                    else:
+                        app.logger.exception("Could not close a database connection after failed backup")
+        if backup_error is not None and target is not None:
+            for partial in (target, Path(f"{target}-wal"), Path(f"{target}-shm")):
+                try:
+                    partial.unlink(missing_ok=True)
+                except Exception:
+                    app.logger.exception("Could not remove partial automatic backup artifact %s", partial)
+    if backup_error is not None:
+        raise backup_error
     for old_backup in sorted(backup_dir.glob("trackr-*.sqlite3"), key=lambda path: path.stat().st_mtime, reverse=True)[10:]:
         old_backup.unlink(missing_ok=True)
     return target
@@ -1342,9 +1711,7 @@ def health():
     conn = None
     try:
         conn = get_db()
-        row = conn.execute("SELECT revision FROM app_state WHERE id = 1").fetchone()
-        if not row:
-            raise RuntimeError("workspace state missing")
+        read_persisted_state(conn)
         return jsonify({"ok": True, "service": "TrackR"})
     except Exception:
         app.logger.exception("Health check failed")
@@ -1418,7 +1785,7 @@ def create_user():
         return jsonify({"ok": False, "error": "Username must be 3-32 characters using letters, numbers, dots, dashes or underscores."}), 400
     if not password:
         return jsonify({"ok": False, "error": "Temporary password must be between 12 and 200 characters."}), 400
-    if role not in ALLOWED_USER_ROLES:
+    if not isinstance(role, str) or role not in ALLOWED_USER_ROLES:
         return jsonify({"ok": False, "error": "Invalid role."}), 400
     conn = get_db()
     try:
@@ -1441,47 +1808,55 @@ def update_user(user_id: int):
     payload = request.get_json(silent=True) or {}
     current_user = get_current_user()
     conn = get_db()
-    target = conn.execute(
-        "SELECT id, username, role, session_version FROM users WHERE id = ?", (user_id,)
-    ).fetchone()
-    if not target:
+    try:
+        # Taking the write reservation before reading the target and admin count
+        # makes this invariant check serializable across separate connections.
+        conn.execute("BEGIN IMMEDIATE")
+        target = conn.execute(
+            "SELECT id, username, role, session_version FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        if not target:
+            conn.rollback()
+            return jsonify({"ok": False, "error": "User not found."}), 404
+        updates: list[str] = []
+        values: list[object] = []
+        revoke_sessions = False
+        if "password" in payload and str(payload.get("password") or ""):
+            password = validate_password(payload.get("password"))
+            if not password:
+                conn.rollback()
+                return jsonify({"ok": False, "error": "Password must be between 12 and 200 characters."}), 400
+            updates.extend(["password_hash = ?", "must_change_password = ?"])
+            values.extend([generate_password_hash(password), 0 if current_user["id"] == user_id else 1])
+            revoke_sessions = True
+        if "role" in payload:
+            role = payload.get("role")
+            if not isinstance(role, str) or role not in ALLOWED_USER_ROLES:
+                conn.rollback()
+                return jsonify({"ok": False, "error": "Invalid role."}), 400
+            if target["role"] == "admin" and role != "admin":
+                admin_count = conn.execute("SELECT COUNT(*) AS count FROM users WHERE role = 'admin'").fetchone()["count"]
+                if admin_count <= 1:
+                    conn.rollback()
+                    return jsonify({"ok": False, "error": "TrackR must always have at least one admin."}), 400
+            updates.append("role = ?")
+            values.append(role)
+            revoke_sessions = revoke_sessions or role != target["role"]
+        if not updates:
+            conn.rollback()
+            return jsonify({"ok": False, "error": "No changes supplied."}), 400
+        new_version = target["session_version"] + (1 if revoke_sessions else 0)
+        if revoke_sessions:
+            updates.append("session_version = ?")
+            values.append(new_version)
+        values.append(user_id)
+        conn.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = ?", values)
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
         conn.close()
-        return jsonify({"ok": False, "error": "User not found."}), 404
-    updates: list[str] = []
-    values: list[object] = []
-    revoke_sessions = False
-    if "password" in payload and str(payload.get("password") or ""):
-        password = validate_password(payload.get("password"))
-        if not password:
-            conn.close()
-            return jsonify({"ok": False, "error": "Password must be between 12 and 200 characters."}), 400
-        updates.extend(["password_hash = ?", "must_change_password = ?"])
-        values.extend([generate_password_hash(password), 0 if current_user["id"] == user_id else 1])
-        revoke_sessions = True
-    if "role" in payload:
-        role = payload.get("role")
-        if role not in ALLOWED_USER_ROLES:
-            conn.close()
-            return jsonify({"ok": False, "error": "Invalid role."}), 400
-        if target["role"] == "admin" and role != "admin":
-            admin_count = conn.execute("SELECT COUNT(*) AS count FROM users WHERE role = 'admin'").fetchone()["count"]
-            if admin_count <= 1:
-                conn.close()
-                return jsonify({"ok": False, "error": "TrackR must always have at least one admin."}), 400
-        updates.append("role = ?")
-        values.append(role)
-        revoke_sessions = revoke_sessions or role != target["role"]
-    if not updates:
-        conn.close()
-        return jsonify({"ok": False, "error": "No changes supplied."}), 400
-    new_version = target["session_version"] + (1 if revoke_sessions else 0)
-    if revoke_sessions:
-        updates.append("session_version = ?")
-        values.append(new_version)
-    values.append(user_id)
-    conn.execute(f"UPDATE users SET {', '.join(updates)} WHERE id = ?", values)
-    conn.commit()
-    conn.close()
     if current_user["id"] == user_id:
         if payload.get("role") == "user":
             session.clear()
@@ -1497,18 +1872,24 @@ def delete_user(user_id: int):
     if current_user["id"] == user_id:
         return jsonify({"ok": False, "error": "You cannot delete the account you are currently using."}), 400
     conn = get_db()
-    target = conn.execute("SELECT id, role FROM users WHERE id = ?", (user_id,)).fetchone()
-    if not target:
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        target = conn.execute("SELECT id, role FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not target:
+            conn.rollback()
+            return jsonify({"ok": False, "error": "User not found."}), 404
+        if target["role"] == "admin":
+            admin_count = conn.execute("SELECT COUNT(*) AS count FROM users WHERE role = 'admin'").fetchone()["count"]
+            if admin_count <= 1:
+                conn.rollback()
+                return jsonify({"ok": False, "error": "TrackR must always have at least one admin."}), 400
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
         conn.close()
-        return jsonify({"ok": False, "error": "User not found."}), 404
-    if target["role"] == "admin":
-        admin_count = conn.execute("SELECT COUNT(*) AS count FROM users WHERE role = 'admin'").fetchone()["count"]
-        if admin_count <= 1:
-            conn.close()
-            return jsonify({"ok": False, "error": "TrackR must always have at least one admin."}), 400
-    conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
-    conn.commit()
-    conn.close()
     return jsonify({"ok": True})
 
 
@@ -1527,19 +1908,16 @@ def filtered_state_for_user(state: dict) -> dict:
 @app.get("/api/state")
 @login_required
 def get_state():
-    conn = get_db()
-    row = conn.execute("SELECT state_json, revision FROM app_state WHERE id = 1").fetchone()
-    conn.close()
-    if not row:
-        state = copy.deepcopy(DEFAULT_STATE)
-        revision = 1
-    else:
-        try:
-            state = json.loads(row["state_json"])
-        except json.JSONDecodeError:
-            app.logger.error("Stored TrackR state is corrupt; refusing to mask it with sample data.")
-            return jsonify({"ok": False, "error": "TrackR data could not be read. Restore a database backup."}), 500
-        revision = int(row["revision"] or 1)
+    conn = None
+    try:
+        conn = get_db()
+        state, revision = read_persisted_state(conn)
+    except Exception:
+        app.logger.exception("Workspace state could not be read")
+        return jsonify({"ok": False, "error": "TrackR data could not be read. Restore a database backup."}), 500
+    finally:
+        if conn is not None:
+            conn.close()
     user = get_current_user()
     if user["role"] != "admin":
         state = filtered_state_for_user(state)
@@ -1555,18 +1933,24 @@ def save_state():
         return jsonify({"ok": False, "error": "Invalid state."}), 400
     try:
         expected_revision = int(payload.get("_revision"))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return jsonify({"ok": False, "error": "Missing workspace revision. Refresh TrackR and try again."}), 400
     try:
         validated = validate_state(payload)
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
-    encoded = json.dumps(validated, separators=(",", ":"))
+    try:
+        encoded = json.dumps(validated, separators=(",", ":"), allow_nan=False)
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "Invalid state."}), 400
     conn = get_db()
     try:
         conn.execute("BEGIN IMMEDIATE")
-        current = conn.execute("SELECT revision FROM app_state WHERE id = 1").fetchone()
-        current_revision = int(current["revision"] if current else 0)
+        try:
+            _current_state, current_revision = read_persisted_state(conn)
+        except RuntimeError:
+            conn.rollback()
+            return jsonify({"ok": False, "error": "TrackR workspace state is unavailable. Restore a database backup."}), 500
         if current_revision != expected_revision:
             conn.rollback()
             return jsonify({
@@ -1593,30 +1977,124 @@ def save_state():
 @app.get("/api/backup")
 @admin_required
 def download_backup():
-    handle = tempfile.NamedTemporaryFile(prefix="trackr-backup-", suffix=".sqlite3", delete=False)
-    handle.close()
-    target = Path(handle.name)
-    source = get_db()
-    destination = sqlite3.connect(target)
-    try:
-        source.backup(destination)
-    finally:
-        destination.close()
-        source.close()
+    target = None
+    handle = None
+    source = None
+    destination = None
+    stream = None
+    response = None
+    response_owns_file = False
+
+    def remove_temp_file():
+        try:
+            target.unlink(missing_ok=True)
+        except Exception:
+            app.logger.exception("Could not remove temporary download backup %s", target)
 
     try:
-        backup_bytes = target.read_bytes()
+        handle = tempfile.NamedTemporaryFile(prefix="trackr-backup-", suffix=".sqlite3", delete=False)
+        target = Path(handle.name)
+        handle.close()
+        handle = None
+        backup_error = None
+        try:
+            source = get_db()
+            destination = sqlite3.connect(target)
+            source.backup(destination)
+        except BaseException as exc:
+            backup_error = exc
+            raise
+        finally:
+            close_error = None
+            # Each connection must be attempted even if the other close fails.
+            for connection in (destination, source):
+                if connection is not None:
+                    try:
+                        connection.close()
+                    except Exception as exc:
+                        app.logger.exception("Could not close a database connection after download backup")
+                        if close_error is None:
+                            close_error = exc
+            if close_error is not None and backup_error is None:
+                raise close_error
+        filename = f"trackr-backup-{datetime.now().strftime('%Y-%m-%d-%H%M%S')}-{secrets.token_hex(3)}.sqlite3"
+        # Own the open file ourselves: send_file may fail after wrapping it,
+        # before a response is returned that we could close.
+        stream = target.open("rb")
+        response = send_file(
+            stream,
+            as_attachment=True,
+            download_name=filename,
+            mimetype="application/vnd.sqlite3",
+            max_age=0,
+        )
+        response.content_length = os.fstat(stream.fileno()).st_size
+        # direct_passthrough returns this iterable directly to the WSGI server.
+        # Its close therefore owns both the file close and exact-path removal.
+        response.response = _DownloadBackupIterator(response.response, stream, remove_temp_file)
+        response_owns_file = True
+        return response
     finally:
-        target.unlink(missing_ok=True)
+        if handle is not None:
+            try:
+                handle.close()
+            except Exception:
+                app.logger.exception("Could not close temporary download backup handle")
+        if not response_owns_file:
+            if response is not None:
+                try:
+                    response.close()
+                except Exception:
+                    app.logger.exception("Could not close failed download backup response")
+            if stream is not None:
+                try:
+                    stream.close()
+                except Exception:
+                    app.logger.exception("Could not close failed download backup file")
+            if target is not None:
+                remove_temp_file()
 
-    filename = f"trackr-backup-{datetime.now().strftime('%Y-%m-%d-%H%M')}.sqlite3"
-    return send_file(
-        BytesIO(backup_bytes),
-        as_attachment=True,
-        download_name=filename,
-        mimetype="application/vnd.sqlite3",
-        max_age=0,
-    )
+
+class _DownloadBackupIterator:
+    """Own a streamed file until WSGI closes it, including early disconnects."""
+
+    def __init__(self, iterable, stream, cleanup):
+        self._iterable = iterable
+        self._iterator = iter(iterable)
+        self._stream = stream
+        self._cleanup = cleanup
+        self._closed = False
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        try:
+            return next(self._iterator)
+        except BaseException:
+            # Also release resources on exhaustion or a stream error. close()
+            # logs cleanup failures so the original iteration error survives.
+            self.close()
+            raise
+
+    def close(self):
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            close = getattr(self._iterable, "close", None)
+            if close is not None:
+                close()
+        except Exception:
+            app.logger.exception("Could not close download backup stream")
+        finally:
+            # Retain explicit file ownership even if the wrapper's close fails.
+            try:
+                self._stream.close()
+            except Exception:
+                app.logger.exception("Could not close download backup file")
+            # Windows requires the file wrapper to close before unlinking.
+            self._cleanup()
 
 
 @app.post("/api/import-estimate")
@@ -1631,9 +2109,15 @@ def import_estimate():
         return jsonify({"ok": False, "error": "The selected file is not recognised as a PDF."}), 400
     try:
         extracted = parse_estimate_pdf(uploaded_file.stream)
+    except EmptyEstimatePdfTextError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 422
+    except UnsupportedEstimatePdfError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 422
+    except EncryptedEstimatePdfError as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
     except Exception:
-        app.logger.exception("Estimate PDF import failed")
-        return jsonify({"ok": False, "error": "Could not read that PDF. Check that it is a valid, text-based estimate PDF."}), 400
+        app.logger.exception("Estimate PDF import failed; PDF may be malformed or unreadable")
+        return jsonify({"ok": False, "error": "The PDF could not be read and may be damaged or incomplete."}), 400
     return jsonify({"ok": True, "extracted": extracted})
 
 

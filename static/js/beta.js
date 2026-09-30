@@ -103,7 +103,7 @@ function renderBeta(){
   if(actionEl) actionEl.textContent=String(awaiting);
   if(urgentEl) urgentEl.textContent=String(urgent);
   if(!statuses.length){
-    rows.innerHTML=`<div class="beta-empty"><strong>No deliveries this week</strong><span>TrakR could not find any scheduled Delivery tasks between ${escapeHtml(weekLabel)}.</span></div>`;
+    rows.innerHTML=`<div class="beta-empty"><strong>No deliveries this week</strong><span>TrackR could not find any scheduled Delivery tasks between ${escapeHtml(weekLabel)}.</span></div>`;
     return;
   }
   rows.innerHTML=statuses.map(({task,status})=>{
@@ -189,7 +189,7 @@ function buildBetaPrintReportHtml(){
     <thead><tr><th>Delivery</th><th>Job</th><th>Address / Builder</th><th>Must be ready</th><th>Production</th><th>Ready</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>` : `<div class="empty-report">No Delivery tasks are scheduled for ${escapeHtml(weekLabel)}.</div>`;
-  const title=`TrakR Delivery Readiness - ${weekLabel}`;
+  const title=`TrackR Delivery Readiness - ${weekLabel}`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>
     @page{size:A4 landscape;margin:8mm}
     *{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -216,17 +216,17 @@ function buildBetaPrintReportHtml(){
     .empty-report{border:1px solid #ccd6dc;background:#f7f9fa;padding:12mm;text-align:center;font-size:11pt;font-weight:700;color:#68778a}
     .footer{margin-top:3mm;padding-top:2mm;border-top:1px solid #d8e0e5;color:#68778a;font-size:6.8pt;display:flex;justify-content:space-between;gap:8mm}
   </style></head><body>
-    <header class="report-header"><div><div class="brand">TrakR</div><h1>Delivery Readiness - Floor Report</h1></div><div class="week"><div class="week-label">${escapeHtml(weekContext)}</div><strong>${escapeHtml(weekLabel)}</strong><div class="printed">Printed ${escapeHtml(printed)}</div></div></header>
+    <header class="report-header"><div><div class="brand">TrackR</div><h1>Delivery Readiness - Floor Report</h1></div><div class="week"><div class="week-label">${escapeHtml(weekContext)}</div><strong>${escapeHtml(weekLabel)}</strong><div class="printed">Printed ${escapeHtml(printed)}</div></div></header>
     <div class="summary"><div class="summary-item"><span>Deliveries</span><strong>${statuses.length}</strong></div><div class="summary-item"><span>Confirmed ready</span><strong>${ready}</strong></div><div class="summary-item"><span>Due / overdue</span><strong>${urgent}</strong></div></div>
     ${table}
-    <footer class="footer"><span>Delivery dates are taken from the calculated TrakR Schedule.</span><span>Ready confirmations are recorded in TrakR.</span></footer>
+    <footer class="footer"><span>Delivery dates are taken from the calculated TrackR Schedule.</span><span>Ready confirmations are recorded in TrackR.</span></footer>
   </body></html>`;
 }
 function printBetaDeliveryReport(){
   if(!isAdmin) return;
   const reportWindow=window.open("","trakrDeliveryReadinessReport","width=1200,height=800");
   if(!reportWindow){
-    showToast("Print window blocked. Allow pop-ups for TrakR and try again.");
+    showToast("Print window blocked. Allow pop-ups for TrackR and try again.");
     return;
   }
   reportWindow.document.open();
