@@ -15,6 +15,7 @@ from io import BytesIO
 from unittest import mock
 from pathlib import Path
 from pypdf import PdfWriter
+from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -1633,6 +1634,7 @@ class TrackRAppTests(unittest.TestCase):
             ("supported rows with quote", recognized, True),
             ("unrelated readable text", "A totally unrelated document", False),
             ("quote without labour rows", "Quote No: Q-123\nQuote Name: Kitchen", False),
+            ("next-line quote without labour rows", "Quote No:\nQ0701\nQuote Name: Kitchen", False),
             ("labour rows without quote", self._recognized_pdf_text(quote_no=""), False),
             ("heading without expected rows", "Quote No: Q-123\nLabour Items", False),
             ("recoverable but unrecognized text", "Quote Name: Kitchen\nDate: 01/02/2026", False),
@@ -1690,6 +1692,98 @@ class TrackRAppTests(unittest.TestCase):
         with mock.patch.object(trackr, "read_pdf_text", return_value=text):
             with self.assertRaises(trackr.UnsupportedEstimatePdfError):
                 trackr.parse_estimate_pdf(BytesIO(b"isolated parser fixture"))
+
+    def test_pdf_quote_no_supports_only_an_immediate_nonempty_identifier_line(self):
+        for text, expected in (
+            ("Quote No: Q0701", "Q0701"),
+            ("Quote No: LEGACY", "LEGACY"),
+            ("Quote No:\nQ0701", "Q0701"),
+            ("Quote No:\r\n \t\r\n Q0701 \r\n", "Q0701"),
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(trackr.extract_quote_no(text), expected)
+        invalid_lines = ("Labour Items", "Labour Detail", "Quote Name", "Quote Name:",
+                         *trackr.EXPECTED_LABOUR_LABELS, "Page 1", "Q0701 extra", "Q0701:", "", " \t")
+        for line in invalid_lines:
+            text = f"Quote No:\n{line}"
+            if line.strip():
+                text += "\nQ0701"  # Never skip an intervening heading/label.
+            with self.subTest(line=line):
+                self.assertEqual(trackr.extract_quote_no(text), "")
+                with mock.patch.object(trackr, "read_pdf_text", return_value=text + "\nLabour Items\n" + self._pdf_labour_row("Assembly", 1)):
+                    with self.assertRaises(trackr.UnsupportedEstimatePdfError):
+                        trackr.parse_estimate_pdf(BytesIO(b"isolated parser fixture"))
+
+    def test_pdf_supply_only_qualifiers_are_limited_to_loading_and_unloading(self):
+        for label in ("Loading", "Unloading"):
+            for qualifier in ("", " (Supply Only)"):
+                text = f"{label}{qualifier} - $0\nhr\n$0.00\n0.54\n$0.00"
+                with self.subTest(label=label, qualifier=qualifier):
+                    self.assertEqual(trackr.extract_labour_hours(text, label), 0.54)
+            for qualifier in (" (Other)", " (Supply Only extra)"):
+                self.assertIsNone(trackr.extract_labour_hours(self._pdf_labour_row(label + qualifier, 1), label))
+        self.assertIsNone(trackr.extract_labour_hours(self._pdf_labour_row("Assembly (Supply Only)", 1), "Assembly"))
+        qualified_unloading = self._pdf_labour_row("Unloading (Supply Only)", 0.66)
+        self.assertIsNone(trackr.extract_labour_hours(qualified_unloading, "Loading"))
+        for incomplete in ("Assembly - incomplete description", "Assembly -"):
+            text = incomplete + "\n" + qualified_unloading
+            self.assertIsNone(trackr.extract_labour_hours(text, "Assembly"))
+            self.assertEqual(trackr.extract_labour_hours(text, "Unloading"), 0.66)
+
+    @staticmethod
+    def _q0701_format_pdf_fixture():
+        # Sanitized text reproduces the real PDF's newline-separated cells and
+        # metadata after the table, without storing a customer's document.
+        lines = ["Labour Detail", "Description", "Units", "Rate", "Quantity", "Total"]
+        for label, rate, hours in (
+            ("Assembly", 57, 3.39), ("CNC Machine", 55, 1.08),
+            ("Drafting", 80, 1.56), ("Edgebander", 55, 1.11),
+            ("QC", 50, 0.50), ("Loading (Supply Only)", 0, 0.54),
+            ("Unloading (Supply Only)", 0, 0.66),
+        ):
+            lines.extend((f"{label} - ${rate}", "hr", f"${rate:.2f}", str(hours), "$0.00"))
+        lines.extend(("Reporting On Section:", "Vanity", "Quote No:", "Q0701",
+                      "Quote Name:", "1x Custom Vanity", "supply", "Date:", "05/10/2026"))
+        writer = PdfWriter()
+        page = writer.add_blank_page(width=612, height=792)
+        font = DictionaryObject({NameObject("/Type"): NameObject("/Font"),
+                                 NameObject("/Subtype"): NameObject("/Type1"),
+                                 NameObject("/BaseFont"): NameObject("/Helvetica")})
+        page[NameObject("/Resources")] = DictionaryObject({NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})})
+        content = DecodedStreamObject()
+        commands = ["BT /F1 10 Tf 12 TL 36 756 Td"]
+        for line in lines:
+            escaped = line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+            commands.append(f"({escaped}) Tj T*")
+        commands.append("ET")
+        content.set_data("\n".join(commands).encode("ascii"))
+        page[NameObject("/Contents")] = content
+        stream = BytesIO()
+        writer.write(stream)
+        stream.seek(0)
+        return stream
+
+    def test_real_q0701_pdf_extraction_format_is_recognized_and_imported(self):
+        text = trackr.read_pdf_text(self._q0701_format_pdf_fixture())
+        self.assertIn("Quote No:\nQ0701", text)
+        self.assertIn("Labour Detail", text)
+        self.assertNotIn("Labour Items", text)
+        expected = {"assembly_hours": 3.39, "cnc_hours": 1.08, "drafting_hours": 1.56,
+                    "edgebander_hours": 1.11, "qc_hours": 0.50,
+                    "loading_hours": 0.54, "unloading_hours": 0.66}
+        result = trackr.parse_estimate_pdf(self._q0701_format_pdf_fixture())
+        self.assertEqual(result["quote_no"], "Q0701")
+        for key, hours in expected.items():
+            self.assertEqual(result[key], hours)
+        csrf = self.login_admin()
+        response = self.client.post(
+            "/api/import-estimate",
+            data={"estimate_pdf": (self._q0701_format_pdf_fixture(), "q0701-format.pdf", "application/pdf")},
+            headers={"X-CSRF-Token": csrf}, content_type="multipart/form-data",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()["ok"])
+        self.assertEqual(response.get_json()["extracted"], result)
 
     def test_parse_estimate_pdf_empty_text_is_rejected(self):
         for text in ("", " \t\n "):

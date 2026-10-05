@@ -985,10 +985,20 @@ def read_pdf_text(file_stream) -> str:
 
 
 def extract_quote_no(text: str) -> str:
-    # The identifier belongs to the Quote No line. Do not let whitespace
-    # matching consume a following heading when the identifier is blank.
+    # Preserve same-line identifiers, including existing identifier formats.
     match = re.search(r"Quote\s+No:[ \t]*([A-Za-z0-9-]+)(?![A-Za-z0-9-])", text, re.IGNORECASE)
-    return match.group(1).strip() if match else ""
+    if match:
+        return match.group(1).strip()
+    # Some labour-detail PDFs extract the value onto its own line. Only the
+    # first non-empty line after a standalone label may supply that value.
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if not re.fullmatch(r"[ \t]*Quote[ \t]+No:[ \t]*", line, re.IGNORECASE):
+            continue
+        candidate = next((line.strip() for line in lines[index + 1:] if line.strip()), "")
+        if re.fullmatch(r"[A-Za-z0-9-]+", candidate) and re.search(r"[0-9]", candidate):
+            return candidate
+    return ""
 
 
 def extract_quote_name(text: str) -> str:
@@ -1018,9 +1028,13 @@ EXPECTED_LABOUR_LABELS = (
 
 
 def extract_labour_hours(text: str, label: str) -> float | None:
-    row_labels = "|".join(re.escape(item) for item in sorted(EXPECTED_LABOUR_LABELS, key=len, reverse=True))
+    def label_pattern(item):
+        qualifier = r"(?:[ \t]*\(Supply[ \t]+Only\))?" if item in ("Loading", "Unloading") else ""
+        return rf"{re.escape(item)}(?![A-Za-z0-9]){qualifier}"
+
+    row_labels = "|".join(label_pattern(item) for item in sorted(EXPECTED_LABOUR_LABELS, key=len, reverse=True))
     row_start = rf"(?<![A-Za-z0-9])(?:{row_labels})(?![A-Za-z0-9])\s*-"
-    target = rf"(?<![A-Za-z0-9]){re.escape(label)}(?![A-Za-z0-9])"
+    target = rf"(?<![A-Za-z0-9]){label_pattern(label)}"
     # Descriptions may wrap across lines, but a later expected labour row
     # always terminates the current row so it cannot supply another row's hours.
     description = rf"(?:(?!{row_start}).)*?"
