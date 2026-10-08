@@ -54,7 +54,7 @@ function renderSchedule(){
       const over=!isUnassignedRow && relevantParts.some(part=>((result.used[rowName] || [])[part.day] || 0) > capacityFor(person,part.day)+1);
       const detailsRequired=taskNeedsDetails(item.task);
       const bar=document.createElement("div");
-      bar.className=`bar ${typeColour(item.task)} ${(item.task.assigned || []).length > 1 ? "split" : ""} ${over ? "over-capacity" : ""} ${detailsRequired ? "details-required" : ""}`;
+      bar.className=`bar ${typeColour(item.task)} ${forecastJobClass(jobById(item.task.job))} ${(item.task.assigned || []).length > 1 ? "split" : ""} ${over ? "over-capacity" : ""} ${detailsRequired ? "details-required" : ""}`;
       bar.style.left=`${item.start*scheduleDayWidth+10}px`;bar.style.width=`${Math.max(96,item.span*scheduleDayWidth-20)}px`;bar.style.top=`${56+item.lane*lanePitch}px`;
       const metaBits=[fmt(minutes)];
       if((item.task.assigned || []).length > 1) metaBits.push("Split");

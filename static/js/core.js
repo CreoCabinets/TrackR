@@ -290,6 +290,7 @@ function parseHours(value){
   return Number.NaN;
 }
 function jobById(id){return jobs.find(job => job.id === id)}
+function forecastJobClass(job){return job?.status === "Forecast" ? "forecast-job" : ""}
 function dayNameForIndex(i){return days[i] ? days[i].name : ""}
 function parseIsoDate(value){
   if (typeof value !== "string" || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(value)) return null;

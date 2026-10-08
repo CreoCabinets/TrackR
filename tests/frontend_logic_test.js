@@ -932,6 +932,79 @@ function testReadOnlyCalendarAndSchedule(){
   assert(adminSchedule.run('calls.panels.length===1 && calls.panels[0]==="taskPanel"'),"admin Schedule-bar click retains editable task behavior");
   console.log("Read-only Calendar and Schedule tests passed");
 }
+function testForecastJobPresentation(){
+  for(const role of ["admin","user"]){
+    const h=absenceHarness(role);
+    vm.runInContext(extractFunction("renderJobs"),h.sandbox);
+    h.run('jobIsArchived=()=>false; calendarStageNamesForJob=()=>[]; document.getElementById("jobsCurrentBtn").classList.toggle=()=>{}; document.getElementById("jobsArchiveBtn").classList.toggle=()=>{}; calendarBaseDate.setFullYear(2026,8,1); visibleMonthOffset=0; document.getElementById("rows");');
+    const stages=["Check Measure","Forward Ordering","Drafting","Machining","Assembly","Loading","Delivery","Install","2pak","Stone","Custom stage"];
+    const fixture={...h.state,jobs:[{id:"SAVED",status:"Forecast",builder:"Synthetic builder",address:"Synthetic address",createdAt:"2020-01-01"},{id:"OTHER",status:"Active"}],tasks:[]};
+    stages.forEach((name,index)=>fixture.tasks.push({id:`SAVED-${index}`,job:"SAVED",name,type:"capacity",department:"Cabinet Making",date:"2026-09-14",duration:60,assigned:["Ben"],showOnCalendar:true,status:"Planned",custom:index===10}));
+    fixture.tasks.push(
+      {id:"SAVED-UNASSIGNED",job:"SAVED",name:"Unassigned assembly",type:"capacity",department:"Cabinet Making",date:"2026-09-14",duration:60,assigned:[],showOnCalendar:true,status:"Planned"},
+      {id:"SAVED-SPLIT",job:"SAVED",name:"Split assembly",type:"capacity",department:"Cabinet Making",date:"2026-09-14",duration:120,assigned:["Ben","Luke"],assignmentMinutes:{Ben:60,Luke:60},showOnCalendar:true,status:"Planned"},
+      {id:"SAVED-ADMIN",job:"SAVED",name:"Admin stage",type:"admin",date:"2026-09-14",duration:60,assigned:[],status:"Planned"},
+      {id:"SAVED-MILESTONE",job:"SAVED",name:"Install",type:"milestone",date:"2026-09-14",assigned:[],status:"Planned"},
+      {id:"OTHER-TASK",job:"OTHER",name:"Assembly",type:"capacity",department:"Cabinet Making",date:"2026-09-14",duration:60,assigned:["Luke"],showOnCalendar:true,status:"Forecast"},
+      {id:"NO-JOB",job:"MISSING",name:"Custom stage",type:"capacity",date:"2026-09-14",duration:60,assigned:["Luke"],showOnCalendar:true,status:"Forecast"}
+    );
+    h.sandbox.fixture=fixture;
+    const fixtureBefore=JSON.stringify(fixture);
+    h.run('applyWorkspaceSnapshot(fixture); calculate();');
+    const scheduledBefore=h.run('JSON.stringify(tasks.map(task=>task.parts))');
+    const unrelatedBefore=h.run('JSON.stringify(taskPayloadForSave(tasks.find(task=>task.id==="OTHER-TASK")))');
+    function renderAndCheck(expected){
+      const stateBefore=h.run('JSON.stringify(workspaceSnapshot())');
+      h.elements.get("rows").children=[];
+      h.run('renderJobs(); renderCalendar(); renderSchedule();');
+      const calendar=h.elements.get("monthGrid").innerHTML;
+      const cards=[...calendar.matchAll(/class="month-item ([^"]*)"[^>]*data-task-id="([^"]*)"/g)];
+      assert(cards.length===fixture.tasks.length,`${role}: all synthetic Calendar tasks rendered`);
+      for(const [,classes,id] of cards){
+        const forecast=expected && (id.startsWith("SAVED-") || id==="NEW-TASK");
+        assert(classes.split(/\s+/).includes("forecast-job")===forecast,`${role}: Calendar ${id} follows parent job status`);
+      }
+      const bars=h.elements.get("rows").children.flatMap(row=>row.querySelector(".bars").children);
+      assert(bars.some(bar=>bar.dataset.taskId==="SAVED-UNASSIGNED"),`${role}: Unassigned Forecast card rendered`);
+      assert(bars.filter(bar=>bar.dataset.taskId==="SAVED-SPLIT").length===2,`${role}: both Forecast split cards rendered`);
+      for(const bar of bars){
+        const id=bar.dataset.taskId;
+        const forecast=expected && (id.startsWith("SAVED-") || id==="NEW-TASK");
+        assert(bar.className.split(/\s+/).includes("forecast-job")===forecast,`${role}: Schedule ${id} follows parent job status`);
+        assert(bar.className.includes(h.run(`typeColour(tasks.find(task=>task.id===${JSON.stringify(id)}))`)),`${role}: Schedule task-type class retained`);
+        assert(!bar.style.background && !bar.style.color,`${role}: no inline card colour overrides`);
+      }
+      const jobHtml=h.elements.get("jobRows").innerHTML;
+      const pills=[...jobHtml.matchAll(/class="job-status ([^"]*)">([^<]*)/g)];
+      const status=h.run('jobs[0].status');
+      const cls=status==="Forecast" ? "forecast" : status==="On Hold" ? "hold" : status==="Complete" ? "complete" : "active";
+      assert(pills[0][1]===cls && pills[0][2]===status,`${role}: Jobs pill uses current status`);
+      assert(h.run('JSON.stringify(workspaceSnapshot())')===stateBefore,`${role}: all views leave saved state unchanged`);
+      assert(h.run('JSON.stringify(tasks.map(task=>task.parts))')===scheduledBefore,`${role}: status colours do not change scheduling results`);
+      assert(h.run('JSON.stringify(taskPayloadForSave(tasks.find(task=>task.id==="OTHER-TASK")))')===unrelatedBefore,`${role}: unrelated Forecast task on Active job unchanged`);
+      assert(h.saved===null,`${role}: presentation never saves data`);
+    }
+    renderAndCheck(true);
+    assert(JSON.stringify(fixture)===fixtureBefore,`${role}: loading and rendering preserve original saved fixture`);
+    for(const status of ["Active","On Hold","Complete","Planned","Waiting","In Progress","Forecast"]){
+      h.sandbox.nextStatus=status;
+      h.run('jobs[0].status=nextStatus;');
+      renderAndCheck(status==="Forecast");
+    }
+    h.run('jobs.push({id:"NEW",status:"Forecast"}); tasks.push({id:"NEW-TASK",job:"NEW",name:"Assembly",type:"capacity",department:"Cabinet Making",date:"2026-09-14",duration:60,assigned:["Luke"],showOnCalendar:true,status:"Planned"}); calculate();');
+    // New tasks naturally add scheduled parts; subsequent presentation must preserve them.
+    const newScheduled=h.run('JSON.stringify(tasks.map(task=>task.parts))');
+    h.elements.get("rows").children=[];
+    const newState=h.run('JSON.stringify(workspaceSnapshot())');
+    h.run('renderJobs(); renderCalendar(); renderSchedule();');
+    assert(/class="month-item [^"]*forecast-job[^"]*"[^>]*data-task-id="NEW-TASK"/.test(h.elements.get("monthGrid").innerHTML),`${role}: new Forecast Calendar card`);
+    const newBar=h.elements.get("rows").children.flatMap(row=>row.querySelector(".bars").children).find(bar=>bar.dataset.taskId==="NEW-TASK");
+    assert(newBar?.className.includes("forecast-job"),`${role}: new Forecast Schedule card`);
+    assert(/data-job-id="NEW"[\s\S]*?class="job-status forecast">Forecast/.test(h.elements.get("jobRows").innerHTML),`${role}: new Forecast Jobs pill`);
+    assert(h.run('JSON.stringify(workspaceSnapshot())')===newState && h.run('JSON.stringify(tasks.map(task=>task.parts))')===newScheduled && h.saved===null,`${role}: new Forecast rendering does not reschedule or save`);
+  }
+  console.log("Forecast presentation tests passed (Jobs/Calendar/Schedule, saved/new jobs, status transitions, task types, warnings, split/unassigned, admin/read-only, no data writes)");
+}
 function testEmployeeRenameReferences(){
   const elements = new Map();
   const element = id => {
@@ -1049,5 +1122,5 @@ async function emitSplitState(){
 }
 const frontendTests = process.argv.includes("--emit-split-state") ? [emitSplitState] : process.argv.includes("--split-only") ? [testDraggedSplitSharesToUnassigned,testPartialUnassignedPersistence] : process.argv.includes("--task-delete-only")
   ? [testCustomTaskDeletionSafety]
-  : [testDraggedSplitSharesToUnassigned,testPartialUnassignedPersistence,testGeneratedJobRebuilds,testAbsenceOverrides,testCustomTaskDeletionSafety,testRosterDayOffOverrides,testHomeCapacityOptOut,testReadOnlyCalendarAndSchedule,testEmployeeRenameReferences];
+  : [testDraggedSplitSharesToUnassigned,testPartialUnassignedPersistence,testGeneratedJobRebuilds,testAbsenceOverrides,testCustomTaskDeletionSafety,testRosterDayOffOverrides,testHomeCapacityOptOut,testReadOnlyCalendarAndSchedule,testForecastJobPresentation,testEmployeeRenameReferences];
 frontendTests.reduce((pending,test)=>pending.then(test),Promise.resolve()).catch(error=>{console.error(error);process.exitCode=1;});

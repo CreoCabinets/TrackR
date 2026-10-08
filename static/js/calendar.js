@@ -48,7 +48,7 @@ function renderCalendar(){
         const calendarKind = task.type === "capacity" ? "Capacity" : "";
         const detailsRequired = taskNeedsDetails(task);
         const subtitle = [detailsRequired ? "⚠ Details required" : "",task.stoneMason ? `Stone: ${task.stoneMason}` : "",assignee,calendarKind,job?.builder,job ? job.address : ""].filter(Boolean).join(" · ");
-        return `<div class="month-item ${cls} ${detailsRequired?"details-required":""}" draggable="true" data-task-id="${escapeHtml(task.id)}" data-task-type="${escapeHtml(task.type)}" data-job-id="${escapeHtml(encodeURIComponent(task.job))}">
+        return `<div class="month-item ${cls} ${forecastJobClass(job)} ${detailsRequired?"details-required":""}" draggable="true" data-task-id="${escapeHtml(task.id)}" data-task-type="${escapeHtml(task.type)}" data-job-id="${escapeHtml(encodeURIComponent(task.job))}">
           <div class="month-item-title">${escapeHtml(task.job)} · ${escapeHtml(task.name)}</div>
           <div class="month-item-sub">${escapeHtml(subtitle)}</div>
         </div>`;
